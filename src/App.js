@@ -1,8 +1,9 @@
-import logo from './logo.svg';
-import './App.css';
+//import logo from './logo.svg';
+//import './App.css';
+import HeartsGame from './cards.tsx';
 
 function App() {
-  return (
+/*  return (
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
@@ -19,7 +20,9 @@ function App() {
         </a>
       </header>
     </div>
-  );
+  );*/
+  <meta http-equiv="Content-Security-Policy" content="%%CSP_CONTENT%%"></meta>
+  return <HeartsGame />;
 }
 
 export default App;
