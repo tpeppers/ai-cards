@@ -22,8 +22,18 @@ The winner of the trick collects it and places it face down. Hearts may not be l
 
 The queen can be led at any time.
 
+## ALTERNATIVE ENCODING:
 
+Here are the SHIFT+CTRL-U+1F0[A-D]X codes:	
+Unicode 	|  1    2   3   4   5  6   7  8   9  A   B   C   D
+U+1F0Ax	    |  🂡	🂢	🂣	🂤	🂥	🂦	🂧	🂨	🂩	🂪	🂫	🂭	🂮
+U+1F0Bx	    |  🂱	🂲	🂳	🂴	🂵	🂶	🂷	🂸	🂹	🂺	🂻	🂽	🂾
+U+1F0Cx	    |  🃁	🃂	🃃	🃄	🃅	🃆	🃇	🃈	🃉	🃊	🃋	🃍	🃎
+U+1F0Dx	    |  🃑	🃒	🃓	🃔	🃕	🃖	🃗	🃘	🃙	🃚	🃛	🃝	🃞
 
+UNUSED, KNIGHTS: 🂬🂼🃌🃜  
+
+Curious if an ad-hoc token-schema performs better or worse than unicode encoding, i.e., asking a model what card to play, after prompting with an entire set of rules, would cause it to pick well?
 
 
 # Getting Started with Create React App
