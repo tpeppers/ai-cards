@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { 
+  decodeUrlToDeck, 
+  getGameStateFromUrl, 
+  isValidDeckUrl,
+  generateRandomDeckUrl,
+  encodeDeckToUrl,
+  updateUrlWithGameState
+} from './urlGameState.js';
 
 // Global settings
 const baseTimeOut = 500;
@@ -255,9 +263,39 @@ const HeartsGame = () => {
   }, []);
 
   const initializeGame = () => {
-    const newDeck = createDeck();
-    const shuffledDeck = shuffleDeck(newDeck);
-    setDeck(shuffledDeck);
+    let newDeck;
+    let urlToUpdate = null;
+    
+    // Check if there's a valid deck URL in the hash
+    const urlState = getGameStateFromUrl();
+    if (urlState && isValidDeckUrl(urlState)) {
+      try {
+        newDeck = decodeUrlToDeck(urlState);
+        setMessage('Game initialized from URL - click Deal to start');
+      } catch (error) {
+        console.error('Failed to decode URL deck:', error);
+        newDeck = createDeck();
+        const shuffledDeck = shuffleDeck(newDeck);
+        newDeck = shuffledDeck;
+        // Update URL with the shuffled deck
+        urlToUpdate = encodeDeckToUrl(shuffledDeck);
+        setMessage('Invalid URL deck, using random deck - click Deal to start');
+      }
+    } else {
+      newDeck = createDeck();
+      const shuffledDeck = shuffleDeck(newDeck);
+      newDeck = shuffledDeck;
+      // Update URL with the shuffled deck
+      urlToUpdate = encodeDeckToUrl(shuffledDeck);
+      setMessage('Game initialized - click Deal to start');
+    }
+    
+    // Update URL if we generated a new deck
+    if (urlToUpdate) {
+      updateUrlWithGameState(urlToUpdate);
+    }
+    
+    setDeck(newDeck);
     setPlayers(players.map(player => ({ ...player, hand: [], tricks: [], score: 0 })));
     setCurrentTrick([]);
     setLeadSuit(null);
@@ -265,7 +303,6 @@ const HeartsGame = () => {
     setGameOver(false);
     setWinner(null);
     setGameStage('deal');
-    setMessage('Game initialized - click Deal to start');
   };
 
   const resetGame = () => {
@@ -296,12 +333,13 @@ const HeartsGame = () => {
   };
 
   const dealCards = () => {
-    const shuffled = shuffleDeck(deck);
+    // Use the deck as-is (already shuffled from URL or during initialization)
+    const deckToDeal = [...deck];
     const newPlayers = [...players];
     
-    for (let i = 0; i < shuffled.length; i++) {
+    for (let i = 0; i < deckToDeal.length; i++) {
       const playerIndex = i % 4;
-      newPlayers[playerIndex].hand.push(shuffled[i]);
+      newPlayers[playerIndex].hand.push(deckToDeal[i]);
     }
     
     // Sort hands
@@ -534,7 +572,6 @@ const HeartsGame = () => {
   const scoreHand = () => {
     const newPlayers = [...players];
     let shootingMoonPlayer = null;
-    let allPointCards = true;
     
     // Score each player's tricks
     newPlayers.forEach(player => {
@@ -560,10 +597,6 @@ const HeartsGame = () => {
       // Check if a player shot the moon
       if (hearts === 13 && queenOfSpades) {
         shootingMoonPlayer = player.id;
-      }
-      
-      if (player.score === 0) {
-        allPointCards = false;
       }
     });
     
@@ -636,7 +669,7 @@ const HeartsGame = () => {
         <div className="flex gap-4">
           <button 
             className="text-white hover:text-gray-300" 
-            onClick={() => alert("Hearts Rules:\n\n• Goal: Have the lowest score at the end\n• Each heart = 1 point\n• Queen of Spades = 13 points\n• Must follow suit if possible\n• Can't lead hearts until hearts are broken\n• Game ends when someone reaches 100 points\n• Shooting the moon: If you take all hearts + Queen of Spades, you get 0 points and others get 26")}
+            onClick={() => alert("Hearts Rules:\n\n• Goal: Have the lowest score at the end\n• Each heart = 1 point\n• Queen of Spades = 13 points\n• Must follow suit if possible\n• Can't lead hearts until hearts are broken\n• Game ends when someone reaches 100 points\n• Shooting the moon: If you take all hearts + Queen of Spades, you get 0 points and others get 26\n\nURL Seeding:\n• Add #[52-letter-string] to URL to set initial deck\n• a-m = Spades 1-13, n-z = Hearts 1-13\n• A-M = Clubs 1-13, N-Z = Diamonds 1-13\n• Valid URLs are 'double pangrams' using each letter exactly once")}
           >
             Help
           </button>
@@ -702,6 +735,17 @@ const HeartsGame = () => {
             Auto Play
           </button>
         )}
+        
+        <button
+          className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+          onClick={() => {
+            const randomUrl = generateRandomDeckUrl();
+            window.location.hash = randomUrl;
+            initializeGame();
+          }}
+        >
+          Random URL
+        </button>
       </div>
       
       {/* Score display in classic MS Hearts style */}
