@@ -15,3 +15,10 @@ new CspHtmlWebpackPlugin(
         },
     }
 )
+
+const customConfig = {
+    'stats': {
+        'errorDetails': true,
+        'children': true
+    }
+}
