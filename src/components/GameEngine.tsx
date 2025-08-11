@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { CardGame, GameState } from '../types/CardGame.tsx';
 import PlayerArea from './PlayerArea.tsx';
 import GameTable from './GameTable.tsx';
+import MoveHistory from './MoveHistory.tsx';
 import { 
   decodeUrlToDeck, 
   getGameStateFromUrl, 
@@ -11,6 +12,13 @@ import {
   encodeDeckToUrl,
   updateUrlWithGameState
 } from '../urlGameState.js';
+
+interface MoveHistoryEntry {
+  id: string;
+  playerName: string;
+  card: string;
+  timestamp: number;
+}
 
 interface GameEngineProps {
   game: CardGame;
@@ -33,6 +41,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   onGameStateChange 
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
+  const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
   
   // Window resize handling
   useEffect(() => {
@@ -87,8 +96,34 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
     updateGameState();
   };
 
+  const formatCard = (card: any) => {
+    const rankNames: { [key: number]: string } = {
+      1: 'A', 11: 'J', 12: 'Q', 13: 'K'
+    };
+    const suitSymbols: { [key: string]: string } = {
+      hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠'
+    };
+    const rankStr = rankNames[card.rank] || card.rank.toString();
+    const suitSymbol = suitSymbols[card.suit] || card.suit;
+    return `${rankStr}${suitSymbol}`;
+  };
+
+  const addMoveToHistory = (playerId: number, card: any) => {
+    const player = game.getPlayer(playerId);
+    if (player) {
+      const move: MoveHistoryEntry = {
+        id: `${Date.now()}-${playerId}-${card.id}`,
+        playerName: player.name,
+        card: formatCard(card),
+        timestamp: Date.now()
+      };
+      setMoveHistory(prev => [...prev, move]);
+    }
+  };
+
   const resetGame = () => {
     game.resetGame();
+    setMoveHistory([]);
     updateGameState();
     if (useUrlSeeding) {
       const randomUrl = generateRandomDeckUrl();
@@ -117,6 +152,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       return;
     }
     
+    addMoveToHistory(0, card);
     updateGameState();
     
     // Simulate other players after a delay
@@ -138,6 +174,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       console.log(`Player ${currentPlayerObj.id} plays card value: ${card.rank} of ${card.suit}`);
       const move = game.playCard(currentPlayerObj.id, card);
       if (move.isValid) {
+        addMoveToHistory(currentPlayerObj.id, card);
         updateGameState();
       } else {
         console.error(`Invalid move by player ${currentPlayerObj.id}:`, move.errorMessage);
@@ -291,6 +328,9 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           </div>
         )}
       </div>
+      
+      {/* Move History */}
+      <MoveHistory moves={moveHistory} />
       
       {/* Game over dialog */}
       {gameState.gameOver && gameState.winner && (
