@@ -39,7 +39,7 @@ const Card: React.FC<CardProps> = ({
   };
 
   const getColor = (suit: string) => {
-    return suit === 'hearts' || suit === 'diamonds' ? 'text-red-600' : 'text-black';
+    return suit === 'hearts' || suit === 'diamonds' ? 'red' : 'black';
   };
 
   const getRank = (rank: number) => {
@@ -92,15 +92,15 @@ const Card: React.FC<CardProps> = ({
       >
         {!faceDown && (
           <>
-            <div className={`self-start font-bold text-lg ${getColor(card.suit)}`} style={{ lineHeight: '1' }}>
+            <div className={`self-start font-bold text-lg `} style={{ lineHeight: '1' }}>   <font color={getColor(card.suit)}>
               {getRank(card.rank)}
-            </div>
-            <div className={`flex justify-center items-center text-4xl ${getColor(card.suit)}`}>
+            </font></div>
+            <div className={`flex justify-center items-center text-4xl`}><font color={getColor(card.suit)}>
               {getSuitSymbol(card.suit)}
-            </div>
-            <div className={`self-end font-bold text-lg ${getColor(card.suit)} rotate-180`} style={{ lineHeight: '1' }}>
+            </font></div>
+            <div className={`self-end font-bold text-lg rotate-180`} style={{ lineHeight: '1' }}>   <font color={getColor(card.suit)}>
               {getRank(card.rank)}
-            </div>
+            </font></div>
           </>
         )}
       </div>
