@@ -4,6 +4,7 @@ import { CardGame, GameState } from '../types/CardGame.tsx';
 import PlayerArea from './PlayerArea.tsx';
 import GameTable from './GameTable.tsx';
 import MoveHistory from './MoveHistory.tsx';
+import TurnIndicator from './TurnIndicator.tsx';
 import { 
   decodeUrlToDeck, 
   getGameStateFromUrl, 
@@ -42,6 +43,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
   const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
+  const [showAllCards, setShowAllCards] = useState<boolean>(false);
   
   // Window resize handling
   useEffect(() => {
@@ -152,6 +154,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       return;
     }
     
+    console.log(`Player 0's turn starts, played card: ${card.rank} of ${card.suit}`);
     addMoveToHistory(0, card);
     updateGameState();
     
@@ -167,17 +170,17 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
     const currentPlayerObj = game.getCurrentPlayer();
     if (!currentPlayerObj || currentPlayerObj.id === 0) return;
   
-    console.log(`Player ${currentPlayerObj.id}'s turn starts.`);
+    console.log(`Player ${currentPlayerObj.id}'s turn (${(game.players[currentPlayerObj.id].name)}) starts.`);
     
     const card = game.getBestMove(currentPlayerObj.id);
     if (card) {
-      console.log(`Player ${currentPlayerObj.id} plays card value: ${card.rank} of ${card.suit}`);
+      console.log(`Player ${(game.players[currentPlayerObj.id].name)} plays card value: ${card.rank} of ${card.suit}`);
       const move = game.playCard(currentPlayerObj.id, card);
       if (move.isValid) {
         addMoveToHistory(currentPlayerObj.id, card);
         updateGameState();
       } else {
-        console.error(`Invalid move by player ${currentPlayerObj.id}:`, move.errorMessage);
+        console.error(`Invalid move by player ${currentPlayerObj.id}: `, move.errorMessage);
       }
     } else {
       console.log(`Player ${currentPlayerObj.id} is out of cards or no valid moves.`);
@@ -208,6 +211,10 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       window.location.hash = randomUrl;
       initializeGame();
     }
+  };
+
+  const toggleCardVisibility = () => {
+    setShowAllCards(!showAllCards);
   };
 
   // Auto-play for AI players
@@ -247,8 +254,15 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           isCurrentPlayer={gameState.currentPlayer === player.id}
           isHuman={player.id === 0}
           playCard={handleCardPlay}
+          showAllCards={showAllCards}
         />
       ))}
+      <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+      {/* Turn indicator */}
+      <TurnIndicator 
+        currentPlayer={game.getCurrentPlayer()} 
+        gameStage={gameState.gameStage}
+      />
       
       {/* Game table with current trick */}
       <GameTable 
@@ -303,6 +317,15 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
             Random URL
           </button>
         )}
+        
+        <button
+          className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700"
+          onClick={toggleCardVisibility}
+        >
+          {showAllCards ? 'Hide Cards' : 'Show All Cards'}
+        </button>
+
+        <button onClick={simulateOtherPlayers}>BUGFIX: Ask Computer to PLAY!</button>
       </div>
       
       {/* Score display */}

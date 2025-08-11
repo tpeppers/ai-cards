@@ -7,10 +7,11 @@ interface PlayerAreaProps {
   isCurrentPlayer: boolean;
   isHuman: boolean;
   playCard: (card: any) => void;
+  showAllCards: boolean;
 }
 
 // Player area component
-const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard }) => {
+const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard, showAllCards }) => {
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -93,7 +94,7 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
           position={getPositionStyle(index)}
           draggable={isHuman && isCurrentPlayer}
           onClick={isHuman && isCurrentPlayer ? () => playCard(card) : undefined}
-          faceDown={!isHuman}
+          faceDown={!isHuman && !showAllCards}
         />
       ))}
     </div>

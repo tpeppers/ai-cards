@@ -115,6 +115,7 @@ export abstract class CardGame {
     // If all players have played, evaluate the trick
     if (this.currentTrick.length === this.players.length) {
       const winnerPlayerId = this.evaluateTrick();
+      console.log(`Trick ended, winner: ${winnerPlayerId}`)
       this.finalizeTrick(winnerPlayerId);
     } else {
       // Move to next player
@@ -160,7 +161,7 @@ export abstract class CardGame {
   }
 
   protected getValidationError(playerId: number, card: Card): string {
-    return "Invalid move";
+    return "Invalid move, tried to play "+ card.rank + " of " + card.suit;
   }
 
   // Getters for game state

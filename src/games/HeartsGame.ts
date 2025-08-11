@@ -3,6 +3,7 @@ import { CardGame, Card, Player } from '../types/CardGame.ts';
 export class HeartsGame extends CardGame {
   private leadSuit: string | null = null;
   private heartsBroken: boolean = false;
+  private playedTricks = 0;
 
   constructor() {
     super(['You', 'West', 'North', 'East']);
@@ -123,7 +124,7 @@ export class HeartsGame extends CardGame {
           return "Can't lead with hearts until hearts are broken!";
         }
       }
-      
+
       // First trick special rule: can't play hearts or queen of spades
       if (this.currentTrick.some(c => c.card.suit === 'clubs' && c.card.rank === 2)) {
         if (card.suit === 'hearts' || (card.suit === 'spades' && card.rank === 12)) {
@@ -166,8 +167,7 @@ export class HeartsGame extends CardGame {
   protected finalizeTrick(winnerPlayerId: number): void {
     // Call parent implementation
     super.finalizeTrick(winnerPlayerId);
-    
-    // Clear lead suit for Hearts
+    this.playedTricks = this.playedTricks + 1;
     this.leadSuit = null;
   }
 
@@ -209,6 +209,16 @@ export class HeartsGame extends CardGame {
       
       // Otherwise play lowest card of the suit
       return suitCards.sort((a, b) => a.rank - b.rank)[0];
+    }
+
+    if(this.playedTricks == 0) {      
+      // if we can't follow suit, but it's the first trick, just dump a high card (QoS and hearts are illegal to play on the first trick)
+      const kingOfSpades = playerHand.find(c => c.suit === 'spades' && c.rank === 13);
+      if (kingOfSpades) return kingOfSpades;
+      // ... or play highest other card?
+      const playableCards = playerHand.filter(c => (c.suit === 'spades' && c.rank != 12) || c.suit === 'diamonds');
+      console.log("Hit rare formerly-blocking exception, playing a card...");
+      return playableCards.sort((a, b) => b.rank - a.rank)[0];    
     }
     
     // If can't follow suit, try to dump the queen of spades
