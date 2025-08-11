@@ -123,6 +123,18 @@ export class HeartsGame extends CardGame {
           return "Can't lead with hearts until hearts are broken!";
         }
       }
+      
+      // First trick special rule: can't play hearts or queen of spades
+      if (this.currentTrick.some(c => c.card.suit === 'clubs' && c.card.rank === 2)) {
+        if (card.suit === 'hearts' || (card.suit === 'spades' && card.rank === 12)) {
+          const onlyHasHeartAndQueen = playerHand.every(c => 
+            c.suit === 'hearts' || (c.suit === 'spades' && c.rank === 12)
+          );
+          if (!onlyHasHeartAndQueen) {
+            return "Can't play hearts or queen of spades on the first trick!";
+          }
+        }
+      }
     }
     
     // Must follow suit if possible
@@ -130,18 +142,6 @@ export class HeartsGame extends CardGame {
       const hasSuit = playerHand.some(c => c.suit === this.leadSuit);
       if (hasSuit && card.suit !== this.leadSuit) {
         return "Must follow suit if possible";
-      }
-    }
-    
-    // First trick special rule: can't play hearts or queen of spades
-    if (this.currentTrick.some(c => c.card.suit === 'clubs' && c.card.rank === 2)) {
-      if (card.suit === 'hearts' || (card.suit === 'spades' && card.rank === 12)) {
-        const onlyHasHeartAndQueen = playerHand.every(c => 
-          c.suit === 'hearts' || (c.suit === 'spades' && c.rank === 12)
-        );
-        if (!onlyHasHeartAndQueen) {
-          return "Can't play hearts or queen of spades on the first trick!";
-        }
       }
     }
     
