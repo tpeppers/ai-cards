@@ -273,7 +273,7 @@ class TestHeartsGameIntegration:
 
 if __name__ == "__main__":
     #import pdb; pdb.set_trace()
-    # Run the test directly
+    
     if len(sys.argv) == 2:
         argString = sys.argv[1]
         handList = list()
@@ -283,4 +283,6 @@ if __name__ == "__main__":
                 handList.append(cardAPGtoSV(eachChar))
             cardCounter = cardCounter + 1
         print("That hand is the following: " + ",".join(handList))            
+
+    # Run the test directly
     #pytest.main([__file__, "-v"])
