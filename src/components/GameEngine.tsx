@@ -225,9 +225,12 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
         simulateOtherPlayers();
       }, currentTimeout * 2);
       
-      return () => clearTimeout(timer);
+      return () => {
+        console.log("Ending autoplay, not sure why.");
+        clearTimeout(timer)
+      };
     }
-  }, [gameState.currentPlayer, gameState.gameStage]);
+  }, [gameState.currentPlayer, gameState.gameStage, gameState.currentTrick]);
 
   return (
     <div className="w-full h-screen flex flex-col items-center justify-center" 
@@ -324,8 +327,6 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
         >
           {showAllCards ? 'Hide Cards' : 'Show All Cards'}
         </button>
-
-        <button onClick={simulateOtherPlayers}>BUGFIX: Ask Computer to PLAY!</button>
       </div>
       
       {/* Score display */}
