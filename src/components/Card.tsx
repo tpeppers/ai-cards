@@ -95,7 +95,7 @@ const Card: React.FC<CardProps> = ({
             <div className={`self-start font-bold text-lg `} style={{ lineHeight: '1' }}>   <font color={getColor(card.suit)}>
               {getRank(card.rank)}
             </font></div>
-            <div className={`flex justify-center items-center text-4xl`}><font color={getColor(card.suit)}>
+            <div className={`flex justify-center items-center text-4xl`} style={{ lineHeight: '4' }}> <font color={getColor(card.suit)}>
               {getSuitSymbol(card.suit)}
             </font></div>
             <div className={`self-end font-bold text-lg rotate-180`} style={{ lineHeight: '1' }}>   <font color={getColor(card.suit)}>

@@ -6,7 +6,7 @@ export class HeartsGame extends CardGame {
   private playedTricks = 0;
 
   constructor() {
-    super(['You', 'West', 'North', 'East']);
+    super(['You', 'East', 'North', 'West']);
     this.message = 'Welcome to Hearts!';
   }
 
@@ -43,6 +43,7 @@ export class HeartsGame extends CardGame {
     });
 
     this.findStartingPlayer();
+    this.playedTricks = 0;
     this.gameStage = 'play';
   }
 
