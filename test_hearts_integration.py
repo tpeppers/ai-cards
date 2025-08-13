@@ -23,7 +23,42 @@ def getCardSV(htmlCard):
 
 ## Convert from StringValue ("2♥") to AlphaPanGram ("B")
 def cardSVtoAPG(cardSV):
-    return None
+    if not cardSV or len(cardSV) < 2 or len(cardSV) > 3:
+        return None
+    
+    # Extract suit symbol (last character)
+    suit_symbol = cardSV[-1]
+    # Extract rank (everything except last character)
+    rank_str = cardSV[:-1]
+    
+    # Convert rank string to numeric rank
+    if rank_str == 'A':
+        rank = 1
+    elif rank_str == 'J':
+        rank = 11
+    elif rank_str == 'Q':
+        rank = 12
+    elif rank_str == 'K':
+        rank = 13
+    else:
+        try:
+            rank = int(rank_str)
+        except ValueError:
+            return None
+    
+    # Convert suit symbol to letter based on schema from urlGameState.js
+    # Hearts: a-m (ranks 1-13), Spades: n-z (ranks 1-13) 
+    # Clubs: A-M (ranks 1-13), Diamonds: N-Z (ranks 1-13)
+    if suit_symbol == '♥':  # Hearts
+        return chr(ord('a') + rank - 1)
+    elif suit_symbol == '♠':  # Spades  
+        return chr(ord('n') + rank - 1)
+    elif suit_symbol == '♣':  # Clubs
+        return chr(ord('A') + rank - 1)
+    elif suit_symbol == '♦':  # Diamonds
+        return chr(ord('N') + rank - 1)
+    else:
+        return None
 
 ## Convert from AlphaPanGram ("B") to StringValue ("2♥")
 def cardAPGtoSV(cardPGA):
@@ -165,6 +200,8 @@ class TestHeartsGameIntegration:
             playerCards = playerHand.find_elements(By.ID,"cardFace")
             print("Found " + str(len(playerCards)) + " cards to look at...")
             assert len(playerCards) == 13, "The starting hand for Hearts must consist of 13 cards"
+
+            for eachLetter in 
 
             for eachCard in playerCards:
                 cardString = getCardSV(eachCard)
