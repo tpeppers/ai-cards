@@ -38,7 +38,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   game, 
   gameName, 
   gameRules, 
-  useUrlSeeding = false,
+  useUrlSeeding = true,
   onGameStateChange 
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
@@ -82,6 +82,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           const deck = decodeUrlToDeck(urlState);
           // TODO: Apply deck to game if game supports URL seeding
           console.log('URL deck loaded:', deck);
+          updateGameState();
         } catch (error) {
           console.error('Failed to decode URL deck:', error);
           // Generate new random deck URL
@@ -133,8 +134,10 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
     }
   };
 
-  const dealCards = () => {
-    game.dealCards();
+  // TODO: Is there a better starting point for this? 
+  // e.g., should it pull from a checkbox, not have an open-top dead-end && really be always on?
+  const dealCards = (urlToDeal?: string) => {
+    game.dealCards(getGameStateFromUrl());
     updateGameState();
   };
 

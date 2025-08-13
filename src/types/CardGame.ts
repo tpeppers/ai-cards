@@ -66,7 +66,7 @@ export abstract class CardGame {
 
   // Abstract methods that each game must implement
   abstract createDeck(): Card[];
-  abstract dealCards(): void;
+  abstract dealCards(urlToDeal?: string): void;
   abstract findStartingPlayer(): void;
   abstract isValidMove(playerId: number, card: Card): boolean;
   abstract getBestMove(playerId: number): Card | null;

@@ -1,4 +1,5 @@
 import { CardGame, Card, Player } from '../types/CardGame.ts';
+import { letterToCard } from '../urlGameState.js'
 
 export class HeartsGame extends CardGame {
   private leadSuit: string | null = null;
@@ -23,8 +24,18 @@ export class HeartsGame extends CardGame {
     return deck;
   }
 
-  dealCards(): void {
-    const deck = this.shuffleDeck(this.createDeck());
+  // "Perform Close-up Magic"
+  rigDeck(urlToDeal): Card[] {
+    const deck: Card[] = [];
+    for(let i = 0; i < urlToDeal.length; i++) {
+      // { suit, rank, id: `${suit}_${rank}` }
+      deck.push(letterToCard(urlToDeal[i]));
+    }
+    return deck;
+  }
+
+  dealCards(urlToDeal: string): void {
+    const deck = urlToDeal ? this.rigDeck(urlToDeal) : this.shuffleDeck(this.createDeck());
     
     for (let i = 0; i < deck.length; i++) {
       const playerIndex = i % 4;
@@ -54,7 +65,7 @@ export class HeartsGame extends CardGame {
     );
     
     this.currentPlayer = twoOfClubsPlayer;
-    this.message = `${this.players[twoOfClubsPlayer].name} starts with the 2 of clubs`;
+    //this.message = `${this.players[twoOfClubsPlayer].name} starts with the 2 of clubs`;
   }
 
   isValidMove(playerId: number, card: Card): boolean {
