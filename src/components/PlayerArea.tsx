@@ -75,7 +75,7 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
       player.id === 1 ? 'right-0 top-0 bottom-0' :
       player.id === 2 ? 'top-0 left-0 right-0' :
       'left-0 top-0 bottom-0'
-    } flex items-center justify-center`}>
+    } flex items-center justify-center`} id="playerHand">
       {/* Player name & score display */}
       <div className={`absolute ${
         isHuman ? 'bottom-36 left-1/2 transform -translate-x-1/2' :

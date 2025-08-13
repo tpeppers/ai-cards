@@ -83,6 +83,7 @@ const Card: React.FC<CardProps> = ({
       {/* Card face */}
       <div 
         className="h-full w-full flex flex-col justify-between p-1"
+        id="cardFace"
         style={{
           backgroundColor: faceDown ? '#006400' : 'white',
           border: '1px solid #000',

@@ -156,12 +156,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
     
     console.log(`Player 0's turn starts, played card: ${card.rank} of ${card.suit}`);
     addMoveToHistory(0, card);
-    updateGameState();
-    
-    // Simulate other players after a delay
-    setTimeout(() => {
-      simulateOtherPlayers();
-    }, currentTimeout);
+    updateGameState();  
   };
 
   const simulateOtherPlayers = () => {
@@ -226,7 +221,6 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       }, currentTimeout * 2);
       
       return () => {
-        console.log("Ending autoplay, not sure why.");
         clearTimeout(timer)
       };
     }
@@ -279,6 +273,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           <button 
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
             onClick={dealCards}
+            id="dealButton"
           >
             Deal
           </button>
