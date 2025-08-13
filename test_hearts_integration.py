@@ -4,6 +4,7 @@ import time
 import signal
 import os
 import string
+import sys
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -15,8 +16,8 @@ def getCardSV(htmlCard):
     cardText = htmlCard.text
     ## quick filter to limit it to cards and not other HTML elements representing the hand
     if len(cardText) > 4 and any(suitSymbol in cardText for suitSymbol in ['♥','♦','♣','♠']):
-        splitCard = cardText.split('\n')
-        return ''.join(splitCard)[:-1] ## :-1 to cut off 2nd (redundant) card number
+        splitCard = cardText.split('\n')[:-1] ## :-1 to cut off 2nd (redundant) card number
+        return ''.join(splitCard) 
     else:
         return None
     
@@ -273,4 +274,13 @@ class TestHeartsGameIntegration:
 if __name__ == "__main__":
     #import pdb; pdb.set_trace()
     # Run the test directly
-    pytest.main([__file__, "-v"])
+    if len(sys.argv) == 2:
+        argString = sys.argv[1]
+        handList = list()
+        cardCounter = 0
+        for eachChar in argString:
+            if cardCounter % 4 == 0:
+                handList.append(cardAPGtoSV(eachChar))
+            cardCounter = cardCounter + 1
+        print("That hand is the following: " + ",".join(handList))            
+    #pytest.main([__file__, "-v"])
