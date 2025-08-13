@@ -218,6 +218,9 @@ class TestHeartsGameIntegration:
             randomDeal = gameUrl.split("#")[1]
 
             print("Found random URL portion: " + randomDeal)
+
+            ## "".join(randomDeal[::4]) should print every 4th character
+            print("the our hand portion looks like: " + "".join(randomDeal[::4]))
             
 
             ## Check that the randomDeal includes every letter at least once in uppercase & at least once in lowercase
@@ -235,12 +238,23 @@ class TestHeartsGameIntegration:
             print("Found " + str(len(playerCards)) + " cards to look at...")
             assert len(playerCards) == 13, "The starting hand for Hearts must consist of 13 cards"
 
-            for eachLetter in 
+            cardNum = 0
+            expectedCards = set()
+            for eachLetter in randomDeal:
+                if cardNum % 4 == 0:
+                    ## This is "our" card and should be in our hand
+                    ourCard = cardAPGtoSV(eachLetter)
+                    expectedCards.add(ourCard)
+                    print("Found interesting card, should be ours: " + ourCard)
+                cardNum = cardNum + 1
+                
+
 
             for eachCard in playerCards:
                 cardString = getCardSV(eachCard)
                 if cardString:
                     print("Looking at a card in the player's hand:  " + cardString)
+                    assert cardString in expectedCards, "Found an unexpected card: " + cardString
 
 
             print("Hearts game integration test passed successfully!")
@@ -257,5 +271,6 @@ class TestHeartsGameIntegration:
 
 
 if __name__ == "__main__":
+    #import pdb; pdb.set_trace()
     # Run the test directly
     pytest.main([__file__, "-v"])
