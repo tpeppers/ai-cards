@@ -61,8 +61,42 @@ def cardSVtoAPG(cardSV):
         return None
 
 ## Convert from AlphaPanGram ("B") to StringValue ("2♥")
-def cardAPGtoSV(cardPGA):
-    return None
+def cardAPGtoSV(cardAPG):
+    if not cardAPG or len(cardAPG) != 1:
+        return None
+    
+    char = cardAPG[0]
+    ascii_val = ord(char)
+    
+    # Determine suit and rank based on the character range
+    if ord('a') <= ascii_val <= ord('m'):  # Hearts: a-m (ranks 1-13)
+        rank = ascii_val - ord('a') + 1
+        suit = '♥'
+    elif ord('n') <= ascii_val <= ord('z'):  # Spades: n-z (ranks 1-13)
+        rank = ascii_val - ord('n') + 1
+        suit = '♠'
+    elif ord('A') <= ascii_val <= ord('M'):  # Clubs: A-M (ranks 1-13)
+        rank = ascii_val - ord('A') + 1
+        suit = '♣'
+    elif ord('N') <= ascii_val <= ord('Z'):  # Diamonds: N-Z (ranks 1-13)
+        rank = ascii_val - ord('N') + 1
+        suit = '♦'
+    else:
+        return None
+    
+    # Convert numeric rank to string representation
+    if rank == 1:
+        rank_str = 'A'
+    elif rank == 11:
+        rank_str = 'J'
+    elif rank == 12:
+        rank_str = 'Q'
+    elif rank == 13:
+        rank_str = 'K'
+    else:
+        rank_str = str(rank)
+    
+    return rank_str + suit
 
 ## Convert from StringValue ("2♥") to text ("Two of Hearts")
 def cardSVtoText(cardSV):
