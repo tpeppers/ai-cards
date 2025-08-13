@@ -11,12 +11,12 @@
 
 
 const LETTER_TO_SUIT = {
-  // Spades: a-m
-  a: 'spades', b: 'spades', c: 'spades', d: 'spades', e: 'spades', f: 'spades',
-  g: 'spades', h: 'spades', i: 'spades', j: 'spades', k: 'spades', l: 'spades', m: 'spades',
-  // Hearts: n-z
-  n: 'hearts', o: 'hearts', p: 'hearts', q: 'hearts', r: 'hearts', s: 'hearts',
-  t: 'hearts', u: 'hearts', v: 'hearts', w: 'hearts', x: 'hearts', y: 'hearts', z: 'hearts',
+  // Hearts: a-m
+  a: 'hearts', b: 'hearts', c: 'hearts', d: 'hearts', e: 'hearts', f: 'hearts',
+  g: 'hearts', h: 'hearts', i: 'hearts', j: 'hearts', k: 'hearts', l: 'hearts', m: 'hearts',
+  // Spades: n-z
+  n: 'spades', o: 'spades', p: 'spades', q: 'spades', r: 'spades', s: 'spades',
+  t: 'spades', u: 'spades', v: 'spades', w: 'spades', x: 'spades', y: 'spades', z: 'spades',
   // Clubs: A-M
   A: 'clubs', B: 'clubs', C: 'clubs', D: 'clubs', E: 'clubs', F: 'clubs',
   G: 'clubs', H: 'clubs', I: 'clubs', J: 'clubs', K: 'clubs', L: 'clubs', M: 'clubs',
@@ -34,9 +34,9 @@ export const cardToLetter = (card) => {
   const { suit, rank } = card;
   
   switch (suit) {
-    case 'spades':
-      return String.fromCharCode('a'.charCodeAt(0) + rank - 1);
     case 'hearts':
+      return String.fromCharCode('a'.charCodeAt(0) + rank - 1);
+    case 'spades':
       return String.fromCharCode('n'.charCodeAt(0) + rank - 1);
     case 'clubs':
       return String.fromCharCode('A'.charCodeAt(0) + rank - 1);
@@ -60,10 +60,10 @@ export const letterToCard = (letter) => {
   
   let rank;
   if (letter >= 'a' && letter <= 'm') {
-    // Spades: a-m
+    // Hearts: a-m
     rank = letter.charCodeAt(0) - 'a'.charCodeAt(0) + 1;
   } else if (letter >= 'n' && letter <= 'z') {
-    // Hearts: n-z
+    // Spades: n-z
     rank = letter.charCodeAt(0) - 'n'.charCodeAt(0) + 1;
   } else if (letter >= 'A' && letter <= 'M') {
     // Clubs: A-M
