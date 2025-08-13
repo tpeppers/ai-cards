@@ -3,11 +3,39 @@ import subprocess
 import time
 import signal
 import os
+import string
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+
+def getCardSV(htmlCard):
+    cardText = htmlCard.text
+    ## quick filter to limit it to cards and not other HTML elements representing the hand
+    if len(cardText) > 4 and any(suitSymbol in cardText for suitSymbol in ['♥','♦','♣','♠']):
+        splitCard = cardText.split('\n')
+        return ''.join(splitCard)[:-1] ## :-1 to cut off 2nd (redundant) card number
+    else:
+        return None
+    
+
+## Convert from StringValue ("2♥") to AlphaPanGram ("B")
+def cardSVtoAPG(cardSV):
+    return None
+
+## Convert from AlphaPanGram ("B") to StringValue ("2♥")
+def cardAPGtoSV(cardPGA):
+    return None
+
+## Convert from StringValue ("2♥") to text ("Two of Hearts")
+def cardSVtoText(cardSV):
+    return None
+
+## Convert from AlphaPanGram ("B") to text ("Two of Hearts")
+def cardAPGtoText(cardSV):
+    return None
 
 
 class TestHeartsGameIntegration:
@@ -33,7 +61,7 @@ class TestHeartsGameIntegration:
     def test_hearts_game_startup_and_availability(self):
         """Test that Hearts game starts successfully and is accessible via web browser"""
         
-        # Start the npm development server
+        # Start the server
         self.npm_process = subprocess.Popen(
             ['npm', 'start'],
             stdout=subprocess.PIPE,
@@ -41,11 +69,12 @@ class TestHeartsGameIntegration:
             preexec_fn=os.setsid,  # Create new process group for easier cleanup
             cwd=os.getcwd()
         )
-        
-        # Wait 30 seconds for the server to start
-        print("Waiting 30 seconds for npm server to start...")
-        time.sleep(30)
-        
+
+        print("\n\nWaiting for npm server to start...")
+        while True:
+            line = self.npm_process.stdout.readline()
+            if b"You can now view " in line: break
+
         # Configure Chrome options for headless mode (good for CI environments)
         chrome_options = Options()
         chrome_options.add_argument('--headless')
@@ -65,7 +94,7 @@ class TestHeartsGameIntegration:
             wait = WebDriverWait(self.driver, 10)
             
             # Check if the page title contains expected content
-            assert "React App" in self.driver.title or "Hearts" in self.driver.title
+            assert "Cards" in self.driver.title
             
             # Look for game-related elements that indicate Hearts game is running
             # This could include game table, cards, or Hearts-specific UI elements
@@ -112,10 +141,37 @@ class TestHeartsGameIntegration:
                     pytest.fail(f"Could not verify Hearts game is running: {e}")
             
             assert game_found, "Hearts game elements not found on the page"
+            gameUrl = self.driver.current_url
+
+            # Verify the page added a random 
+            assert "#" in gameUrl
+
+            randomDeal = gameUrl.split("#")[1]
+
+            print("Found random URL portion: " + randomDeal)
             
-            # Verify the page is responsive
-            assert self.driver.current_url == "http://localhost:3000/" or self.driver.current_url == "http://localhost:3000"
-            
+
+            ## Check that the randomDeal includes every letter at least once in uppercase & at least once in lowercase
+            isDoublePangram = all(letter in gameUrl for letter in string.ascii_letters)
+
+            assert isDoublePangram, "Game URLs must be at least double pangrams!"
+
+            print("Clicking 'deal'...")
+            self.driver.find_element(By.ID, "dealButton").click()
+            time.sleep(2)
+
+            print("Checking that the deal button deals cards...")
+            playerHand = self.driver.find_element(By.ID, "playerHand")
+            playerCards = playerHand.find_elements(By.ID,"cardFace")
+            print("Found " + str(len(playerCards)) + " cards to look at...")
+            assert len(playerCards) == 13, "The starting hand for Hearts must consist of 13 cards"
+
+            for eachCard in playerCards:
+                cardString = getCardSV(eachCard)
+                if cardString:
+                    print("Looking at a card in the player's hand:  " + cardString)
+
+
             print("Hearts game integration test passed successfully!")
             
         except Exception as e:
@@ -123,14 +179,6 @@ class TestHeartsGameIntegration:
             try:
                 self.driver.save_screenshot('/tmp/hearts_test_failure.png')
                 print("Screenshot saved to /tmp/hearts_test_failure.png")
-            except:
-                pass
-            
-            # Get page source for debugging
-            try:
-                with open('/tmp/hearts_test_page_source.html', 'w') as f:
-                    f.write(self.driver.page_source)
-                print("Page source saved to /tmp/hearts_test_page_source.html")
             except:
                 pass
             
