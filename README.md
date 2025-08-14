@@ -21,7 +21,11 @@ xdg-open http://localhost:3000/#[test_case_specific value]
 (e.g.: http://localhost:3000/#JZQtRWnjCFVavhBLuIsGxNgwHYzlSrADdKTqeEfOoUiXMmcykbpP )
 
 
- If the test passes, it's an update one direction...?... idk, maybe [nofail] tests (there will be kobiyashi-marus in the training set, right?)
+If the test passes, it's an update one direction...?... idk, maybe [nofail] tests (there will be kobiyashi-marus in the training set, right?)
+
+Generative fixtures:
+1) GAMES_OF_INTEREST: test fixture that passes in strings from notable games (easy/hard to win? I-think-we-can-improve-this examples?)
+2) GAMES_OF_CHANCE: test fixture that generates (if unspecified) 5-10 games for exploratory usage.. off-by-default? (flag --randoms=10 / -r=10 to enable?)
 
 
 ## Rules of Hearts
