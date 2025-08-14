@@ -1,3 +1,29 @@
+MORE TODO:
+
+Rewrite test_hearts_integration.py for training usage:
+
+PYTEST as a training harness...
+
+TestSuite fixure: Stands up webserver, loads, validates it works..
+
+TestCLASS fixure: (Re-)Loads a given page for a given hand... Fixed hands within a set allow for exact-known winnable(/unwinnable) hands
+
+TestCase fixture: Runs the page for a given hand, playing the hand... 
+
+    - APG_PROMPT_STRAT: an LLM plays using letters, picking cards to play in APG form ("A" to play the ace of clubs)
+    - SV_PROMPT_STRAT_A: an LLM plays using ALPHANUMERIC representations of card rank, but unicode-based suits ("A♣")
+    - SV_PROMPT_STRAT_B: an LLM plays using unicode-based representations of cards (🃑, U+1F0D1)
+    - SV_PROMPT_STRAT_TEXT: an LLM plays using soley textual represenation of cards ("the ace of clubs")
+
+Each page then has a runnable link at the bottom for terminal, in every HTML OUTPUT FROM TESTS:
+xdg-open http://localhost:3000/#[test_case_specific value]
+
+(e.g.: http://localhost:3000/#JZQtRWnjCFVavhBLuIsGxNgwHYzlSrADdKTqeEfOoUiXMmcykbpP )
+
+
+ If the test passes, it's an update one direction...?... idk, maybe [nofail] tests (there will be kobiyashi-marus in the training set, right?)
+
+
 ## Rules of Hearts
 Object of the Game:
 To be the player with the lowest score at the end of the game. When one player hits the agreed-upon score or higher, the game ends; and the player with the lowest score wins.
@@ -31,7 +57,7 @@ U+1F0Bx	    |  🂱	🂲	🂳	🂴	🂵	🂶	🂷	🂸	🂹	🂺	🂻	🂽	🂾
 U+1F0Cx	    |  🃁	🃂	🃃	🃄	🃅	🃆	🃇	🃈	🃉	🃊	🃋	🃍	🃎
 U+1F0Dx	    |  🃑	🃒	🃓	🃔	🃕	🃖	🃗	🃘	🃙	🃚	🃛	🃝	🃞
 
-UNUSED, KNIGHTS: 🂬🂼🃌🃜  
+Note the as-of-yet unused KNIGHTS ("cavalier") available in unicode: 🂬🂼🃌🃜 which might be interesting for testing.
 
 Curious if an ad-hoc token-schema performs better or worse than unicode encoding, i.e., asking a model what card to play, after prompting with an entire set of rules, would cause it to pick well?
 
