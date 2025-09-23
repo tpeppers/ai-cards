@@ -107,6 +107,17 @@ def cardSVtoText(cardSV):
 def cardAPGtoText(cardSV):
     return None
 
+@pytest.fixture
+def hearts_process():
+    npm_process = subprocess.Popen(
+            ['npm', 'start'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            preexec_fn=os.setsid,  # Create new process group for easier cleanup
+            cwd=os.getcwd()
+        )
+    return npm_process
+
 
 class TestHeartsGameIntegration:
     """Integration test for Hearts card game application"""
@@ -128,17 +139,11 @@ class TestHeartsGameIntegration:
             except (ProcessLookupError, OSError):
                 pass  # Process already terminated
     
-    def test_hearts_game_startup_and_availability(self):
+    def test_hearts_game_startup_and_availability(self, hearts_process):
         """Test that Hearts game starts successfully and is accessible via web browser"""
         
         # Start the server
-        self.npm_process = subprocess.Popen(
-            ['npm', 'start'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            preexec_fn=os.setsid,  # Create new process group for easier cleanup
-            cwd=os.getcwd()
-        )
+        self.npm_process = hearts_process
 
         print("\n\nWaiting for npm server to start...")
         while True:
@@ -283,6 +288,6 @@ if __name__ == "__main__":
                 handList.append(cardAPGtoSV(eachChar))
             cardCounter = cardCounter + 1
         print("That hand is the following: " + ",".join(handList))            
-
+    else:
     # Run the test directly
-    #pytest.main([__file__, "-v"])
+        pytest.main([__file__, "-v"])

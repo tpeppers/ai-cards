@@ -22,7 +22,9 @@ const LETTER_TO_SUIT = {
   G: 'clubs', H: 'clubs', I: 'clubs', J: 'clubs', K: 'clubs', L: 'clubs', M: 'clubs',
   // Diamonds: N-Z
   N: 'diamonds', O: 'diamonds', P: 'diamonds', Q: 'diamonds', R: 'diamonds', S: 'diamonds',
-  T: 'diamonds', U: 'diamonds', V: 'diamonds', W: 'diamonds', X: 'diamonds', Y: 'diamonds', Z: 'diamonds'
+  T: 'diamonds', U: 'diamonds', V: 'diamonds', W: 'diamonds', X: 'diamonds', Y: 'diamonds', Z: 'diamonds',
+  // Special: Random, the card will be determined at deal-time, randomly.
+  _: 'random'
 };
 
 /**
@@ -71,6 +73,8 @@ export const letterToCard = (letter) => {
   } else if (letter >= 'N' && letter <= 'Z') {
     // Diamonds: N-Z
     rank = letter.charCodeAt(0) - 'N'.charCodeAt(0) + 1;
+  } else if (letter == '_')  {
+    rank = '_';
   } else {
     throw new Error(`Invalid card letter: ${letter}`);
   }

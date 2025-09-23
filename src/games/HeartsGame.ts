@@ -1,5 +1,5 @@
 import { CardGame, Card, Player } from '../types/CardGame.ts';
-import { letterToCard } from '../urlGameState.js'
+import { cardToLetter, letterToCard } from '../urlGameState.js'
 
 export class HeartsGame extends CardGame {
   private leadSuit: string | null = null;
@@ -24,13 +24,51 @@ export class HeartsGame extends CardGame {
     return deck;
   }
 
-  // "Perform Close-up Magic"
+    isInDeck(eDeck: Card[], aCard :Card): boolean {
+      var isDouble = false;
+      for(let i = 0; i < eDeck.length; i++) {
+        if(eDeck[i].id === aCard.id ) {
+          isDouble = true;
+        }
+      }
+      return isDouble;
+    }
+
+    getNewRandom (existingDeck: Card[]): Card {
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+      let result = '';
+      let isDone = false;
+      while(!isDone){
+          result = characters.charAt(Math.floor(Math.random() * characters.length));
+          console.log(`attempting to generate a new random card: ${result} ...`);
+          isDone = !this.isInDeck(existingDeck, letterToCard(result));
+      }
+      return letterToCard(result);
+    }
+
+  // Perform "Close-up Magic"
   rigDeck(urlToDeal): Card[] {
     const deck: Card[] = [];
     for(let i = 0; i < urlToDeal.length; i++) {
       // { suit, rank, id: `${suit}_${rank}` }
       deck.push(letterToCard(urlToDeal[i]));
     }
+
+    // If there's randoms, we fill them in with values...
+    if(urlToDeal.indexOf('_') > -1) {
+      for(let i = 0; i < urlToDeal.length; i++) {
+        if(urlToDeal[i] === '_') {
+          deck[i] = this.getNewRandom(deck);
+        }
+      }
+    }
+
+    var deckString = '';
+    for(let i = 0; i < urlToDeal.length; i++) {
+        deckString = deckString + cardToLetter(deck[i]);
+    }
+    
+    console.log(`Dealing deck ultimate string was: ${deckString}`)
     return deck;
   }
 

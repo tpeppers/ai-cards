@@ -1,3 +1,91 @@
+# Hearts Card Game - Monorepo
+
+This repository contains both a React-based Hearts card game web application and an iOS companion app for capturing card hand photos.
+
+## Project Structure
+
+```
+├── src/                    # React web application
+├── ios/                    # iOS companion app
+├── server/                 # Express.js API server
+├── docker/                 # Docker deployment files
+└── uploads/               # Image uploads directory (created at runtime)
+```
+
+## Features
+
+### Web Application (React)
+- Interactive Hearts card game
+- URL-based game state management
+- Testing suite with Selenium integration
+
+### iOS Application
+- Camera functionality for capturing 12-card hands
+- Photo upload to web server
+- UUID receipt system for tracking uploads
+
+### API Server (Express.js)
+- Image upload endpoint (`/api/upload`)
+- UUID-based tracking system
+- iOS app download endpoint
+- Upload history management
+
+## Development Setup
+
+### Prerequisites
+- Node.js and npm
+- Xcode (for iOS development)
+- Python 3 (for testing)
+
+### Installation
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Install Python testing dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+### Running the Applications
+
+#### Start both web app and API server:
+```bash
+npm run dev
+```
+
+#### Start individually:
+```bash
+# Web application only (port 3000)
+npm start
+
+# API server only (port 3001)  
+npm run server
+```
+
+#### Build iOS application:
+```bash
+npm run build:ios
+```
+
+### API Endpoints
+
+- `POST /api/upload` - Upload card hand images
+- `GET /api/upload/:uuid` - Get upload details by UUID
+- `GET /api/uploads` - List all uploads
+- `GET /ios/download` - Download compiled iOS app
+- `GET /health` - Server health check
+
+## Research Notes
+
+Research Area Ideas:
+
+I'm interested in circuit generation/evolution, the potential generalizability interpretability tools (i.e., a sufficiently widely usable interpretability tool may be able to apply so broadly as training on text games).
+
+Red teaming: CI/CD escapes (defense in depth), project citrus (or "the acid test"? "fermentation?") -- souring data.
+
 MORE TODO:
 
 Rewrite test_hearts_integration.py for training usage:
@@ -25,8 +113,19 @@ If the test passes, it's an update one direction...?... idk, maybe [nofail] test
 
 Generative fixtures:
 1) GAMES_OF_INTEREST: test fixture that passes in strings from notable games (easy/hard to win? I-think-we-can-improve-this examples?)
+    -- probably make subcategories for these ones...
+    -- "drop-in-to-debug": How do you deal with testing problematic games?
 2) GAMES_OF_CHANCE: test fixture that generates (if unspecified) 5-10 games for exploratory usage.. off-by-default? (flag --randoms=10 / -r=10 to enable?)
 
+NOTE: Games should output full 52-card gamelog into the Console.log("WEST:A"), etc., also would be great to show replay with full link, like maybe:
+http://localhost:3000/#JZQtRWnjCFVavhBLuIsGxNgwHYzlSrADdKTqeEfOoUiXMmcykbpP&p=JZQtRWnjCFVavhBLuIsGxNgwHYzlSrADdKTqeEfOoUiXMmcykbpP
+with another link to "watch replay" in testcases?
+
+Maybe throw up the results on Grafana? 
+
+
+ADDITIONAL TODO: Integrate PHH file format: https://arxiv.org/html/2312.11753v5 
+Rating/benching against "PokerBench": https://arxiv.org/html/2501.08328v1
 
 ## Rules of Hearts
 Object of the Game:
@@ -106,33 +205,3 @@ If you aren't satisfied with the build tool and configuration choices, you can `
 Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
 
 You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
