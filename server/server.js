@@ -16,6 +16,13 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const handsDir = path.join(__dirname, '../hands');
+if (!fs.existsSync(handsDir)) {
+  fs.mkdirSync(handsDir, { recursive: true });
+}
+
+const handsFilePath = path.join(handsDir, 'stored_hands.txt');
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
@@ -120,6 +127,55 @@ app.get('/ios/download', (req, res) => {
       error: 'iOS app not built yet',
       message: 'Run `npm run build:ios` to build the iOS application first'
     });
+  }
+});
+
+// Get all stored hands
+app.get('/api/hands', (req, res) => {
+  try {
+    if (fs.existsSync(handsFilePath)) {
+      const content = fs.readFileSync(handsFilePath, 'utf8');
+      const hands = content.split('\n').filter(hand => hand.trim() !== '');
+      res.json({ hands });
+    } else {
+      res.json({ hands: [] });
+    }
+  } catch (error) {
+    console.error('Error reading hands:', error);
+    res.status(500).json({ error: 'Failed to read stored hands' });
+  }
+});
+
+// Save hands (merge with existing)
+app.post('/api/hands', (req, res) => {
+  try {
+    const { hands } = req.body;
+    if (!Array.isArray(hands)) {
+      return res.status(400).json({ error: 'Hands must be an array' });
+    }
+
+    // Get existing hands
+    let existingHands = [];
+    if (fs.existsSync(handsFilePath)) {
+      const content = fs.readFileSync(handsFilePath, 'utf8');
+      existingHands = content.split('\n').filter(hand => hand.trim() !== '');
+    }
+
+    // Merge with new hands and deduplicate
+    const allHands = new Set([...existingHands, ...hands]);
+    const sortedHands = Array.from(allHands).sort();
+
+    // Save to file
+    fs.writeFileSync(handsFilePath, sortedHands.join('\n'));
+
+    res.json({
+      message: 'Hands saved successfully',
+      totalHands: sortedHands.length,
+      newHands: hands.length
+    });
+  } catch (error) {
+    console.error('Error saving hands:', error);
+    res.status(500).json({ error: 'Failed to save hands' });
   }
 });
 

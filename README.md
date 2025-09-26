@@ -1,3 +1,35 @@
+### TODO:
+
+CLEAN-UP on the Canonicalization. It's not working right, because it can't be, because the behavior of a 6/6 split hand was never defined. It should be based on whichever has the longest & strongest runs (i.e., A/2/3/4 beats 10/J/Q/K, but ties go high)
+
+## Define "hand-weight-height" (high vs low):
+
+The function should return whether a hand is a better high or low hand, i.e., would it have more winners high or low?
+
+## Define "calculate winners": Specify how to calculate the winners in a hand.
+
+I.e., the function should return how many cards can strictly be made winners.
+
+## Define "isBetter([hand])"
+
+The function should return true if thisHand.isBetter(thanThatHand)...
+
+## Define "would improve hand([hand],[cards])"
+
+This is basically "would I throw it back out in a 1-card kitty? (e.g, does it let me short-suit by supplying a winner or less-loser?)"
+
+## Create a hand-analysis page. Given a hand URL/string, I'd like to display some text pulled from an external source (database/files).
+
+- The page should essentially be the same as the hand-builder page, but rather than cards being clickable to add/remove cards in from the table to the hand, the page will instead color code the cards on the table in either red or green for whether or not the card would improve the hand in a 1-card kitty swapout.
+
+Also, when hovering over a card it will display a fact about the card/suit: "The likelihood of drawing a card of this suit in the kitty is (X%)."
+
+Also, add a kitty-size-slider, from 1 to 4-cards. At the bottom the page will have some text about "The expectation of getting a good kitty... X%". Loading the page will have the Javascript simulate 1000 randomly selected kitties and validate against having 0-4 cards that improve the hand empiracally, what are the 5 best or 5 worst kitties generated.
+
+## Finally, perform some rudimentary hand-analysis, validate the findings qualitatively.
+
+Manually pull up the last X hands I've taken pictures of in the hand-analysis page. Judge whether or not you'd take the cards it suggests.
+
 # Hearts Card Game - Monorepo
 
 This repository contains both a React-based Hearts card game web application and an iOS companion app for capturing card hand photos.

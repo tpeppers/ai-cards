@@ -116,8 +116,9 @@ export const decodeUrlToDeck = (urlString) => {
     const letter = urlString[i];
     const card = letterToCard(letter);
     
-    // Ensure no duplicate cards
-    if (usedCards.has(card.id)) {
+    // Ensure no duplicate non-random cards
+    if (card.id != 'random__' && usedCards.has(card.id)) {
+      console.log(`Dupe card throw, card id was: ${card.id}`);
       throw new Error(`Duplicate card found: ${card.id}`);
     }
     usedCards.add(card.id);
@@ -125,13 +126,117 @@ export const decodeUrlToDeck = (urlString) => {
     cards.push(card);
   }
   
-  // Validate we have exactly 52 unique cards
-  if (cards.length !== 52 || usedCards.size !== 52) {
+  
+  var randomCount = (urlString.match(new RegExp("_", "g")) || []).length;
+  // RandomCount is set to -1 if > 0 because there's an extra card 
+  // (the "random" card, looks like card.id === 'random__')
+  if(randomCount > 0) { 
+    randomCount = randomCount - 1;
+  }
+  // Validate we have exactly 52 unique cards,
+  if (cards.length !== 52 || (usedCards.size + randomCount !== 52)) {
+    console.log("Not 52 unique card throw");
     throw new Error('Invalid deck: must contain exactly 52 unique cards');
   }
   
   return cards;
 };
+
+/*** 
+ * To reduce the complexity when thinking/discussing hands, it's useful to have a canonical suit order,
+ * e.g., a hand of all spades or all hearts (in whist) are of equivalent strength (perfect), 
+ * so there's no need to differentiate. 
+ * 
+ * The same goes for any set of suits, really (e.g., all hearts and one spade).
+ */
+export const handToCanonicalString = (handString) => {
+  const nonRandomHandString = handString.split("_").join("");
+  if(nonRandomHandString.length > 16) {
+    throw new Error('handToCanonical is only meant for up to 16 non-random cards, so far.')
+  }
+
+  let heartsStart = [];
+  let spadesStart = [];
+  let clubsStart = [];
+  let diamondsStart = [];
+
+
+  for(let i = 0; i < handString.length; i = i + 1) {
+    let theCard = letterToCard(handString[i]);
+    let theSuit = theCard.suit;
+    switch (theSuit) {
+      case 'hearts':
+        heartsStart.push(theCard);
+        break;
+      case 'spades':
+        spadesStart.push(theCard);
+        break;
+      case 'clubs':
+        clubsStart.push(theCard);
+        break;
+      case 'diamonds':
+        diamondsStart.push(theCard);
+        break;
+      default:
+        // intentionally left blank "_"/randoms aren't counted
+        break;
+    }
+  }
+
+  let newCanonicalHandString = "";
+
+  // Canonical suit ordering is alphabetical:
+  // clubs, diamonds, hearts, spades
+
+  // Sort cards within each suit by rank
+  clubsStart.sort((a, b) => a.rank - b.rank);
+  diamondsStart.sort((a, b) => a.rank - b.rank);
+  heartsStart.sort((a, b) => a.rank - b.rank);
+  spadesStart.sort((a, b) => a.rank - b.rank);
+
+  // Sort suits by count (descending) to determine canonical mapping
+  const suitGroups = [
+    { suit: 'clubs', cards: clubsStart, canonicalSuit: 'clubs' },
+    { suit: 'diamonds', cards: diamondsStart, canonicalSuit: 'diamonds' },
+    { suit: 'hearts', cards: heartsStart, canonicalSuit: 'hearts' },
+    { suit: 'spades', cards: spadesStart, canonicalSuit: 'spades' }
+  ].sort((a, b) => b.cards.length - a.cards.length);
+
+  // Map suits to canonical suits based on frequency
+  // Most frequent suit becomes clubs, second becomes diamonds, etc.
+  const canonicalSuits = ['clubs', 'diamonds', 'hearts', 'spades'];
+  suitGroups.forEach((group, index) => {
+    if (index < canonicalSuits.length && group.cards.length > 0) {
+      group.canonicalSuit = canonicalSuits[index];
+    }
+  });
+
+  // Convert all cards to their canonical representation
+  const allCanonicalCards = [];
+  suitGroups.forEach(group => {
+    group.cards.forEach(card => {
+      const canonicalCard = {
+        suit: group.canonicalSuit,
+        rank: card.rank,
+        id: `${group.canonicalSuit}_${card.rank}`
+      };
+      allCanonicalCards.push(canonicalCard);
+    });
+  });
+
+  // Sort all cards by suit priority (clubs, diamonds, hearts, spades) then by rank
+  allCanonicalCards.sort((a, b) => {
+    const suitOrder = { clubs: 0, diamonds: 1, hearts: 2, spades: 3 };
+    const suitCompare = suitOrder[a.suit] - suitOrder[b.suit];
+    if (suitCompare !== 0) return suitCompare;
+    return a.rank - b.rank;
+  });
+
+  // Convert cards back to their letter representation
+  newCanonicalHandString = allCanonicalCards.map(card => cardToLetter(card)).join('');
+
+  return newCanonicalHandString;
+}
 
 /**
  * Validates if a URL string represents a valid deck

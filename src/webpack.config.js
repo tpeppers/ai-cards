@@ -1,3 +1,5 @@
+const path = require('path');
+
 new CspHtmlWebpackPlugin(
     {
         'default-src': [
@@ -21,4 +23,15 @@ const customConfig = {
         'errorDetails': true,
         'children': true
     }
+}
+
+module.exports = {
+ module: {
+   rules: [
+     {
+       test: /\.txt/,
+       type: 'asset/resource'
+     }
+   ]
+ }
 }

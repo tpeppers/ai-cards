@@ -74,7 +74,9 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   };
 
   const initializeGame = () => {
-    if (useUrlSeeding) {
+    //TODO: REMOVE USE_URL_SEEDING, WANT IT TO BE CONTROLLED BY EXISTANCE OF URL EXTRAS
+    // http://localhost:3000/#n___r___t___a___c___j___m___D___H___L___Q___W___Z___
+    if (getGameStateFromUrl() != null) {
       // Check if there's a valid deck URL in the hash
       const urlState = getGameStateFromUrl();
       if (urlState && isValidDeckUrl(urlState)) {
@@ -124,11 +126,11 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
     }
   };
 
-  const resetGame = () => {
+  const resetGame = (useNewUrl: boolean) => {
     game.resetGame();
     setMoveHistory([]);
     updateGameState();
-    if (useUrlSeeding) {
+    if (useNewUrl) {
       const randomUrl = generateRandomDeckUrl();
       updateUrlWithGameState(randomUrl);
     }
@@ -208,6 +210,8 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       const randomUrl = generateRandomDeckUrl();
       window.location.hash = randomUrl;
       initializeGame();
+      // TODO: figure this out.. 
+      resetGame();
     }
   };
 
@@ -294,7 +298,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
         {gameState.gameOver && (
           <button 
             className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center gap-1"
-            onClick={resetGame}
+            onClick={resetGame(true)}
           >
             <RefreshCw size={16} />
             New Game
@@ -310,7 +314,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           </button>
         )}
         
-        {useUrlSeeding && (
+        {(
           <button
             className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
             onClick={handleRandomUrl}
@@ -369,7 +373,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
             ))}
             <button 
               className="mt-6 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mx-auto"
-              onClick={resetGame}
+              onClick={resetGame(true)}
             >
               Play Again
             </button>
