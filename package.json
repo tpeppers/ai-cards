@@ -20,6 +20,7 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.9.1",
     "react-scripts": "5.0.1",
+    "sharp": "^0.33.0",
     "uuid": "^9.0.1",
     "web-vitals": "^2.1.4"
   },
@@ -30,12 +31,14 @@
     "eject": "react-scripts eject",
     "server": "node server/server.js",
     "dev": "concurrently \"npm run server\" \"npm start\"",
-    "dev:full": "concurrently \"npm run server\" \"npm start\" \"npm run ml:server\"",
+    "dev:full": "concurrently \"npm run server\" \"npm start\" \"npm run ml:server\" \"npm run label-studio\"",
     "build:ios": "cd ios && xcodebuild -project HeartsCardCapture.xcodeproj -scheme HeartsCardCapture -configuration Release -derivedDataPath ./build -destination generic/platform=iOS clean build",
     "ml:install": "cd ml && pip install -r requirements.txt",
     "ml:server": "cd ml/server && python inference_server.py",
     "ml:train": "cd ml/scripts && python train.py",
-    "ml:prepare": "cd ml/scripts && python prepare_dataset.py"
+    "ml:prepare": "cd ml/scripts && python prepare_dataset.py",
+    "ml:verify-labels": "cd ml/scripts && python verify_labels.py",
+    "label-studio": "python -c \"import sys; sys.argv = ['label-studio', 'start', '--port', '8080', '--no-browser']; from label_studio.server import main; main()\""
   },
   "eslintConfig": {
     "extends": [
@@ -57,5 +60,10 @@
   },
   "browser": {
     "fs": false
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.24",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.19"
   }
 }
