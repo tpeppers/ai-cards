@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import HeartsGame from './cards.tsx';
 import HandCreator from './components/HandCreator.tsx';
+import Upload from './components/Upload.tsx';
 
 function App() {
   return (
@@ -22,12 +23,19 @@ function App() {
             >
               Hand Creator
             </Link>
+            <Link
+              to="/upload"
+              className="hover:text-blue-300 transition-colors"
+            >
+              Upload
+            </Link>
           </div>
         </nav>
 
         <Routes>
           <Route path="/" element={<HeartsGame />} />
           <Route path="/hand-creator" element={<HandCreator />} />
+          <Route path="/upload" element={<Upload />} />
         </Routes>
       </Router>
     </>

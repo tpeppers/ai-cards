@@ -4,6 +4,11 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
+const FormData = require('form-data');
+const { spawn } = require('child_process');
+
+// ML service configuration
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:3002';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -176,6 +181,186 @@ app.post('/api/hands', (req, res) => {
   } catch (error) {
     console.error('Error saving hands:', error);
     res.status(500).json({ error: 'Failed to save hands' });
+  }
+});
+
+// Card recognition endpoint - forwards to ML service
+app.post('/api/recognize', upload.single('image'), async (req, res) => {
+  const startTime = Date.now();
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No image file provided'
+      });
+    }
+
+    // Read the uploaded file
+    const imagePath = path.join(uploadDir, req.file.filename);
+    const imageBuffer = fs.readFileSync(imagePath);
+
+    // Create form data for ML service
+    const formData = new FormData();
+    formData.append('image', imageBuffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    });
+
+    // Get confidence threshold from query param (default 0.5)
+    const confidence = parseFloat(req.query.confidence) || 0.5;
+
+    // Forward to ML service
+    const mlResponse = await fetch(
+      `${ML_SERVICE_URL}/recognize?confidence=${confidence}`,
+      {
+        method: 'POST',
+        body: formData,
+        headers: formData.getHeaders()
+      }
+    );
+
+    // Clean up uploaded file
+    fs.unlink(imagePath, (err) => {
+      if (err) console.error('Failed to clean up temp file:', err);
+    });
+
+    if (!mlResponse.ok) {
+      const errorText = await mlResponse.text();
+      console.error(`ML service error (${mlResponse.status}):`, errorText);
+      return res.status(mlResponse.status).json({
+        success: false,
+        error: `ML service error: ${mlResponse.statusText}`,
+        details: errorText
+      });
+    }
+
+    const mlResult = await mlResponse.json();
+
+    // Add total processing time (including network overhead)
+    const totalTime = Date.now() - startTime;
+
+    res.json({
+      ...mlResult,
+      totalProcessingTimeMs: totalTime
+    });
+
+  } catch (error) {
+    console.error('Recognition error:', error);
+
+    // Check if ML service is unavailable
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        error: 'ML service unavailable',
+        message: 'Start the ML inference server with: npm run ml:server'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Recognition failed',
+      message: error.message
+    });
+  }
+});
+
+// Direct card detection using local model
+app.post('/api/detect', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    const imagePath = path.join(uploadDir, req.file.filename);
+    const modelPath = path.join(__dirname, '../models/card_detector_best.pt');
+
+    // Check if model exists
+    if (!fs.existsSync(modelPath)) {
+      fs.unlink(imagePath, () => {});
+      return res.status(500).json({ error: 'Model not found. Run training first.' });
+    }
+
+    // Run Python detection script
+    const python = spawn('python', ['-c', `
+import sys
+import json
+from pathlib import Path
+from ultralytics import YOLO
+
+model = YOLO(r'${modelPath.replace(/\\/g, '\\\\')}')
+results = model.predict(r'${imagePath.replace(/\\/g, '\\\\')}', conf=0.25, verbose=False)
+
+cards = []
+for result in results:
+    for box in result.boxes:
+        cls_id = int(box.cls[0])
+        conf = float(box.conf[0])
+        name = result.names[cls_id]
+        cards.append({'name': name, 'confidence': conf})
+
+cards.sort(key=lambda x: -x['confidence'])
+card_names = [c['name'] for c in cards]
+
+print(json.dumps({
+    'cards': card_names,
+    'count': len(cards),
+    'detections': cards
+}))
+`]);
+
+    let output = '';
+    let errorOutput = '';
+
+    python.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    python.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    python.on('close', (code) => {
+      // Clean up uploaded file
+      fs.unlink(imagePath, () => {});
+
+      if (code !== 0) {
+        console.error('Detection error:', errorOutput);
+        return res.status(500).json({ error: 'Detection failed', details: errorOutput });
+      }
+
+      try {
+        const result = JSON.parse(output.trim());
+        res.json(result);
+      } catch (parseError) {
+        console.error('Parse error:', output);
+        res.status(500).json({ error: 'Failed to parse detection results' });
+      }
+    });
+
+  } catch (error) {
+    console.error('Detection error:', error);
+    res.status(500).json({ error: 'Detection failed', message: error.message });
+  }
+});
+
+// Check ML service health
+app.get('/api/recognize/health', async (req, res) => {
+  try {
+    const mlResponse = await fetch(`${ML_SERVICE_URL}/health`);
+    const mlHealth = await mlResponse.json();
+
+    res.json({
+      status: 'ok',
+      mlService: mlHealth,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.json({
+      status: 'degraded',
+      mlService: { status: 'unavailable', error: error.message },
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
