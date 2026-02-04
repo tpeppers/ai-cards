@@ -38,10 +38,10 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
       const totalWidth = Math.min(windowSize.width - 100, player.hand.length * 30);
       const spacing = totalWidth / Math.max(player.hand.length - 1, 1);
       const startX = (windowSize.width - totalWidth) / 2;
-      
+
       return {
         x: startX + index * spacing,
-        y: windowSize.height - 120,
+        y: windowSize.height - 140,  // Position cards higher to stay within viewport
         raised: false
       };
     } else if (player.id === 1) {
@@ -70,22 +70,17 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
 
   // Player name indicator and score display
   return (
-    <div className={`absolute ${
-      isHuman ? 'bottom-0 left-0 right-0' : 
-      player.id === 1 ? 'right-0 top-0 bottom-0' :
-      player.id === 2 ? 'top-0 left-0 right-0' :
-      'left-0 top-0 bottom-0'
-    } flex items-center justify-center`} id="playerHand">
+    <>
       {/* Player name & score display */}
       <div className={`absolute ${
         isHuman ? 'bottom-36 left-1/2 transform -translate-x-1/2' :
         player.id === 1 ? 'right-24 top-1/2 transform -translate-y-1/2' :
         player.id === 2 ? 'top-24 left-1/2 transform -translate-x-1/2' :
         'left-24 top-1/2 transform -translate-y-1/2'
-      } text-white font-bold bg-black bg-opacity-70 py-1 px-3 rounded`}>
+      } text-white font-bold bg-black bg-opacity-70 py-1 px-3 rounded z-10`}>
         {player.name} {isCurrentPlayer && '(Turn)'} - Score: {player.totalScore}
       </div>
-      
+
       {/* Cards */}
       {player.hand.map((card, index) => (
         <Card
@@ -97,7 +92,7 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
           faceDown={!isHuman && !showAllCards}
         />
       ))}
-    </div>
+    </>
   );
 };
 

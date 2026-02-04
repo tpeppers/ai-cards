@@ -234,7 +234,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   }, [gameState.currentPlayer, gameState.gameStage, gameState.currentTrick]);
 
   return (
-    <div className="w-full h-screen flex flex-col items-center justify-center" 
+    <div className="w-full h-screen overflow-hidden relative"
       style={{ backgroundColor: '#008000', backgroundImage: 'radial-gradient(circle, #009900 0%, #006600 100%)' }}>
       
       {/* Menu Bar */}
@@ -261,7 +261,6 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           showAllCards={showAllCards}
         />
       ))}
-      <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
       {/* Turn indicator */}
       <TurnIndicator 
         currentPlayer={game.getCurrentPlayer()} 

@@ -81,8 +81,8 @@ const Card: React.FC<CardProps> = ({
       }}
     >
       {/* Card face */}
-      <div 
-        className="h-full w-full flex flex-col justify-between p-1"
+      <div
+        className="h-full w-full relative"
         id="cardFace"
         style={{
           backgroundColor: faceDown ? '#006400' : 'white',
@@ -93,15 +93,20 @@ const Card: React.FC<CardProps> = ({
       >
         {!faceDown && (
           <>
-            <div className={`self-start font-bold text-lg `} style={{ lineHeight: '1' }}>   <font color={getColor(card.suit)}>
-              {getRank(card.rank)}
-            </font></div>
-            <div className={`flex justify-center items-center text-4xl`} style={{ lineHeight: '4' }}> <font color={getColor(card.suit)}>
-              {getSuitSymbol(card.suit)}
-            </font></div>
-            <div className={`self-end font-bold text-lg rotate-180`} style={{ lineHeight: '1' }}>   <font color={getColor(card.suit)}>
-              {getRank(card.rank)}
-            </font></div>
+            {/* Top-left corner: rank + suit */}
+            <div className="absolute top-1 left-1 flex flex-col items-center leading-none" style={{ color: getColor(card.suit) }}>
+              <span className="font-bold text-sm">{getRank(card.rank)}</span>
+              <span className="text-sm">{getSuitSymbol(card.suit)}</span>
+            </div>
+            {/* Center suit symbol */}
+            <div className="absolute inset-0 flex items-center justify-center" style={{ color: getColor(card.suit) }}>
+              <span className="text-2xl">{getSuitSymbol(card.suit)}</span>
+            </div>
+            {/* Bottom-right corner: rank + suit (rotated) */}
+            <div className="absolute bottom-1 right-1 flex flex-col items-center leading-none rotate-180" style={{ color: getColor(card.suit) }}>
+              <span className="font-bold text-sm">{getRank(card.rank)}</span>
+              <span className="text-sm">{getSuitSymbol(card.suit)}</span>
+            </div>
           </>
         )}
       </div>
