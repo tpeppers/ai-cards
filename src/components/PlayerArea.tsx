@@ -87,6 +87,7 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
           key={card.id}
           card={card}
           position={getPositionStyle(index)}
+          zIndex={index + 1}
           draggable={isHuman && isCurrentPlayer}
           onClick={isHuman && isCurrentPlayer ? () => playCard(card) : undefined}
           faceDown={!isHuman && !showAllCards}

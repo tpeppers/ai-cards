@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import HomePage from './components/HomePage.tsx';
 import HeartsGame from './cards.tsx';
+import BidWhistGame from './BidWhistGame.tsx';
 import HandCreator from './components/HandCreator.tsx';
 import Upload from './components/Upload.tsx';
 
@@ -15,7 +17,19 @@ function App() {
               to="/"
               className="hover:text-blue-300 transition-colors"
             >
-              Hearts Game
+              Home
+            </Link>
+            <Link
+              to="/hearts"
+              className="hover:text-blue-300 transition-colors"
+            >
+              Hearts
+            </Link>
+            <Link
+              to="/bidwhist"
+              className="hover:text-blue-300 transition-colors"
+            >
+              Bid Whist
             </Link>
             <Link
               to="/hand-creator"
@@ -33,7 +47,9 @@ function App() {
         </nav>
 
         <Routes>
-          <Route path="/" element={<HeartsGame />} />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/hearts" element={<HeartsGame />} />
+          <Route path="/bidwhist" element={<BidWhistGame />} />
           <Route path="/hand-creator" element={<HandCreator />} />
           <Route path="/upload" element={<Upload />} />
         </Routes>

@@ -146,10 +146,11 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   const handleCardPlay = (card: any) => {
     // Only allow current player to play
     const currentPlayer = game.getCurrentPlayer();
-    if (!currentPlayer || currentPlayer.id !== 0 || gameState.currentTrick.some(play => play.playerId === 0)) {
+    const currentGameState = game.getGameState();
+    if (!currentPlayer || currentPlayer.id !== 0 || currentGameState.currentTrick.some(play => play.playerId === 0)) {
       return;
     }
-    
+
     const move = game.playCard(0, card);
     if (!move.isValid && move.errorMessage) {
       // Show error message temporarily

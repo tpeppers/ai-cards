@@ -31,7 +31,7 @@ export interface GameState {
   players: Player[];
   currentTrick: PlayedCard[];
   currentPlayer: number | null;
-  gameStage: 'deal' | 'play' | 'scoring';
+  gameStage: 'deal' | 'bidding' | 'trumpSelection' | 'discarding' | 'play' | 'scoring';
   gameOver: boolean;
   winner: Player | null;
   message: string;
@@ -42,7 +42,7 @@ export abstract class CardGame {
   protected players: Player[];
   protected currentTrick: PlayedCard[];
   protected currentPlayer: number | null;
-  protected gameStage: 'deal' | 'play' | 'scoring';
+  protected gameStage: 'deal' | 'bidding' | 'trumpSelection' | 'discarding' | 'play' | 'scoring';
   protected gameOver: boolean;
   protected winner: Player | null;
   protected message: string;
