@@ -318,47 +318,93 @@ const HandCreator: React.FC = () => {
         )}
       </div>
 
-      <div className="space-y-6">
-        {suits.map((suit) => (
-          <div key={suit.name} className="border rounded-lg p-4">
-            <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
-              <span style={{ color: suit.color }}>{suit.symbol}</span>
-              <span className="capitalize">{suit.name}</span>
-            </h2>
-            <div className="grid grid-cols-13 gap-2">
-              {Array.from({ length: 13 }, (_, i) => i + 1).map((rank) => {
-                const selected = isCardSelected(suit.name, rank);
-                const disabled = !selected && selectedCards.length >= handSize;
+      <div className="grid grid-cols-2 gap-4">
+        {/* Left column - Black suits */}
+        <div className="space-y-4">
+          {suits.filter(s => s.color === 'black').map((suit) => (
+            <div key={suit.name} className="border rounded-lg p-2">
+              <h2 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                <span style={{ color: suit.color }}>{suit.symbol}</span>
+                <span className="capitalize">{suit.name}</span>
+              </h2>
+              <div className="flex flex-wrap gap-1">
+                {Array.from({ length: 13 }, (_, i) => i + 1).map((rank) => {
+                  const selected = isCardSelected(suit.name, rank);
+                  const disabled = !selected && selectedCards.length >= handSize;
 
-                return (
-                  <button
-                    key={rank}
-                    onClick={() => toggleCard(suit.name, rank)}
-                    disabled={disabled}
-                    className={`
-                      w-12 h-16 border rounded text-sm font-bold
-                      ${selected
-                        ? 'bg-gray-300 text-gray-500 border-gray-400 cursor-pointer opacity-50'
-                        : disabled
-                          ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
-                          : 'bg-white hover:bg-gray-100 border-gray-300 cursor-pointer'
-                      }
-                      transition-colors duration-200
-                    `}
-                    style={{
-                      color: !selected && !disabled ? suit.color : undefined
-                    }}
-                  >
-                    <div className="flex flex-col items-center justify-center h-full">
-                      <div className="text-xs">{getRankDisplay(rank)}</div>
-                      <div className="text-sm">{suit.symbol}</div>
-                    </div>
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={rank}
+                      onClick={() => toggleCard(suit.name, rank)}
+                      disabled={disabled}
+                      className={`
+                        w-6 h-8 border rounded text-xs font-bold
+                        ${selected
+                          ? 'bg-gray-300 text-gray-500 border-gray-400 cursor-pointer opacity-50'
+                          : disabled
+                            ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
+                            : 'bg-white hover:bg-gray-100 border-gray-300 cursor-pointer'
+                        }
+                        transition-colors duration-200
+                      `}
+                      style={{
+                        color: !selected && !disabled ? suit.color : undefined
+                      }}
+                    >
+                      <div className="flex flex-col items-center justify-center h-full leading-none">
+                        <div style={{ fontSize: '10px' }}>{getRankDisplay(rank)}</div>
+                        <div style={{ fontSize: '10px' }}>{suit.symbol}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        {/* Right column - Red suits */}
+        <div className="space-y-4">
+          {suits.filter(s => s.color === 'red').map((suit) => (
+            <div key={suit.name} className="border rounded-lg p-2">
+              <h2 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                <span style={{ color: suit.color }}>{suit.symbol}</span>
+                <span className="capitalize">{suit.name}</span>
+              </h2>
+              <div className="flex flex-wrap gap-1">
+                {Array.from({ length: 13 }, (_, i) => i + 1).map((rank) => {
+                  const selected = isCardSelected(suit.name, rank);
+                  const disabled = !selected && selectedCards.length >= handSize;
+
+                  return (
+                    <button
+                      key={rank}
+                      onClick={() => toggleCard(suit.name, rank)}
+                      disabled={disabled}
+                      className={`
+                        w-6 h-8 border rounded text-xs font-bold
+                        ${selected
+                          ? 'bg-gray-300 text-gray-500 border-gray-400 cursor-pointer opacity-50'
+                          : disabled
+                            ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
+                            : 'bg-white hover:bg-gray-100 border-gray-300 cursor-pointer'
+                        }
+                        transition-colors duration-200
+                      `}
+                      style={{
+                        color: !selected && !disabled ? suit.color : undefined
+                      }}
+                    >
+                      <div className="flex flex-col items-center justify-center h-full leading-none">
+                        <div style={{ fontSize: '10px' }}>{getRankDisplay(rank)}</div>
+                        <div style={{ fontSize: '10px' }}>{suit.symbol}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="mt-8 text-center space-y-4">
