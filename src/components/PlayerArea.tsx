@@ -45,24 +45,24 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
         raised: false
       };
     } else if (player.id === 1) {
-      // Right player - cards stacked sideways
+      // Right player (East) - cards stacked sideways
       return {
         x: windowSize.width - 100,
-        y: 150 + index * 15,
+        y: 120 + index * 25,
         raised: false
       };
     } else if (player.id === 2) {
-      // Top player - cards stacked horizontally
+      // Top player (North) - cards stacked horizontally
       return {
-        x: (windowSize.width / 2) - (player.hand.length * 15 / 2) + index * 15,
+        x: (windowSize.width / 2) - (player.hand.length * 30 / 2) + index * 30,
         y: 20,
         raised: false
       };
     } else {
-      // Left player - cards stacked sideways
+      // Left player (West) - cards stacked sideways
       return {
         x: 30,
-        y: 150 + index * 15,
+        y: 120 + index * 25,
         raised: false
       };
     }

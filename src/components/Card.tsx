@@ -93,19 +93,19 @@ const Card: React.FC<CardProps> = ({
       >
         {!faceDown && (
           <>
-            {/* Top-left corner: rank + suit */}
-            <div className="absolute top-1 left-1 flex flex-col items-center leading-none" style={{ color: getColor(card.suit) }}>
+            {/* Top-left corner: rank + suit side-by-side */}
+            <div className="absolute top-1 left-1 flex items-center leading-none" style={{ color: getColor(card.suit) }}>
               <span className="font-bold text-sm">{getRank(card.rank)}</span>
-              <span className="text-sm">{getSuitSymbol(card.suit)}</span>
+              <span className="text-xs">{getSuitSymbol(card.suit)}</span>
             </div>
             {/* Center suit symbol */}
             <div className="absolute inset-0 flex items-center justify-center" style={{ color: getColor(card.suit) }}>
               <span className="text-2xl">{getSuitSymbol(card.suit)}</span>
             </div>
-            {/* Bottom-right corner: rank + suit (rotated) */}
-            <div className="absolute bottom-1 right-1 flex flex-col items-center leading-none rotate-180" style={{ color: getColor(card.suit) }}>
+            {/* Bottom-right corner: rank + suit side-by-side (rotated) */}
+            <div className="absolute bottom-1 right-1 flex items-center leading-none rotate-180" style={{ color: getColor(card.suit) }}>
               <span className="font-bold text-sm">{getRank(card.rank)}</span>
-              <span className="text-sm">{getSuitSymbol(card.suit)}</span>
+              <span className="text-xs">{getSuitSymbol(card.suit)}</span>
             </div>
           </>
         )}
