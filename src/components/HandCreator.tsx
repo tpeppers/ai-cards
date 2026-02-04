@@ -228,20 +228,29 @@ const HandCreator: React.FC = () => {
 
   const loadStoredHands = async () => {
     const hands = await getStoredHands();
-    console.log("Storing hands: ", hands.split('\n'));
-    setStoredHands(hands.split('\n'));
+    // Filter out empty lines and trim whitespace
+    const handList = hands.split('\n').map(h => h.trim()).filter(h => h.length > 0);
+    console.log("Storing hands: ", handList);
+    setStoredHands(handList);
   };
 
   const loadSelectedHand = (handString: string) => {
-    if (!handString) return;
+    if (!handString || !handString.trim()) return;
 
     // Parse the hand string to recreate the selected cards
     const cards: Card[] = [];
     for (let i = 0; i < handString.length; i++) {
       const letter = handString[i];
-      const card = letterToCard(letter);
-      if (card) {
-        cards.push(card);
+      // Skip whitespace and invalid characters
+      if (!letter || letter.trim() === '') continue;
+      try {
+        const card = letterToCard(letter);
+        if (card) {
+          cards.push(card);
+        }
+      } catch (e) {
+        // Skip invalid card letters
+        console.warn(`Skipping invalid card letter: "${letter}"`);
       }
     }
     setSelectedCards(cards);
