@@ -26,6 +26,8 @@ interface GameEngineProps {
   gameName: string;
   gameRules: string;
   useUrlSeeding?: boolean;
+  hideMoveHistory?: boolean;
+  refreshKey?: number;
   onGameStateChange?: (gameState: GameState) => void;
 }
 
@@ -34,12 +36,14 @@ const baseTimeOut = 500;
 let currentTimeout = baseTimeOut;
 let lastPlayManual = true;
 
-const GameEngine: React.FunctionComponent<GameEngineProps> = ({ 
-  game, 
-  gameName, 
-  gameRules, 
+const GameEngine: React.FunctionComponent<GameEngineProps> = ({
+  game,
+  gameName,
+  gameRules,
   useUrlSeeding = true,
-  onGameStateChange 
+  hideMoveHistory = false,
+  refreshKey = 0,
+  onGameStateChange
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
   const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
@@ -51,10 +55,48 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       // Force a re-render when window is resized
       setGameState({...game.getGameState()});
     };
-    
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [game]);
+
+  // Keyboard shortcuts: 1-9, 0, -, = to play cards at index 0-11
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only process if it's the human's turn during play phase
+      const currentGameState = game.getGameState();
+      if (currentGameState.gameStage !== 'play') return;
+      if (currentGameState.currentPlayer !== 0) return;
+      if (currentGameState.currentTrick.some(play => play.playerId === 0)) return;
+
+      // Map keys to card indices: 1=0, 2=1, ..., 9=8, 0=9, -=10, ==11
+      const keyToIndex: { [key: string]: number } = {
+        '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5,
+        '7': 6, '8': 7, '9': 8, '0': 9, '-': 10, '=': 11
+      };
+
+      const cardIndex = keyToIndex[event.key];
+      if (cardIndex === undefined) return;
+
+      const humanHand = currentGameState.players[0]?.hand;
+      if (!humanHand || cardIndex >= humanHand.length) return;
+
+      const card = humanHand[cardIndex];
+      if (card) {
+        handleCardPlay(card);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState.currentPlayer, gameState.gameStage, gameState.currentTrick]);
+
+  // Sync state when parent signals a refresh (e.g., after bidding/discarding)
+  useEffect(() => {
+    if (refreshKey > 0) {
+      setGameState(game.getGameState());
+    }
+  }, [refreshKey, game]);
 
   // Initialize game
   useEffect(() => {
@@ -207,13 +249,9 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   };
 
   const handleRandomUrl = () => {
-    if (useUrlSeeding) {
-      const randomUrl = generateRandomDeckUrl();
-      window.location.hash = randomUrl;
-      initializeGame();
-      // TODO: figure this out.. 
-      resetGame();
-    }
+    const randomUrl = generateRandomDeckUrl();
+    window.location.hash = randomUrl;
+    resetGame(true);
   };
 
   const toggleCardVisibility = () => {
@@ -296,9 +334,9 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
         )}
         
         {gameState.gameOver && (
-          <button 
+          <button
             className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center gap-1"
-            onClick={resetGame(true)}
+            onClick={() => resetGame(true)}
           >
             <RefreshCw size={16} />
             New Game
@@ -356,7 +394,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       </div>
       
       {/* Move History */}
-      <MoveHistory moves={moveHistory} />
+      {!hideMoveHistory && <MoveHistory moves={moveHistory} />}
       
       {/* Game over dialog */}
       {gameState.gameOver && gameState.winner && (
@@ -371,9 +409,9 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
                 <span>{player.totalScore}</span>
               </div>
             ))}
-            <button 
+            <button
               className="mt-6 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mx-auto"
-              onClick={resetGame(true)}
+              onClick={() => resetGame(true)}
             >
               Play Again
             </button>

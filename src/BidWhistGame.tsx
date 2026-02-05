@@ -11,6 +11,7 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const gameRef = useRef<BidWhistGame>(new BidWhistGame());
   const [gameState, setGameState] = useState<GameState>(gameRef.current.getGameState());
   const [biddingState, setBiddingState] = useState(gameRef.current.getBiddingState());
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const game = gameRef.current;
 
@@ -68,6 +69,8 @@ Card Rankings:
   const handleDiscard = (cardIds: string[]) => {
     if (game.discardCards(cardIds)) {
       updateStates();
+      // Signal GameEngine to refresh its state for play phase
+      setRefreshKey(prev => prev + 1);
     }
   };
 
@@ -115,6 +118,8 @@ Card Rankings:
     const timer = setTimeout(() => {
       game.processAITrumpSelection(declarer);
       updateStates();
+      // Signal GameEngine to refresh for play phase (AI auto-discards)
+      setRefreshKey(prev => prev + 1);
     }, 1500);
 
     return () => clearTimeout(timer);
@@ -127,8 +132,13 @@ Card Rankings:
     const currentPhaseIndex = phaseOrder.indexOf(gameState.gameStage);
     const newPhaseIndex = phaseOrder.indexOf(newState.gameStage);
 
+    // Allow transition from scoring to deal/bidding (new hand)
+    const isNewHand = gameState.gameStage === 'scoring' &&
+      (newState.gameStage === 'deal' || newState.gameStage === 'bidding');
+
     // Don't allow GameEngine to regress to earlier phases (stale state)
-    if (newPhaseIndex < currentPhaseIndex) {
+    // Exception: new hand transitions are allowed
+    if (newPhaseIndex < currentPhaseIndex && !isNewHand) {
       return;
     }
 
@@ -156,7 +166,9 @@ Card Rankings:
         game={game}
         gameName="Bid Whist"
         gameRules={gameRules}
-        useUrlSeeding={false}
+        useUrlSeeding={true}
+        hideMoveHistory={true}
+        refreshKey={refreshKey}
         onGameStateChange={handleGameStateChange}
       />
 

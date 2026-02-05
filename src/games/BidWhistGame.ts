@@ -1,4 +1,5 @@
 import { CardGame, Card } from '../types/CardGame.ts';
+import { cardToLetter, letterToCard } from '../urlGameState.js';
 
 type BidDirection = 'uptown' | 'downtown' | 'downtown-noaces';
 
@@ -53,8 +54,48 @@ export class BidWhistGame extends CardGame {
     return deck;
   }
 
+  private isInDeck(eDeck: Card[], aCard: Card): boolean {
+    return eDeck.some(card => card.id === aCard.id);
+  }
+
+  private getNewRandom(existingDeck: Card[]): Card {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    let result = '';
+    let isDone = false;
+    while (!isDone) {
+      result = characters.charAt(Math.floor(Math.random() * characters.length));
+      isDone = !this.isInDeck(existingDeck, letterToCard(result));
+    }
+    return letterToCard(result);
+  }
+
+  // Perform "Close-up Magic" - create deck from URL string
+  private rigDeck(urlToDeal: string): Card[] {
+    const deck: Card[] = [];
+    for (let i = 0; i < urlToDeal.length; i++) {
+      deck.push(letterToCard(urlToDeal[i]));
+    }
+
+    // If there's randoms, fill them in with values
+    if (urlToDeal.indexOf('_') > -1) {
+      for (let i = 0; i < urlToDeal.length; i++) {
+        if (urlToDeal[i] === '_') {
+          deck[i] = this.getNewRandom(deck);
+        }
+      }
+    }
+
+    let deckString = '';
+    for (let i = 0; i < urlToDeal.length; i++) {
+      deckString = deckString + cardToLetter(deck[i]);
+    }
+
+    console.log(`Bid Whist dealing deck, URL string was: ${deckString}`);
+    return deck;
+  }
+
   dealCards(urlToDeal?: string): void {
-    const deck = this.shuffleDeck(this.createDeck());
+    const deck = urlToDeal ? this.rigDeck(urlToDeal) : this.shuffleDeck(this.createDeck());
 
     // Deal 12 cards to each player (48 cards)
     for (let i = 0; i < 48; i++) {
@@ -713,7 +754,7 @@ export class BidWhistGame extends CardGame {
   }
 
   startNewHand(): void {
-    super.startNewHand();
+    // Reset bid whist state BEFORE calling super (which deals cards)
     this.leadSuit = null;
     this.trumpSuit = null;
     this.currentHighBid = 0;
@@ -725,6 +766,8 @@ export class BidWhistGame extends CardGame {
     this.lastCompletedTrick = [];
     // Rotate dealer clockwise for new hand: 0→3→2→1→0
     this.dealer = (this.dealer + 3) % 4;
+    // Now deal cards (uses the new dealer position)
+    super.startNewHand();
   }
 
   // Getters
