@@ -26,8 +26,8 @@ const GameTable: React.FC<GameTableProps> = ({ currentTrick, message }) => {
 
   return (
     <div className="absolute inset-0 flex items-center justify-center">
-      {/* Message display */}
-      <div className="absolute top-1 left-0 right-0 text-center text-white text-lg font-bold bg-black bg-opacity-70 py-1">
+      {/* Message display - positioned below menu bar */}
+      <div className="absolute top-8 left-0 right-0 text-center text-white text-lg font-bold bg-black bg-opacity-70 py-1">
         {message}
       </div>
       

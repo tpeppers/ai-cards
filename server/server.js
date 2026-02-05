@@ -6,6 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const FormData = require('form-data');
 const { spawn } = require('child_process');
+const sharp = require('sharp');
+const labelStudio = require('./labelStudio');
 
 // ML service configuration
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:3002';
@@ -24,6 +26,11 @@ if (!fs.existsSync(uploadDir)) {
 const handsDir = path.join(__dirname, '../hands');
 if (!fs.existsSync(handsDir)) {
   fs.mkdirSync(handsDir, { recursive: true });
+}
+
+const labelingDir = path.join(__dirname, '../labeling/images');
+if (!fs.existsSync(labelingDir)) {
+  fs.mkdirSync(labelingDir, { recursive: true });
 }
 
 const handsFilePath = path.join(handsDir, 'stored_hands.txt');
@@ -265,6 +272,9 @@ app.post('/api/recognize', upload.single('image'), async (req, res) => {
   }
 });
 
+// Store recent detections for reporting (in-memory, keyed by filename)
+const recentDetections = new Map();
+
 // Direct card detection using local model
 app.post('/api/detect', upload.single('image'), async (req, res) => {
   try {
@@ -281,7 +291,19 @@ app.post('/api/detect', upload.single('image'), async (req, res) => {
       return res.status(500).json({ error: 'Model not found. Run training first.' });
     }
 
-    // Run Python detection script
+    // Get image dimensions using sharp
+    let imageWidth, imageHeight;
+    try {
+      const metadata = await sharp(imagePath).metadata();
+      imageWidth = metadata.width;
+      imageHeight = metadata.height;
+    } catch (err) {
+      console.error('Failed to get image dimensions:', err);
+      imageWidth = 0;
+      imageHeight = 0;
+    }
+
+    // Run Python detection script with bbox output
     const python = spawn('python', ['-c', `
 import sys
 import json
@@ -297,7 +319,13 @@ for result in results:
         cls_id = int(box.cls[0])
         conf = float(box.conf[0])
         name = result.names[cls_id]
-        cards.append({'name': name, 'confidence': conf})
+        # Get bbox as [x1, y1, x2, y2] in pixel coordinates
+        bbox = box.xyxy[0].tolist()
+        cards.append({
+            'name': name,
+            'confidence': conf,
+            'bbox': [round(x, 1) for x in bbox]
+        })
 
 cards.sort(key=lambda x: -x['confidence'])
 card_names = [c['name'] for c in cards]
@@ -321,18 +349,42 @@ print(json.dumps({
     });
 
     python.on('close', (code) => {
-      // Clean up uploaded file
-      fs.unlink(imagePath, () => {});
-
       if (code !== 0) {
+        fs.unlink(imagePath, () => {});
         console.error('Detection error:', errorOutput);
         return res.status(500).json({ error: 'Detection failed', details: errorOutput });
       }
 
       try {
         const result = JSON.parse(output.trim());
-        res.json(result);
+
+        // Store detection info for potential reporting (keep image for 10 minutes)
+        const detectionId = req.file.filename;
+        recentDetections.set(detectionId, {
+          imagePath,
+          imageWidth,
+          imageHeight,
+          detections: result.detections,
+          timestamp: Date.now()
+        });
+
+        // Clean up old detections after 10 minutes
+        setTimeout(() => {
+          const detection = recentDetections.get(detectionId);
+          if (detection) {
+            recentDetections.delete(detectionId);
+            fs.unlink(detection.imagePath, () => {});
+          }
+        }, 10 * 60 * 1000);
+
+        res.json({
+          ...result,
+          detectionId,
+          imageWidth,
+          imageHeight
+        });
       } catch (parseError) {
+        fs.unlink(imagePath, () => {});
         console.error('Parse error:', output);
         res.status(500).json({ error: 'Failed to parse detection results' });
       }
@@ -341,6 +393,118 @@ print(json.dumps({
   } catch (error) {
     console.error('Detection error:', error);
     res.status(500).json({ error: 'Detection failed', message: error.message });
+  }
+});
+
+// Label Studio endpoints
+
+// Check Label Studio status
+app.get('/api/label-studio/status', async (req, res) => {
+  try {
+    const status = await labelStudio.getStatus();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Setup Label Studio with API key
+app.post('/api/label-studio/setup', async (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    if (!apiKey) {
+      return res.status(400).json({ error: 'API key is required' });
+    }
+
+    const result = await labelStudio.setup(apiKey);
+    res.json({
+      success: true,
+      message: 'Label Studio configured successfully',
+      ...result
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Serve labeling images statically
+app.use('/labeling', express.static(labelingDir));
+
+// Report incorrect detection
+app.post('/api/label-studio/report', async (req, res) => {
+  try {
+    const { detectionId } = req.body;
+    if (!detectionId) {
+      return res.status(400).json({ error: 'Detection ID is required' });
+    }
+
+    // Get stored detection info
+    const detection = recentDetections.get(detectionId);
+    if (!detection) {
+      return res.status(404).json({
+        error: 'Detection not found or expired. Please re-upload the image.'
+      });
+    }
+
+    // Check Label Studio status
+    const status = await labelStudio.getStatus();
+    if (!status.running) {
+      return res.status(503).json({
+        error: 'Label Studio is not running. Start it with: npm run label-studio'
+      });
+    }
+
+    // Copy image to labeling directory with detection info
+    const labelingFilename = `${Date.now()}_${path.basename(detection.imagePath)}`;
+    const labelingPath = path.join(labelingDir, labelingFilename);
+    fs.copyFileSync(detection.imagePath, labelingPath);
+
+    // Save detection metadata for reference
+    const metaPath = labelingPath.replace(/\.[^.]+$/, '_meta.json');
+    fs.writeFileSync(metaPath, JSON.stringify({
+      originalDetections: detection.detections,
+      imageWidth: detection.imageWidth,
+      imageHeight: detection.imageHeight,
+      timestamp: new Date().toISOString()
+    }, null, 2));
+
+    // Try API-based task creation first
+    const config = labelStudio.loadConfig();
+    if (config.refreshToken && status.projectId) {
+      try {
+        const imageUrl = `http://localhost:3001/labeling/${labelingFilename}`;
+        const task = await labelStudio.createTask(
+          status.projectId,
+          imageUrl,
+          detection.detections,
+          detection.imageWidth,
+          detection.imageHeight
+        );
+
+        return res.json({
+          success: true,
+          message: 'Task created in Label Studio',
+          taskUrl: task.taskUrl,
+          taskId: task.taskId
+        });
+      } catch (apiError) {
+        console.log('API task creation failed, falling back to manual import:', apiError.message);
+      }
+    }
+
+    // Fallback: Manual import flow
+    const projectId = config.projectId || 10;
+    res.json({
+      success: true,
+      message: 'Image ready for Label Studio import',
+      manualImport: true,
+      imageUrl: `http://localhost:3001/labeling/${labelingFilename}`,
+      importUrl: `http://localhost:8080/projects/${projectId}/data?tab=13`,
+      instructions: 'Click the import URL, then add the image URL to import it'
+    });
+  } catch (error) {
+    console.error('Report error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

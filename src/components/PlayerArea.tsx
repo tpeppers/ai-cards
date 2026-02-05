@@ -52,10 +52,10 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
         raised: false
       };
     } else if (player.id === 2) {
-      // Top player (North) - cards stacked horizontally
+      // Top player (North) - cards stacked horizontally, below message bar
       return {
         x: (windowSize.width / 2) - (player.hand.length * 30 / 2) + index * 30,
-        y: 20,
+        y: 70,
         raised: false
       };
     } else {
@@ -75,7 +75,7 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
       <div className={`absolute ${
         isHuman ? 'bottom-36 left-1/2 transform -translate-x-1/2' :
         player.id === 1 ? 'right-24 top-1/2 transform -translate-y-1/2' :
-        player.id === 2 ? 'top-24 left-1/2 transform -translate-x-1/2' :
+        player.id === 2 ? 'top-44 left-1/2 transform -translate-x-1/2' :
         'left-24 top-1/2 transform -translate-y-1/2'
       } text-white font-bold bg-black bg-opacity-70 py-1 px-3 rounded z-10`}>
         {player.name} {isCurrentPlayer && '(Turn)'} - Score: {player.totalScore}
