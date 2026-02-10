@@ -14,7 +14,7 @@ const cardBackings = [
 
 const games = [
   { id: 'hearts', name: 'Hearts', description: 'Classic trick-avoiding game. Try to have the lowest score!' },
-  { id: 'bidwhist', name: 'Bid Whist', description: 'Partnership trick-taking game with bidding. Popular in African-American culture.' },
+  { id: 'bidwhist', name: 'Bid Whist', description: 'Partnership trick-taking game with bidding.' },
 ];
 
 const HomePage: React.FC<HomePageProps> = () => {
