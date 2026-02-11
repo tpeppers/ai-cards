@@ -5,6 +5,7 @@ import HeartsGame from './cards.tsx';
 import BidWhistGame from './BidWhistGame.tsx';
 import HandCreator from './components/HandCreator.tsx';
 import Upload from './components/Upload.tsx';
+import StrategyComparison from './components/StrategyComparison.tsx';
 
 function App() {
   return (
@@ -43,6 +44,12 @@ function App() {
             >
               Upload
             </Link>
+            <Link
+              to="/compare"
+              className="hover:text-blue-300 transition-colors"
+            >
+              Compare
+            </Link>
           </div>
         </nav>
 
@@ -52,6 +59,7 @@ function App() {
           <Route path="/bidwhist" element={<BidWhistGame />} />
           <Route path="/hand-creator" element={<HandCreator />} />
           <Route path="/upload" element={<Upload />} />
+          <Route path="/compare" element={<StrategyComparison />} />
         </Routes>
       </Router>
     </>
