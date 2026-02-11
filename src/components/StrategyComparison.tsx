@@ -1,20 +1,34 @@
 import React, { useState, useRef } from 'react';
-import { STRATEGY_REGISTRY, StrategyRegistryEntry } from '../strategies/index.ts';
+import { STRATEGY_REGISTRY } from '../strategies/index.ts';
 import { BatchRunner } from '../simulation/BatchRunner.ts';
 import { ComparisonConfig, StrategyComparisonResult } from '../simulation/types.ts';
 import ComparisonResults from './ComparisonResults.tsx';
 
 const bidWhistStrategies = STRATEGY_REGISTRY.filter(s => s.game === 'bidwhist');
+const CUSTOM_VALUE = 'custom';
 
 const GAME_COUNT_OPTIONS = [10, 100, 1000, 10000];
 
+const textareaBase: React.CSSProperties = {
+  width: '100%',
+  padding: '8px',
+  borderRadius: '4px',
+  border: '1px solid #4b5563',
+  backgroundColor: '#374151',
+  color: '#e5e7eb',
+  fontFamily: 'monospace',
+  fontSize: '13px',
+  resize: 'vertical',
+  boxSizing: 'border-box',
+};
+
 const StrategyComparison: React.FC = () => {
   const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'by-player'>('by-team');
-  const [team0Strategy, setTeam0Strategy] = useState(0);
-  const [team1Strategy, setTeam1Strategy] = useState(1);
+  const [team0Selection, setTeam0Selection] = useState('0');
+  const [team1Selection, setTeam1Selection] = useState('1');
+  const [custom0Text, setCustom0Text] = useState('');
+  const [custom1Text, setCustom1Text] = useState('');
   const [numGames, setNumGames] = useState(100);
-  const [customStrategy, setCustomStrategy] = useState('');
-  const [useCustomForTeam, setUseCustomForTeam] = useState<number | null>(null);
 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
@@ -22,20 +36,27 @@ const StrategyComparison: React.FC = () => {
 
   const runnerRef = useRef<BatchRunner | null>(null);
 
-  const getStrategyForIndex = (idx: number): { name: string; text: string } => {
-    if (idx < bidWhistStrategies.length) {
-      return { name: bidWhistStrategies[idx].name, text: bidWhistStrategies[idx].text };
+  const isCustom0 = team0Selection === CUSTOM_VALUE;
+  const isCustom1 = team1Selection === CUSTOM_VALUE;
+
+  const getTextForSlot = (selection: string, customText: string): { name: string; text: string } => {
+    if (selection === CUSTOM_VALUE) {
+      return { name: 'Custom', text: customText };
     }
-    return { name: 'Custom', text: customStrategy };
+    const idx = Number(selection);
+    const entry = bidWhistStrategies[idx];
+    return { name: entry.name, text: entry.text };
+  };
+
+  const getDisplayText = (selection: string, customText: string): string => {
+    if (selection === CUSTOM_VALUE) return customText;
+    const idx = Number(selection);
+    return bidWhistStrategies[idx]?.text ?? '';
   };
 
   const handleRun = async () => {
-    const strat0 = useCustomForTeam === 0
-      ? { name: 'Custom', text: customStrategy }
-      : getStrategyForIndex(team0Strategy);
-    const strat1 = useCustomForTeam === 1
-      ? { name: 'Custom', text: customStrategy }
-      : getStrategyForIndex(team1Strategy);
+    const strat0 = getTextForSlot(team0Selection, custom0Text);
+    const strat1 = getTextForSlot(team1Selection, custom1Text);
 
     const config: ComparisonConfig = {
       strategies: [
@@ -73,15 +94,21 @@ const StrategyComparison: React.FC = () => {
 
   const progressPct = progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
 
+  const teamLabel = (idx: number) =>
+    assignmentMode === 'by-team'
+      ? (idx === 0 ? 'Team 0 (You & North)' : 'Team 1 (East & West)')
+      : `Player ${idx}`;
+
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px', color: '#e5e7eb' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#0f1f15', padding: '24px', color: '#e5e7eb' }}>
+    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>
         Strategy Comparison
       </h1>
 
       {/* Config panel */}
       <div style={{
-        backgroundColor: '#1f2937',
+        backgroundColor: '#162b1e',
         padding: '20px',
         borderRadius: '8px',
         marginBottom: '16px'
@@ -121,65 +148,80 @@ const StrategyComparison: React.FC = () => {
           </div>
         </div>
 
-        {/* Strategy dropdowns */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap' }}>
-          <div>
+        {/* Strategy slots side-by-side */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+          {/* Slot 0 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
             <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-              {assignmentMode === 'by-team' ? 'Team 0 (You & North)' : 'Player 0'}
+              {teamLabel(0)}
             </label>
             <select
-              value={useCustomForTeam === 0 ? 'custom' : team0Strategy}
-              onChange={(e) => {
-                if (e.target.value === 'custom') {
-                  setUseCustomForTeam(0);
-                } else {
-                  if (useCustomForTeam === 0) setUseCustomForTeam(null);
-                  setTeam0Strategy(Number(e.target.value));
-                }
-              }}
+              value={team0Selection}
+              onChange={(e) => setTeam0Selection(e.target.value)}
               style={{
                 padding: '6px 12px',
                 borderRadius: '4px',
                 border: '1px solid #4b5563',
                 backgroundColor: '#374151',
                 color: '#e5e7eb',
-                minWidth: '180px',
+                width: '100%',
+                marginBottom: '8px',
               }}
             >
               {bidWhistStrategies.map((s, i) => (
-                <option key={i} value={i}>{s.name}</option>
+                <option key={i} value={String(i)}>{s.name}</option>
               ))}
-              <option value="custom">Custom</option>
+              <option value={CUSTOM_VALUE}>Custom</option>
             </select>
+            <textarea
+              value={getDisplayText(team0Selection, custom0Text)}
+              onChange={(e) => { if (isCustom0) setCustom0Text(e.target.value); }}
+              readOnly={!isCustom0}
+              rows={14}
+              style={{
+                ...textareaBase,
+                opacity: isCustom0 ? 1 : 0.7,
+                cursor: isCustom0 ? 'text' : 'default',
+              }}
+              placeholder={isCustom0 ? 'Paste .cstrat strategy here...' : ''}
+            />
           </div>
-          <div>
+
+          {/* Slot 1 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
             <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-              {assignmentMode === 'by-team' ? 'Team 1 (East & West)' : 'Player 1'}
+              {teamLabel(1)}
             </label>
             <select
-              value={useCustomForTeam === 1 ? 'custom' : team1Strategy}
-              onChange={(e) => {
-                if (e.target.value === 'custom') {
-                  setUseCustomForTeam(1);
-                } else {
-                  if (useCustomForTeam === 1) setUseCustomForTeam(null);
-                  setTeam1Strategy(Number(e.target.value));
-                }
-              }}
+              value={team1Selection}
+              onChange={(e) => setTeam1Selection(e.target.value)}
               style={{
                 padding: '6px 12px',
                 borderRadius: '4px',
                 border: '1px solid #4b5563',
                 backgroundColor: '#374151',
                 color: '#e5e7eb',
-                minWidth: '180px',
+                width: '100%',
+                marginBottom: '8px',
               }}
             >
               {bidWhistStrategies.map((s, i) => (
-                <option key={i} value={i}>{s.name}</option>
+                <option key={i} value={String(i)}>{s.name}</option>
               ))}
-              <option value="custom">Custom</option>
+              <option value={CUSTOM_VALUE}>Custom</option>
             </select>
+            <textarea
+              value={getDisplayText(team1Selection, custom1Text)}
+              onChange={(e) => { if (isCustom1) setCustom1Text(e.target.value); }}
+              readOnly={!isCustom1}
+              rows={14}
+              style={{
+                ...textareaBase,
+                opacity: isCustom1 ? 1 : 0.7,
+                cursor: isCustom1 ? 'text' : 'default',
+              }}
+              placeholder={isCustom1 ? 'Paste .cstrat strategy here...' : ''}
+            />
           </div>
         </div>
 
@@ -208,32 +250,6 @@ const StrategyComparison: React.FC = () => {
           </div>
         </div>
 
-        {/* Custom strategy textarea */}
-        {useCustomForTeam !== null && (
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-              Custom Strategy (for {assignmentMode === 'by-team' ? `Team ${useCustomForTeam}` : `Player ${useCustomForTeam}`})
-            </label>
-            <textarea
-              value={customStrategy}
-              onChange={(e) => setCustomStrategy(e.target.value)}
-              rows={12}
-              style={{
-                width: '100%',
-                padding: '8px',
-                borderRadius: '4px',
-                border: '1px solid #4b5563',
-                backgroundColor: '#374151',
-                color: '#e5e7eb',
-                fontFamily: 'monospace',
-                fontSize: '13px',
-                resize: 'vertical',
-              }}
-              placeholder="Paste .cstrat strategy here..."
-            />
-          </div>
-        )}
-
         {/* Run button */}
         <button
           onClick={handleRun}
@@ -256,7 +272,7 @@ const StrategyComparison: React.FC = () => {
       {/* Progress bar */}
       {running && (
         <div style={{
-          backgroundColor: '#1f2937',
+          backgroundColor: '#162b1e',
           padding: '16px',
           borderRadius: '8px',
           marginBottom: '16px'
@@ -297,6 +313,7 @@ const StrategyComparison: React.FC = () => {
 
       {/* Results */}
       {result && <ComparisonResults result={result} />}
+    </div>
     </div>
   );
 };

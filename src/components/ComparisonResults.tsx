@@ -44,7 +44,7 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
 
       {/* Breakdown */}
       <div style={{
-        backgroundColor: '#1f2937',
+        backgroundColor: '#162b1e',
         padding: '16px',
         borderRadius: '8px',
         marginBottom: '24px'
@@ -73,7 +73,7 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
           <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '2px solid #374151', position: 'sticky', top: 0, backgroundColor: '#111827' }}>
+                <tr style={{ borderBottom: '2px solid #374151', position: 'sticky', top: 0, backgroundColor: '#0f1f15' }}>
                   <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: '13px' }}>#</th>
                   <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: '13px' }}>Rotation</th>
                   <th style={{ padding: '6px 8px', textAlign: 'left', fontSize: '13px' }}>Config A Winner</th>
