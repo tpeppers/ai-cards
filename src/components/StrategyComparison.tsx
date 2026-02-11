@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { STRATEGY_REGISTRY } from '../strategies/index.ts';
 import { BatchRunner } from '../simulation/BatchRunner.ts';
 import { ComparisonConfig, StrategyComparisonResult } from '../simulation/types.ts';
+import { RED_TEAM_DECKS } from '../simulation/redTeamDecks.ts';
 import ComparisonResults from './ComparisonResults.tsx';
 
 const bidWhistStrategies = STRATEGY_REGISTRY.filter(s => s.game === 'bidwhist');
@@ -23,12 +24,17 @@ const textareaBase: React.CSSProperties = {
 };
 
 const StrategyComparison: React.FC = () => {
-  const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'by-player'>('by-team');
+  const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'round-robin'>('by-team');
   const [team0Selection, setTeam0Selection] = useState('0');
   const [team1Selection, setTeam1Selection] = useState('1');
   const [custom0Text, setCustom0Text] = useState('');
   const [custom1Text, setCustom1Text] = useState('');
   const [numGames, setNumGames] = useState(100);
+
+  // Round-robin state
+  const [rrSelected, setRrSelected] = useState<Set<number>>(() => new Set([0, 1]));
+  const [rrCustomChecked, setRrCustomChecked] = useState(false);
+  const [rrCustomText, setRrCustomText] = useState('');
 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
@@ -54,24 +60,55 @@ const StrategyComparison: React.FC = () => {
     return bidWhistStrategies[idx]?.text ?? '';
   };
 
-  const handleRun = async () => {
-    const strat0 = getTextForSlot(team0Selection, custom0Text);
-    const strat1 = getTextForSlot(team1Selection, custom1Text);
+  const toggleRrStrategy = (idx: number) => {
+    setRrSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
 
-    const config: ComparisonConfig = {
-      strategies: [
-        { name: strat0.name, strategyText: strat0.text },
-        { name: strat1.name, strategyText: strat1.text },
-      ],
-      assignmentMode,
-      numGames,
-    };
+  const rrStrategyCount = rrSelected.size + (rrCustomChecked ? 1 : 0);
+
+  const handleRun = async () => {
+    let config: ComparisonConfig;
+
+    const isRedMode = numGames === -1;
+    const effectiveNumGames = isRedMode ? RED_TEAM_DECKS.length : numGames;
+    const predefinedDeckUrls = isRedMode ? RED_TEAM_DECKS.map(d => d.url) : undefined;
+
+    if (assignmentMode === 'by-team') {
+      const strat0 = getTextForSlot(team0Selection, custom0Text);
+      const strat1 = getTextForSlot(team1Selection, custom1Text);
+      config = {
+        strategies: [
+          { name: strat0.name, strategyText: strat0.text },
+          { name: strat1.name, strategyText: strat1.text },
+        ],
+        assignmentMode,
+        numGames: effectiveNumGames,
+        predefinedDeckUrls,
+      };
+    } else {
+      // Round-robin: build strategies from checked items
+      const strategies = Array.from(rrSelected)
+        .sort((a, b) => a - b)
+        .map(idx => ({
+          name: bidWhistStrategies[idx].name,
+          strategyText: bidWhistStrategies[idx].text,
+        }));
+      if (rrCustomChecked && rrCustomText.trim()) {
+        strategies.push({ name: 'Custom', strategyText: rrCustomText });
+      }
+      config = { strategies, assignmentMode, numGames: effectiveNumGames, predefinedDeckUrls };
+    }
 
     const runner = new BatchRunner();
     runnerRef.current = runner;
     setRunning(true);
     setResult(null);
-    setProgress({ completed: 0, total: numGames * 4 });
+    setProgress({ completed: 0, total: 0 });
 
     try {
       const comparisonResult = await runner.runComparison(config, (completed, total) => {
@@ -94,10 +131,7 @@ const StrategyComparison: React.FC = () => {
 
   const progressPct = progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
 
-  const teamLabel = (idx: number) =>
-    assignmentMode === 'by-team'
-      ? (idx === 0 ? 'Team 0 (You & North)' : 'Team 1 (East & West)')
-      : `Player ${idx}`;
+  const canRun = assignmentMode === 'by-team' || rrStrategyCount >= 2;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0f1f15', padding: '24px', color: '#e5e7eb' }}>
@@ -133,97 +167,171 @@ const StrategyComparison: React.FC = () => {
               By Team
             </button>
             <button
-              onClick={() => setAssignmentMode('by-player')}
+              onClick={() => setAssignmentMode('round-robin')}
               style={{
                 padding: '6px 16px',
                 borderRadius: '4px',
                 border: 'none',
-                backgroundColor: assignmentMode === 'by-player' ? '#3b82f6' : '#374151',
+                backgroundColor: assignmentMode === 'round-robin' ? '#3b82f6' : '#374151',
                 color: '#e5e7eb',
                 cursor: 'pointer',
               }}
             >
-              By Player
+              Round Robin
             </button>
           </div>
         </div>
 
-        {/* Strategy slots side-by-side */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-          {/* Slot 0 */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-              {teamLabel(0)}
-            </label>
-            <select
-              value={team0Selection}
-              onChange={(e) => setTeam0Selection(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '4px',
-                border: '1px solid #4b5563',
-                backgroundColor: '#374151',
-                color: '#e5e7eb',
-                width: '100%',
-                marginBottom: '8px',
-              }}
-            >
-              {bidWhistStrategies.map((s, i) => (
-                <option key={i} value={String(i)}>{s.name}</option>
-              ))}
-              <option value={CUSTOM_VALUE}>Custom</option>
-            </select>
-            <textarea
-              value={getDisplayText(team0Selection, custom0Text)}
-              onChange={(e) => { if (isCustom0) setCustom0Text(e.target.value); }}
-              readOnly={!isCustom0}
-              rows={14}
-              style={{
-                ...textareaBase,
-                opacity: isCustom0 ? 1 : 0.7,
-                cursor: isCustom0 ? 'text' : 'default',
-              }}
-              placeholder={isCustom0 ? 'Paste .cstrat strategy here...' : ''}
-            />
-          </div>
+        {/* By-team: two strategy slots side-by-side */}
+        {assignmentMode === 'by-team' && (
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+            {/* Slot 0 */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
+                Team 0 (You & North)
+              </label>
+              <select
+                value={team0Selection}
+                onChange={(e) => setTeam0Selection(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #4b5563',
+                  backgroundColor: '#374151',
+                  color: '#e5e7eb',
+                  width: '100%',
+                  marginBottom: '8px',
+                }}
+              >
+                {bidWhistStrategies.map((s, i) => (
+                  <option key={i} value={String(i)}>{s.name}</option>
+                ))}
+                <option value={CUSTOM_VALUE}>Custom</option>
+              </select>
+              <textarea
+                value={getDisplayText(team0Selection, custom0Text)}
+                onChange={(e) => { if (isCustom0) setCustom0Text(e.target.value); }}
+                readOnly={!isCustom0}
+                rows={14}
+                style={{
+                  ...textareaBase,
+                  opacity: isCustom0 ? 1 : 0.7,
+                  cursor: isCustom0 ? 'text' : 'default',
+                }}
+                placeholder={isCustom0 ? 'Paste .cstrat strategy here...' : ''}
+              />
+            </div>
 
-          {/* Slot 1 */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-              {teamLabel(1)}
-            </label>
-            <select
-              value={team1Selection}
-              onChange={(e) => setTeam1Selection(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '4px',
-                border: '1px solid #4b5563',
-                backgroundColor: '#374151',
-                color: '#e5e7eb',
-                width: '100%',
-                marginBottom: '8px',
-              }}
-            >
-              {bidWhistStrategies.map((s, i) => (
-                <option key={i} value={String(i)}>{s.name}</option>
-              ))}
-              <option value={CUSTOM_VALUE}>Custom</option>
-            </select>
-            <textarea
-              value={getDisplayText(team1Selection, custom1Text)}
-              onChange={(e) => { if (isCustom1) setCustom1Text(e.target.value); }}
-              readOnly={!isCustom1}
-              rows={14}
-              style={{
-                ...textareaBase,
-                opacity: isCustom1 ? 1 : 0.7,
-                cursor: isCustom1 ? 'text' : 'default',
-              }}
-              placeholder={isCustom1 ? 'Paste .cstrat strategy here...' : ''}
-            />
+            {/* Slot 1 */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
+                Team 1 (East & West)
+              </label>
+              <select
+                value={team1Selection}
+                onChange={(e) => setTeam1Selection(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #4b5563',
+                  backgroundColor: '#374151',
+                  color: '#e5e7eb',
+                  width: '100%',
+                  marginBottom: '8px',
+                }}
+              >
+                {bidWhistStrategies.map((s, i) => (
+                  <option key={i} value={String(i)}>{s.name}</option>
+                ))}
+                <option value={CUSTOM_VALUE}>Custom</option>
+              </select>
+              <textarea
+                value={getDisplayText(team1Selection, custom1Text)}
+                onChange={(e) => { if (isCustom1) setCustom1Text(e.target.value); }}
+                readOnly={!isCustom1}
+                rows={14}
+                style={{
+                  ...textareaBase,
+                  opacity: isCustom1 ? 1 : 0.7,
+                  cursor: isCustom1 ? 'text' : 'default',
+                }}
+                placeholder={isCustom1 ? 'Paste .cstrat strategy here...' : ''}
+              />
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Round-robin: checkbox list */}
+        {assignmentMode === 'round-robin' && (
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>
+              Select strategies to compare ({rrStrategyCount} selected, need 2+)
+            </label>
+            <div style={{
+              maxHeight: '300px',
+              overflowY: 'auto',
+              backgroundColor: '#0f1f15',
+              borderRadius: '6px',
+              padding: '8px',
+              border: '1px solid #374151',
+            }}>
+              {bidWhistStrategies.map((s, i) => (
+                <label
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 8px',
+                    cursor: 'pointer',
+                    borderRadius: '4px',
+                    backgroundColor: rrSelected.has(i) ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={rrSelected.has(i)}
+                    onChange={() => toggleRrStrategy(i)}
+                    style={{ accentColor: '#3b82f6' }}
+                  />
+                  <span style={{ fontSize: '13px' }}>{s.name}</span>
+                </label>
+              ))}
+              {/* Custom option */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 8px',
+                  cursor: 'pointer',
+                  borderRadius: '4px',
+                  backgroundColor: rrCustomChecked ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                  borderTop: '1px solid #374151',
+                  marginTop: '4px',
+                  paddingTop: '10px',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={rrCustomChecked}
+                  onChange={() => setRrCustomChecked(!rrCustomChecked)}
+                  style={{ accentColor: '#3b82f6' }}
+                />
+                <span style={{ fontSize: '13px' }}>Custom</span>
+              </label>
+            </div>
+            {rrCustomChecked && (
+              <textarea
+                value={rrCustomText}
+                onChange={(e) => setRrCustomText(e.target.value)}
+                rows={10}
+                style={{ ...textareaBase, marginTop: '8px' }}
+                placeholder="Paste .cstrat strategy here..."
+              />
+            )}
+          </div>
+        )}
 
         {/* Game count */}
         <div style={{ marginBottom: '16px' }}>
@@ -247,22 +355,36 @@ const StrategyComparison: React.FC = () => {
                 {n >= 1000 ? `${n / 1000}K` : n}
               </button>
             ))}
+            <button
+              onClick={() => setNumGames(-1)}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: numGames === -1 ? '#ef4444' : '#374151',
+                color: '#e5e7eb',
+                cursor: 'pointer',
+                fontWeight: numGames === -1 ? 'bold' : 'normal',
+              }}
+            >
+              {RED_TEAM_DECKS.length}-RED
+            </button>
           </div>
         </div>
 
         {/* Run button */}
         <button
           onClick={handleRun}
-          disabled={running}
+          disabled={running || !canRun}
           style={{
             padding: '10px 32px',
             borderRadius: '6px',
             border: 'none',
-            backgroundColor: running ? '#4b5563' : '#10b981',
+            backgroundColor: (running || !canRun) ? '#4b5563' : '#10b981',
             color: '#ffffff',
             fontWeight: 'bold',
             fontSize: '16px',
-            cursor: running ? 'not-allowed' : 'pointer',
+            cursor: (running || !canRun) ? 'not-allowed' : 'pointer',
           }}
         >
           {running ? 'Running...' : 'Run Comparison'}
