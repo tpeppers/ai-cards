@@ -1,5 +1,7 @@
 import { CardGame, Card } from '../types/CardGame.ts';
 import { cardToLetter, letterToCard } from '../urlGameState.js';
+import { evaluatePlay, evaluateBid, evaluateTrump } from '../strategy/evaluator.ts';
+import { buildBidWhistContext } from '../strategy/context.ts';
 
 type BidDirection = 'uptown' | 'downtown' | 'downtown-noaces';
 
@@ -254,6 +256,16 @@ export class BidWhistGame extends CardGame {
 
   // AI bidding logic - separate for future expansion
   getAIBid(playerId: number): number {
+    // Try strategy evaluator first
+    if (this.strategy) {
+      const ctx = buildBidWhistContext(this, playerId);
+      const bid = evaluateBid(this.strategy, ctx);
+      if (bid !== null) {
+        return bid;
+      }
+    }
+
+    // Fallback to default logic
     // Dealer's 4th bid - special options
     if (this.isDealersTurn() && playerId === this.dealer) {
       // If there's a bid to take, AI dealer might take it or pass
@@ -389,6 +401,19 @@ export class BidWhistGame extends CardGame {
 
   // AI trump selection logic - chooses based on hand composition
   getAITrumpSelection(playerId: number): { suit: string; direction: BidDirection } {
+    // Try strategy evaluator first
+    if (this.strategy) {
+      const ctx = buildBidWhistContext(this, playerId);
+      const result = evaluateTrump(this.strategy, ctx);
+      if (result) {
+        const validDirections: BidDirection[] = ['uptown', 'downtown', 'downtown-noaces'];
+        const dir = validDirections.includes(result.direction as BidDirection)
+          ? result.direction as BidDirection : 'uptown';
+        return { suit: result.suit, direction: dir };
+      }
+    }
+
+    // Fallback to default logic
     const hand = this.players[playerId].hand;
 
     // Count cards in each suit
@@ -574,6 +599,20 @@ export class BidWhistGame extends CardGame {
   }
 
   getBestMove(playerId: number): Card | null {
+    // Try strategy evaluator first
+    if (this.strategy) {
+      const ctx = buildBidWhistContext(this, playerId);
+      const card = evaluatePlay(this.strategy, ctx);
+      if (card && this.isValidMove(playerId, card)) {
+        return card;
+      }
+    }
+
+    // Fallback to default logic
+    return this.defaultGetBestMove(playerId);
+  }
+
+  private defaultGetBestMove(playerId: number): Card | null {
     const playerHand = this.players[playerId].hand;
 
     if (playerHand.length === 0) return null;
@@ -625,7 +664,7 @@ export class BidWhistGame extends CardGame {
     );
   }
 
-  private getCardValue(card: Card): number {
+  getCardValue(card: Card): number {
     // Uptown: A K Q J 10 9 8 7 6 5 4 3 2 (A highest)
     // Downtown: A 2 3 4 5 6 7 8 9 10 J Q K (A still high, 2 is best)
     // Downtown No Aces: 2 3 4 5 6 7 8 9 10 J Q K A (2 is best, A is worst)
@@ -639,7 +678,7 @@ export class BidWhistGame extends CardGame {
     }
   }
 
-  private compareCards(a: Card, b: Card): number {
+  compareCards(a: Card, b: Card): number {
     // Trump beats non-trump
     if (a.suit === this.trumpSuit && b.suit !== this.trumpSuit) return 1;
     if (b.suit === this.trumpSuit && a.suit !== this.trumpSuit) return -1;
@@ -651,7 +690,7 @@ export class BidWhistGame extends CardGame {
     return 0;
   }
 
-  private evaluateCurrentWinner(): number {
+  evaluateCurrentWinner(): number {
     if (this.currentTrick.length === 0) return -1;
 
     let winnerIndex = 0;
@@ -753,7 +792,7 @@ export class BidWhistGame extends CardGame {
     this.message = 'Welcome to Bid Whist!';
   }
 
-  startNewHand(): void {
+  startNewHand(url?: string): void {
     // Reset bid whist state BEFORE calling super (which deals cards)
     this.leadSuit = null;
     this.trumpSuit = null;
@@ -767,7 +806,26 @@ export class BidWhistGame extends CardGame {
     // Rotate dealer clockwise for new hand: 0→3→2→1→0
     this.dealer = (this.dealer + 3) % 4;
     // Now deal cards (uses the new dealer position)
-    super.startNewHand();
+    super.startNewHand(url);
+  }
+
+  // Simulation helpers
+  simulateAutoDiscard(playerId: number): void {
+    this.autoDiscard(playerId);
+    this.findStartingPlayer();
+    this.gameStage = 'play';
+  }
+
+  setDealer(dealer: number): void {
+    this.dealer = dealer;
+  }
+
+  getBooksWon(): [number, number] {
+    return this.booksWon;
+  }
+
+  getCurrentHighBid(): number {
+    return this.currentHighBid;
   }
 
   // Getters

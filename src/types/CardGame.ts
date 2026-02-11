@@ -1,5 +1,8 @@
 // Generic card game interfaces and types
 
+import { StrategyAST } from '../strategy/types.ts';
+import { parseStrategy } from '../strategy/parser.ts';
+
 export interface Card {
   suit: string;
   rank: number;
@@ -46,6 +49,8 @@ export abstract class CardGame {
   protected gameOver: boolean;
   protected winner: Player | null;
   protected message: string;
+  protected strategy: StrategyAST | null = null;
+  protected allPlayedCards: Card[] = [];
 
   constructor(playerNames: string[]) {
     this.players = playerNames.map((name, index) => ({
@@ -62,6 +67,18 @@ export abstract class CardGame {
     this.gameOver = false;
     this.winner = null;
     this.message = 'Welcome to the game!';
+  }
+
+  loadStrategy(text: string): void {
+    this.strategy = parseStrategy(text);
+  }
+
+  setStrategy(ast: StrategyAST | null): void {
+    this.strategy = ast;
+  }
+
+  getPlayedCards(): Card[] {
+    return [...this.allPlayedCards];
   }
 
   // Abstract methods that each game must implement
@@ -124,9 +141,12 @@ export abstract class CardGame {
   }
 
   protected finalizeTrick(winnerPlayerId: number): void {
+    // Track all played cards for strategy context
+    this.allPlayedCards.push(...this.currentTrick.map(play => play.card));
+
     // Add cards to winner's tricks
     this.players[winnerPlayerId].tricks.push(...this.currentTrick.map(play => play.card));
-    
+
     // Clear the current trick
     this.currentTrick = [];
     this.currentPlayer = winnerPlayerId;
@@ -198,9 +218,10 @@ export abstract class CardGame {
     this.gameOver = false;
     this.winner = null;
     this.message = 'Welcome to the game!';
+    this.allPlayedCards = [];
   }
 
-  startNewHand(): void {
+  startNewHand(url?: string): void {
     this.players.forEach(player => {
       player.hand = [];
       player.tricks = [];
@@ -209,6 +230,7 @@ export abstract class CardGame {
     this.currentTrick = [];
     this.currentPlayer = null;
     this.gameStage = 'deal';
-    this.dealCards();
+    this.allPlayedCards = [];
+    this.dealCards(url);
   }
 }

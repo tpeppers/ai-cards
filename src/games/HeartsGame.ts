@@ -1,5 +1,7 @@
 import { CardGame, Card, Player } from '../types/CardGame.ts';
-import { cardToLetter, letterToCard } from '../urlGameState.js'
+import { cardToLetter, letterToCard } from '../urlGameState.js';
+import { evaluatePlay } from '../strategy/evaluator.ts';
+import { buildHeartsContext } from '../strategy/context.ts';
 
 export class HeartsGame extends CardGame {
   private leadSuit: string | null = null;
@@ -222,8 +224,22 @@ export class HeartsGame extends CardGame {
   }
 
   getBestMove(playerId: number): Card | null {
+    // Try strategy evaluator first
+    if (this.strategy) {
+      const ctx = buildHeartsContext(this, playerId);
+      const card = evaluatePlay(this.strategy, ctx);
+      if (card && this.isValidMove(playerId, card)) {
+        return card;
+      }
+    }
+
+    // Fallback to default logic
+    return this.defaultGetBestMove(playerId);
+  }
+
+  private defaultGetBestMove(playerId: number): Card | null {
     const playerHand = this.players[playerId].hand;
-    
+
     if (playerHand.length === 0) return null;
 
     // If leading a trick
