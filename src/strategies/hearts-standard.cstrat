@@ -1,0 +1,37 @@
+strategy "Hearts Standard"
+game: hearts
+
+play:
+  leading:
+    # Must play 2 of clubs if we have it (first trick)
+    when have("clubs_2"):
+      play hand.suit("clubs").lowest
+    # If hearts aren't broken, lead a non-heart
+    when not hearts_broken and hand.nontrump.count > 0:
+      play hand.nontrump.lowest
+    # Otherwise play lowest card
+    default:
+      play hand.lowest
+
+  following:
+    # Play highest card that won't win the trick (duck under)
+    when hand.suit(lead_suit).losers.count > 0:
+      play hand.suit(lead_suit).losers.highest
+    # Must win - play lowest of suit
+    default:
+      play hand.suit(lead_suit).lowest
+
+  void:
+    # First trick: can't play hearts or queen of spades
+    # Dump queen of spades if possible
+    when have("spades_12") and not is_first_trick:
+      play hand.suit("spades").highest
+    # Dump high hearts
+    when hand.hearts.count > 0 and not is_first_trick:
+      play hand.hearts.highest
+    # First trick - play king of spades if we have it
+    when have("spades_13") and is_first_trick:
+      play hand.suit("spades").highest
+    # Play highest card to dump points
+    default:
+      play hand.highest

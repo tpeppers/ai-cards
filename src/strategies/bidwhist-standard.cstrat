@@ -1,0 +1,76 @@
+strategy "Bid Whist Standard"
+game: bidwhist
+
+play:
+  leading:
+    # If on declarer's team, lead with trump to pull opponents' trump
+    when on_declarer_team and has_trump:
+      play hand.trump.highest
+    # Otherwise lead lowest card
+    default:
+      play hand.lowest
+
+  following:
+    # If we have cards that can win the trick, play the lowest winner
+    when hand.suit(lead_suit).winners.count > 0:
+      play hand.suit(lead_suit).winners.lowest
+    # Otherwise dump our lowest card of the suit
+    default:
+      play hand.suit(lead_suit).lowest
+
+  void:
+    # If partner is not winning and we have trump, trump in with lowest
+    when not partner_winning and has_trump:
+      play hand.trump.lowest
+    # Otherwise dump lowest card
+    default:
+      play hand.lowest
+
+bid:
+  # Dealer's 4th bid special handling
+  when is_dealer and bid.current > 0 and bid.current <= 3:
+    bid take
+  when is_dealer and bid.current > 3:
+    pass
+  when is_dealer and bid.current == 0:
+    bid 1
+  # Player 1 (East) - conservative, max bid 1
+  when me.id == 1 and bid.current >= 1:
+    pass
+  when me.id == 1:
+    bid 1
+  # Player 2 (North) - moderate, max bid 2
+  when me.id == 2 and bid.current >= 2:
+    pass
+  when me.id == 2 and bid.current == 1:
+    bid 2
+  when me.id == 2:
+    bid 1
+  # Player 3 (West) - aggressive, max bid 3
+  when me.id == 3 and bid.current >= 3:
+    pass
+  when me.id == 3 and bid.current == 2:
+    bid 3
+  when me.id == 3 and bid.current == 1:
+    bid 2
+  when me.id == 3:
+    bid 1
+  default:
+    pass
+
+trump:
+  # Partner signaled low hand - go downtown
+  when partner_bid == 1:
+    choose suit: best_suit() direction: downtown
+  # Partner signaled high hand - go uptown
+  when partner_bid == 2:
+    choose suit: best_suit() direction: uptown
+  # More low cards than high, and have aces - downtown with aces good
+  when low_count() > high_count() and ace_count() >= 2:
+    choose suit: best_suit() direction: downtown
+  # More low cards but few aces - downtown no aces
+  when low_count() > high_count():
+    choose suit: best_suit() direction: downtown-noaces
+  # Default to uptown
+  default:
+    choose suit: best_suit() direction: uptown
