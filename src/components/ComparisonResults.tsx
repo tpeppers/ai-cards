@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { StrategyComparisonResult, HandResult } from '../simulation/types.ts';
+import { StrategyComparisonResult, GameResult, HandResult } from '../simulation/types.ts';
 import { BidWhistSimulator } from '../simulation/BidWhistSimulator.ts';
 import { computeAllHandStrengths } from '../simulation/handStrength.ts';
 
@@ -557,6 +557,74 @@ function computeBidAnalysis(result: StrategyComparisonResult): BidAnalysisData {
   };
 }
 
+// ── Filtered Hand Computation ────────────────────────────────────────
+
+interface FilteredHandEntry {
+  game: GameResult;
+  hand: HandResult;
+  handIndex: number;
+  declarerTeam: number;
+  defenderTeam: number;
+  declStratIdx: number;
+  defStratIdx: number;
+  made: boolean;
+}
+
+function computeFilteredHands(
+  result: StrategyComparisonResult,
+  filter: HandFilter,
+): FilteredHandEntry[] {
+  const isRR = result.config.assignmentMode === 'round-robin';
+  const entries: FilteredHandEntry[] = [];
+
+  for (const game of result.results) {
+    for (let hi = 0; hi < game.hands.length; hi++) {
+      const hand = game.hands[hi];
+      if (hand.bidWinner < 0 || !hand.bidAmount) continue;
+
+      const declarerTeam = hand.bidWinner % 2;
+      const defenderTeam = 1 - declarerTeam;
+
+      let declStratIdx: number;
+      let defStratIdx: number;
+      if (isRR) {
+        declStratIdx = declarerTeam === 0 ? game.team0StrategyIndex : game.team1StrategyIndex;
+        defStratIdx = defenderTeam === 0 ? game.team0StrategyIndex : game.team1StrategyIndex;
+      } else {
+        declStratIdx = game.configIndex === declarerTeam ? 0 : 1;
+        defStratIdx = game.configIndex === defenderTeam ? 0 : 1;
+      }
+
+      const declarerBooks = hand.booksWon[declarerTeam] + 1;
+      const made = declarerBooks >= hand.bidAmount + 6;
+
+      // Check filter criteria
+      if (filter.bidLevel !== undefined && hand.bidAmount !== filter.bidLevel) continue;
+      if (filter.direction !== undefined && hand.direction !== filter.direction) continue;
+      if (filter.trumpSuit !== undefined && hand.trumpSuit !== filter.trumpSuit) continue;
+
+      // Role + strategy check
+      if (filter.role === 'declaring') {
+        if (filter.strategyIndex !== undefined && declStratIdx !== filter.strategyIndex) continue;
+        if (filter.outcome === 'made' && !made) continue;
+        if (filter.outcome === 'set' && made) continue;
+      } else if (filter.role === 'defending') {
+        if (filter.strategyIndex !== undefined && defStratIdx !== filter.strategyIndex) continue;
+        if (filter.outcome === 'set' && made) continue;  // "set" means defender set the declarer (declarer didn't make)
+        if (filter.outcome === 'made' && !made) continue; // shouldn't normally happen for defending, but handle it
+      } else {
+        // role === 'any'
+        if (filter.outcome === 'made' && !made) continue;
+        if (filter.outcome === 'set' && made) continue;
+      }
+
+      entries.push({ game, hand, handIndex: hi, declarerTeam, defenderTeam, declStratIdx, defStratIdx, made });
+    }
+  }
+
+  return entries;
+}
+
 // ── Styles ───────────────────────────────────────────────────────────
 
 const thStyle: React.CSSProperties = {
@@ -584,9 +652,21 @@ const boxStyle: React.CSSProperties = {
   marginBottom: '16px',
 };
 
+// ── Hand Filter ──────────────────────────────────────────────────────
+
+interface HandFilter {
+  label: string;
+  strategyIndex?: number;
+  role: 'declaring' | 'defending' | 'any';
+  outcome?: 'made' | 'set';
+  bidLevel?: number;
+  direction?: string;
+  trumpSuit?: string;
+}
+
 // ── Tab types ────────────────────────────────────────────────────────
 
-type TabId = 'results' | 'interesting' | 'stats' | 'bidAnalysis' | 'handStrength';
+type TabId = 'results' | 'interesting' | 'stats' | 'bidAnalysis' | 'handStrength' | 'filtered';
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -608,6 +688,13 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
   type HsSortKey = 'id' | 'preBidAdv' | 'postAdv'
     | 'preBidS' | 'preBidE' | 'preBidN' | 'preBidW'
     | 'postS' | 'postE' | 'postN' | 'postW';
+  const [handFilter, setHandFilter] = useState<HandFilter | null>(null);
+
+  const showFiltered = (filter: HandFilter) => {
+    setHandFilter(filter);
+    setActiveTab('filtered');
+  };
+
   const [hsSortKey, setHsSortKey] = useState<HsSortKey>('id');
   const [hsSortAsc, setHsSortAsc] = useState<boolean>(true);
 
@@ -659,20 +746,25 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
     });
   };
 
-  const tabs: { id: TabId; label: string }[] = isRR
-    ? [
-        { id: 'results', label: 'Results' },
-        { id: 'interesting', label: `Interesting Games (${interestingGames.length})` },
-        { id: 'stats', label: 'Stats Overview' },
-        { id: 'bidAnalysis', label: 'Bid Analysis' },
-      ]
-    : [
-        { id: 'results', label: 'Results' },
-        { id: 'interesting', label: `Interesting Games (${interestingGames.length})` },
-        { id: 'stats', label: 'Stats Overview' },
-        { id: 'bidAnalysis', label: 'Bid Analysis' },
-        { id: 'handStrength', label: 'Hand Strength' },
-      ];
+  const tabs: { id: TabId; label: string }[] = [
+    ...(isRR
+      ? [
+          { id: 'results' as TabId, label: 'Results' },
+          { id: 'interesting' as TabId, label: `Interesting Games (${interestingGames.length})` },
+          { id: 'stats' as TabId, label: 'Stats Overview' },
+          { id: 'bidAnalysis' as TabId, label: 'Bid Analysis' },
+        ]
+      : [
+          { id: 'results' as TabId, label: 'Results' },
+          { id: 'interesting' as TabId, label: `Interesting Games (${interestingGames.length})` },
+          { id: 'stats' as TabId, label: 'Stats Overview' },
+          { id: 'bidAnalysis' as TabId, label: 'Bid Analysis' },
+          { id: 'handStrength' as TabId, label: 'Hand Strength' },
+        ]),
+    ...(handFilter
+      ? [{ id: 'filtered' as TabId, label: `Filtered: ${handFilter.label}` }]
+      : []),
+  ];
 
   return (
     <div style={{ marginTop: '24px' }}>
@@ -696,6 +788,8 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
           box-shadow: 0 2px 8px rgba(0,0,0,0.5);
         }
         .hand-tip:hover .hand-tip-content { display: block; }
+        .stat-link { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+        .stat-link:hover { text-decoration-style: solid; background-color: rgba(96, 165, 250, 0.1); }
       `}</style>
       {/* Tab bar */}
       <div style={{ display: 'flex', marginBottom: '16px' }}>
@@ -1116,11 +1210,13 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                           <tbody>
                             <tr>
                               <td style={{ padding: '2px 0', fontSize: '12px', color: '#9ca3af' }}>Declared</td>
-                              <td style={{ padding: '2px 0', fontSize: '12px', textAlign: 'right' }}>{o.declared} hands</td>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', label: `${name} declaring` })}
+                                style={{ padding: '2px 0', fontSize: '12px', textAlign: 'right' }}>{o.declared} hands</td>
                             </tr>
                             <tr>
                               <td style={{ padding: '2px 0', fontSize: '12px', color: '#9ca3af' }}>Make Rate</td>
-                              <td style={{ padding: '2px 0', fontSize: '12px', textAlign: 'right', fontWeight: 'bold',
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', outcome: 'made', label: `${name} declaring, made` })}
+                                style={{ padding: '2px 0', fontSize: '12px', textAlign: 'right', fontWeight: 'bold',
                                 color: o.declared > 0 && o.made / o.declared >= 0.5 ? '#68d391' : '#f56565' }}>
                                 {pct(o.made, o.declared)}
                               </td>
@@ -1133,11 +1229,13 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                             </tr>
                             <tr style={{ borderTop: '1px solid #374151' }}>
                               <td style={{ padding: '4px 0 2px', fontSize: '12px', color: '#9ca3af' }}>Defended</td>
-                              <td style={{ padding: '4px 0 2px', fontSize: '12px', textAlign: 'right' }}>{o.defended} hands</td>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'defending', label: `${name} defending` })}
+                                style={{ padding: '4px 0 2px', fontSize: '12px', textAlign: 'right' }}>{o.defended} hands</td>
                             </tr>
                             <tr>
                               <td style={{ padding: '2px 0', fontSize: '12px', color: '#9ca3af' }}>Set Rate</td>
-                              <td style={{ padding: '2px 0', fontSize: '12px', textAlign: 'right', fontWeight: 'bold',
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'defending', outcome: 'set', label: `${name} defending, set opponent` })}
+                                style={{ padding: '2px 0', fontSize: '12px', textAlign: 'right', fontWeight: 'bold',
                                 color: o.defended > 0 && o.setOpp / o.defended >= 0.5 ? '#68d391' : '#f6ad55' }}>
                                 {pct(o.setOpp, o.defended)}
                               </td>
@@ -1179,17 +1277,22 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {stats.bidLevels.map(({ level, data }) => (
                         <tr key={level}>
                           <td style={{ ...sTdLeftStyle, fontWeight: 'bold' }}>{level}</td>
-                          <td style={sTdStyle}>{data.total}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', bidLevel: level, label: `All hands, bid ${level}` })}
+                            style={sTdStyle}>{data.total}</td>
                           <td style={sTdStyle}>{pct(data.total, stats.totalHands)}</td>
-                          <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[0]}</td>
-                          <td style={{
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 0, role: 'declaring', bidLevel: level, label: `${nameA} declaring, bid ${level}` })}
+                            style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[0]}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 0, role: 'declaring', bidLevel: level, outcome: 'made', label: `${nameA} declaring, bid ${level}, made` })}
+                            style={{
                             ...sTdStyle, fontWeight: 'bold',
                             ...betterBg(data.made[0], data.decl[0], data.made[1], data.decl[1]),
                           }}>
                             {pct(data.made[0], data.decl[0])}
                           </td>
-                          <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[1]}</td>
-                          <td style={{
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 1, role: 'declaring', bidLevel: level, label: `${nameB} declaring, bid ${level}` })}
+                            style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[1]}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 1, role: 'declaring', bidLevel: level, outcome: 'made', label: `${nameB} declaring, bid ${level}, made` })}
+                            style={{
                             ...sTdStyle, fontWeight: 'bold',
                             ...betterBg(data.made[1], data.decl[1], data.made[0], data.decl[0]),
                           }}>
@@ -1226,15 +1329,19 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {stats.bidLevels.map(({ level, data }) => (
                         <tr key={level}>
                           <td style={{ ...sTdLeftStyle, fontWeight: 'bold' }}>{level}</td>
-                          <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.def[0]}</td>
-                          <td style={{
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 0, role: 'defending', bidLevel: level, label: `${nameA} defending, bid ${level}` })}
+                            style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.def[0]}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 0, role: 'defending', bidLevel: level, outcome: 'set', label: `${nameA} defending, bid ${level}, set opponent` })}
+                            style={{
                             ...sTdStyle, fontWeight: 'bold',
                             ...betterBg(data.set[0], data.def[0], data.set[1], data.def[1]),
                           }}>
                             {pct(data.set[0], data.def[0])}
                           </td>
-                          <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.def[1]}</td>
-                          <td style={{
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 1, role: 'defending', bidLevel: level, label: `${nameB} defending, bid ${level}` })}
+                            style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.def[1]}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 1, role: 'defending', bidLevel: level, outcome: 'set', label: `${nameB} defending, bid ${level}, set opponent` })}
+                            style={{
                             ...sTdStyle, fontWeight: 'bold',
                             ...betterBg(data.set[1], data.def[1], data.set[0], data.def[0]),
                           }}>
@@ -1273,17 +1380,23 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {stats.directions.map(({ key, data }) => (
                         <tr key={key}>
                           <td style={sTdLeftStyle}>{DIRECTION_LABELS[key] || key}</td>
-                          <td style={sTdStyle}>{data.total}</td>
-                          <td style={sTdStyle}>{pct(data.madeTotal, data.total)}</td>
-                          <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[0]}</td>
-                          <td style={{
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', direction: key, label: `All hands, ${DIRECTION_LABELS[key] || key}` })}
+                            style={sTdStyle}>{data.total}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', direction: key, outcome: 'made', label: `All hands, ${DIRECTION_LABELS[key] || key}, made` })}
+                            style={sTdStyle}>{pct(data.madeTotal, data.total)}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 0, role: 'declaring', direction: key, label: `${nameA} declaring, ${DIRECTION_LABELS[key] || key}` })}
+                            style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[0]}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 0, role: 'declaring', direction: key, outcome: 'made', label: `${nameA} declaring, ${DIRECTION_LABELS[key] || key}, made` })}
+                            style={{
                             ...sTdStyle, fontWeight: 'bold',
                             ...betterBg(data.made[0], data.decl[0], data.made[1], data.decl[1]),
                           }}>
                             {pct(data.made[0], data.decl[0])}
                           </td>
-                          <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[1]}</td>
-                          <td style={{
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 1, role: 'declaring', direction: key, label: `${nameB} declaring, ${DIRECTION_LABELS[key] || key}` })}
+                            style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[1]}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 1, role: 'declaring', direction: key, outcome: 'made', label: `${nameB} declaring, ${DIRECTION_LABELS[key] || key}, made` })}
+                            style={{
                             ...sTdStyle, fontWeight: 'bold',
                             ...betterBg(data.made[1], data.decl[1], data.made[0], data.decl[0]),
                           }}>
@@ -1322,17 +1435,23 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {stats.trumpSuits.map(({ key, data }) => (
                         <tr key={key}>
                           <td style={sTdLeftStyle}>{suitLabel(key)}</td>
-                          <td style={sTdStyle}>{data.total}</td>
-                          <td style={sTdStyle}>{pct(data.madeTotal, data.total)}</td>
-                          <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[0]}</td>
-                          <td style={{
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', trumpSuit: key, label: `All hands, ${key}` })}
+                            style={sTdStyle}>{data.total}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', trumpSuit: key, outcome: 'made', label: `All hands, ${key}, made` })}
+                            style={sTdStyle}>{pct(data.madeTotal, data.total)}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 0, role: 'declaring', trumpSuit: key, label: `${nameA} declaring, ${key}` })}
+                            style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[0]}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 0, role: 'declaring', trumpSuit: key, outcome: 'made', label: `${nameA} declaring, ${key}, made` })}
+                            style={{
                             ...sTdStyle, fontWeight: 'bold',
                             ...betterBg(data.made[0], data.decl[0], data.made[1], data.decl[1]),
                           }}>
                             {pct(data.made[0], data.decl[0])}
                           </td>
-                          <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[1]}</td>
-                          <td style={{
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 1, role: 'declaring', trumpSuit: key, label: `${nameB} declaring, ${key}` })}
+                            style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[1]}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ strategyIndex: 1, role: 'declaring', trumpSuit: key, outcome: 'made', label: `${nameB} declaring, ${key}, made` })}
+                            style={{
                             ...sTdStyle, fontWeight: 'bold',
                             ...betterBg(data.made[1], data.decl[1], data.made[0], data.decl[0]),
                           }}>
@@ -1379,11 +1498,13 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                           <tbody>
                             <tr>
                               <td style={{ padding: '2px 0', fontSize: '11px', color: '#9ca3af' }}>Declared</td>
-                              <td style={{ padding: '2px 0', fontSize: '11px', textAlign: 'right' }}>{o.declared}</td>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', label: `${name} declaring` })}
+                                style={{ padding: '2px 0', fontSize: '11px', textAlign: 'right' }}>{o.declared}</td>
                             </tr>
                             <tr>
                               <td style={{ padding: '2px 0', fontSize: '11px', color: '#9ca3af' }}>Make Rate</td>
-                              <td style={{ padding: '2px 0', fontSize: '11px', textAlign: 'right', fontWeight: 'bold',
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', outcome: 'made', label: `${name} declaring, made` })}
+                                style={{ padding: '2px 0', fontSize: '11px', textAlign: 'right', fontWeight: 'bold',
                                 color: o.declared > 0 && o.made / o.declared >= 0.5 ? '#68d391' : '#f56565' }}>
                                 {pct(o.made, o.declared)}
                               </td>
@@ -1396,11 +1517,13 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                             </tr>
                             <tr style={{ borderTop: '1px solid #374151' }}>
                               <td style={{ padding: '4px 0 2px', fontSize: '11px', color: '#9ca3af' }}>Defended</td>
-                              <td style={{ padding: '4px 0 2px', fontSize: '11px', textAlign: 'right' }}>{o.defended}</td>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'defending', label: `${name} defending` })}
+                                style={{ padding: '4px 0 2px', fontSize: '11px', textAlign: 'right' }}>{o.defended}</td>
                             </tr>
                             <tr>
                               <td style={{ padding: '2px 0', fontSize: '11px', color: '#9ca3af' }}>Set Rate</td>
-                              <td style={{ padding: '2px 0', fontSize: '11px', textAlign: 'right', fontWeight: 'bold',
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'defending', outcome: 'set', label: `${name} defending, set opponent` })}
+                                style={{ padding: '2px 0', fontSize: '11px', textAlign: 'right', fontWeight: 'bold',
                                 color: o.defended > 0 && o.setOpp / o.defended >= 0.5 ? '#68d391' : '#f6ad55' }}>
                                 {pct(o.setOpp, o.defended)}
                               </td>
@@ -1447,12 +1570,15 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {rrStats.bidLevels.map(({ level, data }) => (
                         <tr key={level}>
                           <td style={{ ...sTdLeftStyle, fontWeight: 'bold' }}>{level}</td>
-                          <td style={sTdStyle}>{data.total}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', bidLevel: level, label: `All hands, bid ${level}` })}
+                            style={sTdStyle}>{data.total}</td>
                           <td style={sTdStyle}>{pct(data.total, rrStats.totalHands)}</td>
-                          {strategyNames.map((_, i) => (
+                          {strategyNames.map((sn, i) => (
                             <React.Fragment key={i}>
-                              <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[i] ?? 0}</td>
-                              <td style={{ ...sTdStyle, fontWeight: 'bold' }}>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', bidLevel: level, label: `${sn} declaring, bid ${level}` })}
+                                style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[i] ?? 0}</td>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', bidLevel: level, outcome: 'made', label: `${sn} declaring, bid ${level}, made` })}
+                                style={{ ...sTdStyle, fontWeight: 'bold' }}>
                                 {pct(data.made[i] ?? 0, data.decl[i] ?? 0)}
                               </td>
                             </React.Fragment>
@@ -1493,10 +1619,12 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {rrStats.bidLevels.map(({ level, data }) => (
                         <tr key={level}>
                           <td style={{ ...sTdLeftStyle, fontWeight: 'bold' }}>{level}</td>
-                          {strategyNames.map((_, i) => (
+                          {strategyNames.map((sn, i) => (
                             <React.Fragment key={i}>
-                              <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.def[i] ?? 0}</td>
-                              <td style={{ ...sTdStyle, fontWeight: 'bold' }}>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'defending', bidLevel: level, label: `${sn} defending, bid ${level}` })}
+                                style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.def[i] ?? 0}</td>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'defending', bidLevel: level, outcome: 'set', label: `${sn} defending, bid ${level}, set opponent` })}
+                                style={{ ...sTdStyle, fontWeight: 'bold' }}>
                                 {pct(data.set[i] ?? 0, data.def[i] ?? 0)}
                               </td>
                             </React.Fragment>
@@ -1539,12 +1667,16 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {rrStats.directions.map(({ key, data }) => (
                         <tr key={key}>
                           <td style={sTdLeftStyle}>{DIRECTION_LABELS[key] || key}</td>
-                          <td style={sTdStyle}>{data.total}</td>
-                          <td style={sTdStyle}>{pct(data.madeTotal, data.total)}</td>
-                          {strategyNames.map((_, i) => (
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', direction: key, label: `All hands, ${DIRECTION_LABELS[key] || key}` })}
+                            style={sTdStyle}>{data.total}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', direction: key, outcome: 'made', label: `All hands, ${DIRECTION_LABELS[key] || key}, made` })}
+                            style={sTdStyle}>{pct(data.madeTotal, data.total)}</td>
+                          {strategyNames.map((sn, i) => (
                             <React.Fragment key={i}>
-                              <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[i] ?? 0}</td>
-                              <td style={{ ...sTdStyle, fontWeight: 'bold' }}>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', direction: key, label: `${sn} declaring, ${DIRECTION_LABELS[key] || key}` })}
+                                style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[i] ?? 0}</td>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', direction: key, outcome: 'made', label: `${sn} declaring, ${DIRECTION_LABELS[key] || key}, made` })}
+                                style={{ ...sTdStyle, fontWeight: 'bold' }}>
                                 {pct(data.made[i] ?? 0, data.decl[i] ?? 0)}
                               </td>
                             </React.Fragment>
@@ -1587,12 +1719,16 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {rrStats.trumpSuits.map(({ key, data }) => (
                         <tr key={key}>
                           <td style={sTdLeftStyle}>{suitLabel(key)}</td>
-                          <td style={sTdStyle}>{data.total}</td>
-                          <td style={sTdStyle}>{pct(data.madeTotal, data.total)}</td>
-                          {strategyNames.map((_, i) => (
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', trumpSuit: key, label: `All hands, ${key}` })}
+                            style={sTdStyle}>{data.total}</td>
+                          <td className="stat-link" onClick={() => showFiltered({ role: 'any', trumpSuit: key, outcome: 'made', label: `All hands, ${key}, made` })}
+                            style={sTdStyle}>{pct(data.madeTotal, data.total)}</td>
+                          {strategyNames.map((sn, i) => (
                             <React.Fragment key={i}>
-                              <td style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[i] ?? 0}</td>
-                              <td style={{ ...sTdStyle, fontWeight: 'bold' }}>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', trumpSuit: key, label: `${sn} declaring, ${key}` })}
+                                style={{ ...sTdStyle, borderLeft: '1px solid #374151' }}>{data.decl[i] ?? 0}</td>
+                              <td className="stat-link" onClick={() => showFiltered({ strategyIndex: i, role: 'declaring', trumpSuit: key, outcome: 'made', label: `${sn} declaring, ${key}, made` })}
+                                style={{ ...sTdStyle, fontWeight: 'bold' }}>
                                 {pct(data.made[i] ?? 0, data.decl[i] ?? 0)}
                               </td>
                             </React.Fragment>
@@ -1851,6 +1987,96 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
           </div>
         </div>
       )}
+
+      {/* ── Hand Strength tab (by-team only) ───────────────────── */}
+      {/* ── Filtered List tab ──────────────────────────────────── */}
+      {activeTab === 'filtered' && handFilter && (() => {
+        const filtered = computeFilteredHands(result, handFilter);
+        return (
+          <div>
+            <div style={{
+              ...boxStyle,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div>
+                <span style={{ color: '#9ca3af', fontSize: '13px' }}>Showing hands where: </span>
+                <span style={{ fontWeight: 'bold', fontSize: '13px' }}>{handFilter.label}</span>
+                <span style={{ color: '#6b7280', fontSize: '12px', marginLeft: '12px' }}>
+                  ({filtered.length} hands)
+                </span>
+              </div>
+              <button
+                onClick={() => { setHandFilter(null); setActiveTab('stats'); }}
+                style={{
+                  padding: '4px 12px', fontSize: '12px', color: '#e5e7eb',
+                  backgroundColor: '#374151', border: 'none', borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Clear filter
+              </button>
+            </div>
+            {filtered.length === 0 ? (
+              <p style={{ color: '#9ca3af' }}>No matching hands found.</p>
+            ) : (
+              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #374151', position: 'sticky', top: 0, backgroundColor: '#0f1f15', zIndex: 1 }}>
+                      <th style={sThStyle}>#</th>
+                      <th style={sThStyle}>Rot</th>
+                      <th style={sThLeftStyle}>Bidder</th>
+                      <th style={sThLeftStyle}>Call</th>
+                      <th style={sThStyle}>Books</th>
+                      <th style={{ ...sThStyle, textAlign: 'center' }}>Made?</th>
+                      <th style={sThLeftStyle}>T0 Strategy</th>
+                      <th style={sThLeftStyle}>T1 Strategy</th>
+                      <th style={{ ...sThStyle, textAlign: 'center' }}>Play</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((entry, idx) => {
+                      const rotatedUrl = BidWhistSimulator.rotateDeck(entry.game.deckUrl, entry.game.rotation);
+                      const playUrl = `/bidwhist#${rotatedUrl}`;
+                      const h = entry.hand;
+                      const t0Name = strategyNames[entry.game.team0StrategyIndex] ?? `S${entry.game.team0StrategyIndex}`;
+                      const t1Name = strategyNames[entry.game.team1StrategyIndex] ?? `S${entry.game.team1StrategyIndex}`;
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid #374151' }}>
+                          <td style={sTdStyle}>{idx + 1}</td>
+                          <td style={sTdStyle}>{entry.game.rotation}</td>
+                          <td style={sTdLeftStyle}>{formatBidder(h)}</td>
+                          <td style={sTdLeftStyle}>{formatCall(h)}</td>
+                          <td style={sTdStyle}>{h.booksWon[0]}-{h.booksWon[1]}</td>
+                          <td style={{ ...sTdStyle, textAlign: 'center' }}>{formatMadeIt(h)}</td>
+                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
+                            {t0Name.length > 18 ? t0Name.slice(0, 16) + '..' : t0Name}
+                          </td>
+                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
+                            {t1Name.length > 18 ? t1Name.slice(0, 16) + '..' : t1Name}
+                          </td>
+                          <td style={{ ...sTdStyle, textAlign: 'center' }}>
+                            <HandTip label="S" deckUrl={rotatedUrl} player={0}>
+                              <a
+                                href={playUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: '#60a5fa', textDecoration: 'underline' }}
+                              >
+                                Play
+                              </a>
+                            </HandTip>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Hand Strength tab (by-team only) ───────────────────── */}
       {activeTab === 'handStrength' && !isRR && (
