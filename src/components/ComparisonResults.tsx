@@ -746,6 +746,25 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
     });
   };
 
+  const openReplay = (
+    rotatedUrl: string,
+    t0StratIdx: number,
+    t1StratIdx: number,
+    dealer: number = 0,
+  ) => {
+    const t0 = config.strategies[t0StratIdx];
+    const t1 = config.strategies[t1StratIdx];
+    sessionStorage.setItem('replay-config', JSON.stringify({
+      deckUrl: rotatedUrl,
+      dealer,
+      team0StrategyText: t0?.strategyText ?? '',
+      team0StrategyName: t0?.name ?? `Strategy ${t0StratIdx}`,
+      team1StrategyText: t1?.strategyText ?? '',
+      team1StrategyName: t1?.name ?? `Strategy ${t1StratIdx}`,
+    }));
+    window.open(`/replay#${rotatedUrl}`, '_blank');
+  };
+
   const tabs: { id: TabId; label: string }[] = [
     ...(isRR
       ? [
@@ -1056,6 +1075,11 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                               Play
                             </a>
                           </HandTip>
+                          {' '}
+                          <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, 0, 1, game.rotation); }}
+                            style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
+                            Replay
+                          </a>
                         </td>
                       </tr>
                     );
@@ -1139,6 +1163,15 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                                 Play
                               </a>
                             </HandTip>
+                            {allRes.length > 0 && (
+                              <>
+                                {' '}
+                                <a href="#" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openReplay(rotatedUrl, allRes[0].team0StrategyIndex, allRes[0].team1StrategyIndex, game.rotation); }}
+                                  style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
+                                  Replay
+                                </a>
+                              </>
+                            )}
                           </td>
                         </tr>
                         {isExpanded && allRes.map((r, ri) => {
@@ -1171,6 +1204,11 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                                 <span style={{ color: '#68d391', fontWeight: 'bold' }}>
                                   {winnerName.length > 15 ? winnerName.slice(0, 13) + '..' : winnerName}
                                 </span>
+                                {' '}
+                                <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, r.team0StrategyIndex, r.team1StrategyIndex, game.rotation); }}
+                                  style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px', fontSize: '11px' }}>
+                                  Replay
+                                </a>
                               </td>
                             </tr>
                           );
@@ -1976,6 +2014,11 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                             >
                               Play
                             </a>
+                            {' '}
+                            <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, entry.team0StrategyIndex, entry.team1StrategyIndex, entry.rotation); }}
+                              style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
+                              Replay
+                            </a>
                           </td>
                         </tr>
                       );
@@ -2066,6 +2109,11 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                                 Play
                               </a>
                             </HandTip>
+                            {' '}
+                            <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, entry.game.team0StrategyIndex, entry.game.team1StrategyIndex, entry.game.rotation); }}
+                              style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
+                              Replay
+                            </a>
                           </td>
                         </tr>
                       );
@@ -2245,6 +2293,11 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                                 Play
                               </a>
                             </HandTip>
+                            {' '}
+                            <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, 0, 1, game.rotation); }}
+                              style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
+                              Replay
+                            </a>
                           </td>
                         </tr>
                       );

@@ -1,6 +1,6 @@
 import { BidWhistGame } from '../games/BidWhistGame.ts';
 import { StrategyAST } from '../strategy/types.ts';
-import { GameResult } from './types.ts';
+import { GameResult, HandResult } from './types.ts';
 import { generateRandomDeckUrl } from '../urlGameState.js';
 
 const MAX_REDEALS = 10;
@@ -32,47 +32,45 @@ export class BidWhistSimulator {
     deckUrl: string,
     playerStrategies: (StrategyAST | null)[],
     handDeckUrls: string[],
-    configIndex: number
+    configIndex: number,
+    dealer: number = 0
   ): GameResult {
     const game = new BidWhistGame();
-    game.setDealer(0);
+    game.setDealer(dealer);
 
     // Deal first hand with the given deck URL
     game.dealCards(deckUrl);
 
     const usedHandUrls: string[] = [deckUrl];
+    const hands: HandResult[] = [];
     let handsPlayed = 0;
     let redealCount = 0;
 
     // Run hands until game is over
     while (!game.isGameOver() && handsPlayed < MAX_HANDS) {
       // Run the current hand through all phases
-      const redealt = this.runHand(game, playerStrategies);
+      const handResult = this.runHand(game, playerStrategies);
 
-      if (redealt) {
+      if (handResult === null) {
+        // Redeal (everyone passed)
         redealCount++;
         if (redealCount > MAX_REDEALS) {
-          // Force dealer to bid 1 by temporarily setting a strategy that always bids 1
-          // Just break out and declare based on current scores
           break;
         }
         continue;
       }
 
+      hands.push(handResult);
       handsPlayed++;
 
       if (game.isGameOver()) break;
 
       // Start next hand with pre-generated URL
-      const nextUrlIndex = handsPlayed; // 0-indexed: hand 1 uses index 1
+      const nextUrlIndex = handsPlayed;
       const nextUrl = nextUrlIndex < handDeckUrls.length
         ? handDeckUrls[nextUrlIndex]
         : generateRandomDeckUrl();
-      if (nextUrlIndex < handDeckUrls.length) {
-        usedHandUrls.push(handDeckUrls[nextUrlIndex]);
-      } else {
-        usedHandUrls.push(nextUrl);
-      }
+      usedHandUrls.push(nextUrl);
       game.startNewHand(nextUrl);
     }
 
@@ -88,14 +86,15 @@ export class BidWhistSimulator {
       handsPlayed,
       handDeckUrls: usedHandUrls,
       configIndex,
+      hands,
     };
   }
 
   /**
    * Run a single hand: bidding → trump selection → discarding → play 12 tricks.
-   * Returns true if the hand was redealt (everyone passed).
+   * Returns HandResult with details, or null if redealt (everyone passed).
    */
-  private runHand(game: BidWhistGame, strategies: (StrategyAST | null)[]): boolean {
+  private runHand(game: BidWhistGame, strategies: (StrategyAST | null)[]): HandResult | null {
     const state = game.getGameState();
 
     // Phase: Bidding
@@ -106,14 +105,21 @@ export class BidWhistSimulator {
     // Check if redeal happened (everyone passed → bidding restarts)
     const afterBid = game.getGameState();
     if (afterBid.gameStage === 'bidding') {
-      // Redeal happened
-      return true;
+      return null; // Redeal
     }
+
+    // Capture bid info
+    const bidWinner = game.getDeclarer() ?? -1;
+    const bidAmount = game.getCurrentHighBid();
 
     // Phase: Trump selection
     if (afterBid.gameStage === 'trumpSelection') {
       this.runTrumpSelection(game, strategies);
     }
+
+    // Capture trump info
+    const trumpSuit = game.getTrumpSuit() ?? '';
+    const direction = game.getBidDirection();
 
     // Phase: Discarding (if declarer is player 0, it won't auto-discard)
     const afterTrump = game.getGameState();
@@ -124,10 +130,31 @@ export class BidWhistSimulator {
       }
     }
 
+    // Capture discards (declarer's tricks before play = the 4 discards)
+    const discards: string[] = [];
+    if (bidWinner >= 0) {
+      const declarerTricks = game.getGameState().players[bidWinner].tricks;
+      // After discard but before play, tricks = the 4 discarded cards
+      for (const card of declarerTricks) {
+        discards.push(card.id);
+      }
+    }
+
     // Phase: Play 12 tricks
     this.runPlay(game, strategies);
 
-    return false;
+    const booksWon = game.getBooksWon();
+    const teamScoresAfter = game.getTeamScores();
+
+    return {
+      bidWinner,
+      bidAmount,
+      trumpSuit,
+      direction,
+      discards,
+      booksWon: [...booksWon],
+      teamScoresAfter: [...teamScoresAfter],
+    };
   }
 
   private runBidding(game: BidWhistGame, strategies: (StrategyAST | null)[]): void {

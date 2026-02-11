@@ -91,7 +91,7 @@ export class BatchRunner {
             idx === 0 ? rotatedUrl : url
           );
 
-          const resultA = simulator.simulateGame(rotatedUrl, configAStrategies, rotatedHandUrls, 0);
+          const resultA = simulator.simulateGame(rotatedUrl, configAStrategies, rotatedHandUrls, 0, rotation);
           resultA.rotation = rotation;
           resultA.deckUrl = baseDeckUrl;
           resultA.rotatedUrl = rotatedUrl;
@@ -99,7 +99,7 @@ export class BatchRunner {
           resultA.team1StrategyIndex = 1;
           allResults.push(resultA);
 
-          const resultB = simulator.simulateGame(rotatedUrl, configBStrategies, rotatedHandUrls, 1);
+          const resultB = simulator.simulateGame(rotatedUrl, configBStrategies, rotatedHandUrls, 1, rotation);
           resultB.rotation = rotation;
           resultB.deckUrl = baseDeckUrl;
           resultB.rotatedUrl = rotatedUrl;
@@ -194,7 +194,7 @@ export class BatchRunner {
             const stJ = parsedStrategies[sj] ?? null;
             const playerStrats = [stI, stJ, stI, stJ];
 
-            const result = simulator.simulateGame(rotatedUrl, playerStrats, rotatedHandUrls, 0);
+            const result = simulator.simulateGame(rotatedUrl, playerStrats, rotatedHandUrls, 0, rotation);
             result.rotation = rotation;
             result.deckUrl = baseDeckUrl;
             result.rotatedUrl = rotatedUrl;

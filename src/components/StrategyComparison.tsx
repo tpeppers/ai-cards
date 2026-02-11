@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { STRATEGY_REGISTRY } from '../strategies/index.ts';
+import { STRATEGY_REGISTRY, splitStrategySections, replaceStrategySection } from '../strategies/index.ts';
 import { BatchRunner } from '../simulation/BatchRunner.ts';
 import { ComparisonConfig, StrategyComparisonResult } from '../simulation/types.ts';
 import { RED_TEAM_DECKS } from '../simulation/redTeamDecks.ts';
@@ -24,7 +24,7 @@ const textareaBase: React.CSSProperties = {
 };
 
 const StrategyComparison: React.FC = () => {
-  const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'round-robin'>('by-team');
+  const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'round-robin' | 'ab-test'>('by-team');
   const [team0Selection, setTeam0Selection] = useState('0');
   const [team1Selection, setTeam1Selection] = useState('1');
   const [custom0Text, setCustom0Text] = useState('');
@@ -35,6 +35,14 @@ const StrategyComparison: React.FC = () => {
   const [rrSelected, setRrSelected] = useState<Set<number>>(() => new Set([0, 1]));
   const [rrCustomChecked, setRrCustomChecked] = useState(false);
   const [rrCustomText, setRrCustomText] = useState('');
+
+  // A/B Test state
+  const [abBaseSelection, setAbBaseSelection] = useState('0');
+  const [abSection, setAbSection] = useState<'play' | 'bid' | 'trump'>('trump');
+  const [abSectionText, setAbSectionText] = useState(() => {
+    const sections = splitStrategySections(bidWhistStrategies[0].text);
+    return sections.trump;
+  });
 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
@@ -71,6 +79,22 @@ const StrategyComparison: React.FC = () => {
 
   const rrStrategyCount = rrSelected.size + (rrCustomChecked ? 1 : 0);
 
+  const abBaseText = bidWhistStrategies[Number(abBaseSelection)]?.text ?? '';
+  const abSections = splitStrategySections(abBaseText);
+  const abOriginalSectionText = abSections[abSection];
+
+  const handleAbBaseChange = (value: string) => {
+    setAbBaseSelection(value);
+    const sections = splitStrategySections(bidWhistStrategies[Number(value)].text);
+    setAbSectionText(sections[abSection]);
+  };
+
+  const handleAbSectionChange = (section: 'play' | 'bid' | 'trump') => {
+    setAbSection(section);
+    const sections = splitStrategySections(bidWhistStrategies[Number(abBaseSelection)].text);
+    setAbSectionText(sections[section]);
+  };
+
   const handleRun = async () => {
     let config: ComparisonConfig;
 
@@ -78,7 +102,19 @@ const StrategyComparison: React.FC = () => {
     const effectiveNumGames = isRedMode ? RED_TEAM_DECKS.length : numGames;
     const predefinedDeckUrls = isRedMode ? RED_TEAM_DECKS.map(d => d.url) : undefined;
 
-    if (assignmentMode === 'by-team') {
+    if (assignmentMode === 'ab-test') {
+      const baseEntry = bidWhistStrategies[Number(abBaseSelection)];
+      const modifiedText = replaceStrategySection(baseEntry.text, abSection, abSectionText);
+      config = {
+        strategies: [
+          { name: baseEntry.name, strategyText: baseEntry.text },
+          { name: `${baseEntry.name} (modified ${abSection})`, strategyText: modifiedText },
+        ],
+        assignmentMode: 'by-team',
+        numGames: effectiveNumGames,
+        predefinedDeckUrls,
+      };
+    } else if (assignmentMode === 'by-team') {
       const strat0 = getTextForSlot(team0Selection, custom0Text);
       const strat1 = getTextForSlot(team1Selection, custom1Text);
       config = {
@@ -131,7 +167,7 @@ const StrategyComparison: React.FC = () => {
 
   const progressPct = progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
 
-  const canRun = assignmentMode === 'by-team' || rrStrategyCount >= 2;
+  const canRun = assignmentMode === 'by-team' || assignmentMode === 'ab-test' || rrStrategyCount >= 2;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0f1f15', padding: '24px', color: '#e5e7eb' }}>
@@ -178,6 +214,19 @@ const StrategyComparison: React.FC = () => {
               }}
             >
               Round Robin
+            </button>
+            <button
+              onClick={() => setAssignmentMode('ab-test')}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: assignmentMode === 'ab-test' ? '#3b82f6' : '#374151',
+                color: '#e5e7eb',
+                cursor: 'pointer',
+              }}
+            >
+              A/B Test
             </button>
           </div>
         </div>
@@ -330,6 +379,87 @@ const StrategyComparison: React.FC = () => {
                 placeholder="Paste .cstrat strategy here..."
               />
             )}
+          </div>
+        )}
+
+        {/* A/B Test: base strategy + section override */}
+        {assignmentMode === 'ab-test' && (
+          <div style={{ marginBottom: '16px' }}>
+            {/* Base strategy selector */}
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
+              Base Strategy
+            </label>
+            <select
+              value={abBaseSelection}
+              onChange={(e) => handleAbBaseChange(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '4px',
+                border: '1px solid #4b5563',
+                backgroundColor: '#374151',
+                color: '#e5e7eb',
+                width: '100%',
+                marginBottom: '12px',
+              }}
+            >
+              {bidWhistStrategies.map((s, i) => (
+                <option key={i} value={String(i)}>{s.name}</option>
+              ))}
+            </select>
+
+            {/* Section selector */}
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
+              Section to Override
+            </label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              {(['play', 'bid', 'trump'] as const).map(sec => (
+                <button
+                  key={sec}
+                  onClick={() => handleAbSectionChange(sec)}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    backgroundColor: abSection === sec ? '#3b82f6' : '#374151',
+                    color: '#e5e7eb',
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  {sec}:
+                </button>
+              ))}
+            </div>
+
+            {/* Side-by-side textareas */}
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
+                  Original
+                </label>
+                <textarea
+                  value={abOriginalSectionText}
+                  readOnly
+                  rows={14}
+                  style={{
+                    ...textareaBase,
+                    opacity: 0.7,
+                    cursor: 'default',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
+                  Modified
+                </label>
+                <textarea
+                  value={abSectionText}
+                  onChange={(e) => setAbSectionText(e.target.value)}
+                  rows={14}
+                  style={textareaBase}
+                />
+              </div>
+            </div>
           </div>
         )}
 
