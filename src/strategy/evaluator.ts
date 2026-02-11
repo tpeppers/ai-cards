@@ -152,6 +152,24 @@ function haveCard(cardId: string, ctx: StrategyContext): boolean {
   return ctx.hand.some(c => c.id === cardId);
 }
 
+function deuceTreyCount(ctx: StrategyContext): number {
+  return ctx.hand.filter(c => c.rank === 2 || c.rank === 3).length;
+}
+
+function kingAceCount(ctx: StrategyContext): number {
+  return ctx.hand.filter(c => c.rank === 13 || c.rank === 1).length;
+}
+
+function kingCount(ctx: StrategyContext): number {
+  return ctx.hand.filter(c => c.rank === 13).length;
+}
+
+function maxSuitCount(ctx: StrategyContext): number {
+  const counts: { [suit: string]: number } = { spades: 0, hearts: 0, diamonds: 0, clubs: 0 };
+  ctx.hand.forEach(c => { if (counts[c.suit] !== undefined) counts[c.suit]++; });
+  return Math.max(...Object.values(counts));
+}
+
 // ── Expression Evaluator ────────────────────────────────────────────
 
 function evalExpr(expr: Expression, ctx: StrategyContext): any {
@@ -191,6 +209,7 @@ function resolveVariable(name: string, ctx: StrategyContext): any {
     case 'is_first_trick': return ctx.isFirstTrick;
     case 'hearts_broken': return ctx.heartsBroken;
     case 'partner_bid': return ctx.partnerBid;
+    case 'bid_count': return ctx.bidCount;
     case 'me': return { id: ctx.playerId };
     default:
       return undefined;
@@ -240,6 +259,14 @@ function evalCall(name: string, args: any[], ctx: StrategyContext): any {
       return getPartnerCard(ctx);
     case 'best_direction':
       return lowCount(ctx) > highCount(ctx) ? 'downtown' : 'uptown';
+    case 'deuce_trey_count':
+      return deuceTreyCount(ctx);
+    case 'king_ace_count':
+      return kingAceCount(ctx);
+    case 'king_count':
+      return kingCount(ctx);
+    case 'max_suit_count':
+      return maxSuitCount(ctx);
     default:
       return undefined;
   }
@@ -260,9 +287,9 @@ function evalProperty(expr: any, ctx: StrategyContext): any {
       case 'hearts': return filterHearts(cs);
       case 'suit':
         return args.length > 0 ? filterSuit(cs, args[0] as string) : cs;
-      case 'highest': return cardSetHighest(cs, ctx.getCardValue);
-      case 'lowest': return cardSetLowest(cs, ctx.getCardValue);
-      case 'highest_safe': return highestSafe(cs, ctx);
+      case 'strongest': return cardSetHighest(cs, ctx.getCardValue);
+      case 'weakest': return cardSetLowest(cs, ctx.getCardValue);
+      case 'strongest_safe': return highestSafe(cs, ctx);
       case 'winners': return cardSetWinners(cs, ctx);
       case 'losers': return cardSetLosers(cs, ctx);
       case 'count': return cs.cards.length;

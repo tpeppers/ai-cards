@@ -139,6 +139,7 @@ export interface StrategyContext {
   bidDirection: string;
   currentHighBid: number;
   bids: BidInfo[];
+  bidCount: number; // number of bids placed so far (0=first bidder)
   partnerBid: number; // partner's bid amount (0=pass)
 
   // Card evaluation helpers (injected by game)

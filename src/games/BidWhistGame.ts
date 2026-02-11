@@ -261,7 +261,12 @@ export class BidWhistGame extends CardGame {
       const ctx = buildBidWhistContext(this, playerId);
       const bid = evaluateBid(this.strategy, ctx);
       if (bid !== null) {
-        return bid;
+        // Validate: strategy may return a bid that's not higher than current
+        const validBids = this.getValidBids();
+        if (validBids.includes(bid)) {
+          return bid;
+        }
+        // Invalid bid from strategy — fall through to default logic
       }
     }
 
