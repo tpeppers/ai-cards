@@ -159,7 +159,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',5,6,7,8) + cards('S',5,6,7,8) + cards('C',5,6,7,8),
     cards('S',1,13,12,11) + cards('C',1,13,12,11) + cards('D',2,3,4,5),
     cards('D',6,7,8,9,10) + cards('H',2,3,4) + cards('S',4,9,10) + cards('C',4),
-    cards('H',9,10) + cards('D',11) + cards('C',9),
+    cards('H',9,10) + cards('C',9,10),
     C1, '7: East 4-4-4-0 void diamonds, all middle ranks'
   ));
 
@@ -233,8 +233,8 @@ function generateDecks(): RedTeamDeck[] {
   D.push(mk(
     cards('H',1,2,10,11) + cards('S',1,2,10,11) + cards('C',1,2,10,11),
     cards('H',3,4,5,6) + cards('S',3,4,5,6) + cards('C',3,4,5,6),
-    cards('C',13,12,9,8) + cards('D',13,12,11,10) + cards('H',6,7,8,9),
-    cards('D',2,3,4,5,6,7,8,9) + cards('S',6,7,8,9),
+    cards('C',13,12,9,8) + cards('D',13,12,11,10) + cards('H',12,7,8,9),
+    cards('D',2,3,4,5,6,7,8,9) + cards('S',7,8,9) + cards('C',7),
     cards('D',1) + cards('S',13,12) + cards('H',13),
     C2, '14: S has all A+2 pairs in 3 suits, downtown dominant'
   ));
@@ -315,7 +315,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',4,5,6,7) + cards('S',4,5,6,7) + cards('C',4,5,6,7),
     cards('D',1,2,3,13,12,11) + cards('H',8,9,10) + cards('S',8,9,10),
     cards('D',4,5,6,7,8,9,10) + cards('C',8,9,10) + cards('H',12,11),
-    cards('S',12,11) + cards('D',12,11),
+    cards('S',12,11) + cards('C',12,11),
     C2, '22: S has A,2,3,K each of 3 suits - downtown powerhouse'
   ));
 
@@ -371,7 +371,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('S',4,5,6,7,8,9,10) + cards('D',4,5,6,7,8),
     cards('D',1,13,12,11,10,9) + cards('H',2,3,4,5,6,7),
     cards('S',1,13,12,11,2,3) + cards('C',2,3,4,5,6,7),
-    cards('H',8) + cards('S',2,3) + cards('C',8),
+    cards('H',8) + cards('D',2,3) + cards('C',8),
     C3, '27: E has 7 spades but 4-10, opponents hold S-A,K,Q,J,2,3'
   ));
 
@@ -391,7 +391,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',2,3,4,5) + cards('S',2,3,4,5) + cards('C',2,3,4,5),
     cards('D',5,6,7,8,9,10,11) + cards('H',6,7,8,9,10),
     cards('D',1,13,12,2,3,4) + cards('S',6,7,8,9) + cards('C',6,7),
-    cards('C',8,9) + cards('S',10,11),
+    cards('C',8,9,10) + cards('S',10),
     C3, '29: N has 7 diamonds but 5-J, W holds D-A,K,Q,2,3,4'
   ));
 
@@ -430,7 +430,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',2,3,4,5,6,7,8,9,10,11) + cards('S',5,6),
     cards('S',1,13,12,11,10,9) + cards('C',1,13,12,11,10,9),
     cards('D',1,13,12,11,10,9,8,7) + cards('C',2,3,4,5),
-    cards('H',1,13,12) + cards('S',2,3,4,7,8) + cards('D',2,3,4),
+    cards('H',1,13,12) + cards('S',2,3,4,7,8) + cards('D',2,3,4,6),
     cards('C',6,7,8) + cards('D',5),
     C3, '33: S has 10 hearts but only 2-J, W holds H-A,K,Q'
   ));
@@ -450,7 +450,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',1,13,12,10) + cards('S',1,13,12,11) + cards('C',1,13,12,11),
     cards('H',3,4,5,6,7,8,9) + cards('S',5,6,7,8,9),
     cards('D',1,13,12,11,10,9,8) + cards('C',2,3,4,5,6),
-    cards('H',2,11) + cards('D',2,3,4,5,6,7) + cards('S',2,3,4),
+    cards('H',2,11) + cards('D',2,3,4,5,6,7) + cards('S',2,3,4) + cards('C',10),
     cards('S',10) + cards('C',7,8,9),
     C3, '35: E has 7 hearts 3-9, S holds H-A,K,Q,10'
   ));
@@ -466,7 +466,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',13,12,11,10) + cards('S',13,12,11,10) + cards('C',13,12,11,10),
     cards('H',3,4,5,6) + cards('S',3,4,5,6) + cards('C',3,4,5,6),
     cards('H',2,7,8) + cards('S',2,7,8) + cards('C',2,7,8) + cards('D',2,7,8),
-    cards('H',1,9) + cards('S',1,9) + cards('C',1,9) + cards('D',1,9,10,11),
+    cards('H',1,9) + cards('S',1,9) + cards('C',1,9) + cards('D',1,9,10,11,12,13),
     cards('D',3,4,5,6),
     C4, '36: N has all four 2s, W has all four Aces - blocks both directions'
   ));
@@ -476,7 +476,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',12,11,10,9) + cards('S',12,11,10,9) + cards('C',12,11,10,9),
     cards('H',4,5,6,7) + cards('S',4,5,6,7) + cards('C',4,5,6,7),
     cards('H',2,3,8) + cards('S',2,3,8) + cards('C',2,3,8) + cards('D',2,3,8),
-    cards('H',1,13) + cards('S',1,13) + cards('C',1,13) + cards('D',1,13,9,10),
+    cards('H',1,13) + cards('S',1,13) + cards('C',1,13) + cards('D',1,13,9,10,11,12),
     cards('D',4,5,6,7),
     C4, '37: N has 2s+3s, W has Aces+Kings - total lockdown'
   ));
@@ -503,24 +503,13 @@ function generateDecks(): RedTeamDeck[] {
 
   // 40: Defenders with complementary ranks
   D.push(mk(
-    cards('H',13,12,11,10) + cards('S',13,12,11,10) + cards('C',13,12) + cards('D',13,12),
-    cards('H',5,6,7,8) + cards('S',5,6,7,8) + cards('C',5,6,7,8),
-    cards('H',1,2,3) + cards('S',1,2,3) + cards('C',1,2,3) + cards('D',1,2,3),
-    cards('H',9) + cards('S',9) + cards('C',9,10,11) + cards('D',9,10,11),
-    cards('H',4) + cards('S',4) + cards('D',4,5,6,7,8) + cards('C',4),
-    // Kitty is 5 cards! Fix.
-    C4, '40: PLACEHOLDER'
-  ));
-
-  // Fix hand 40
-  D[D.length - 1] = mk(
     cards('H',13,12,11,10) + cards('S',13,12,11,10) + cards('C',13,12,11,10),
     cards('H',5,6,7,8) + cards('S',5,6,7,8) + cards('C',5,6,7,8),
     cards('H',1,2,3) + cards('S',1,2,3) + cards('C',1,2,3) + cards('D',1,2,3),
-    cards('H',9,4) + cards('S',9,4) + cards('D',9,10,11,12,13) + cards('C',9,4),
+    cards('H',9,4) + cards('S',9,4) + cards('D',8,9,10,11,12,13) + cards('C',9,4),
     cards('D',4,5,6,7),
     C4, '40: N has A,2,3 each suit as wall, S has K,Q,J,10 in 3 suits'
-  );
+  ));
 
   // 41: West has all Kings and Queens as uptown wall
   D.push(mk(
@@ -537,7 +526,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',13,10,9,8) + cards('S',13,10,9,8) + cards('C',13,10,9,8),
     cards('H',7,6,5,4) + cards('S',7,6,5,4) + cards('C',7,6,5,4),
     cards('H',1,12,11) + cards('S',1,12,11) + cards('C',1,12,11) + cards('D',1,12,11),
-    cards('H',2,3) + cards('S',2,3) + cards('C',2,3) + cards('D',2,3,10,9),
+    cards('H',2,3) + cards('S',2,3) + cards('C',2,3) + cards('D',2,3,10,9,8,13),
     cards('D',4,5,6,7),
     C4, '42: N has A,Q,J; W has 2,3 - interlocking stoppers in all suits'
   ));
@@ -547,8 +536,8 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',13,12,11,10,9,8) + cards('S',13,12,11,10,9,8),
     cards('C',13,12,11,10,9,8) + cards('D',13,12,11,10,9,8),
     cards('H',2,3,4,5) + cards('S',2,3,4,5) + cards('C',2,3) + cards('D',2,3),
-    cards('H',1,6,7) + cards('S',1,6,7) + cards('C',1,4,5,6,7) + cards('D',1,4),
-    cards('D',5,6,7,8),
+    cards('H',1,6,7) + cards('S',1,6,7) + cards('C',1,4,5,6,7) + cards('D',1),
+    cards('D',4,5,6,7),
     C4, '43: N has all 2s+3s, W has all Aces - complete wall'
   ));
 
@@ -577,7 +566,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',13,12,11,10) + cards('S',13,12,11,10) + cards('C',13,12,11,10),
     cards('H',9,8,7,6) + cards('S',9,8,7,6) + cards('C',9,8,7,6),
     cards('H',1,2,5) + cards('S',1,2,5) + cards('C',1,2,5) + cards('D',1,2,5),
-    cards('H',3,4) + cards('S',3,4) + cards('C',3,4) + cards('D',3,4,6,7),
+    cards('H',3,4) + cards('S',3,4) + cards('C',3,4) + cards('D',3,4,6,7,12,13),
     cards('D',8,9,10,11),
     C4, '46: N has A,2 in each suit; E/S have middle/high - defense dominates'
   ));
@@ -597,7 +586,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('H',13,12,10,9) + cards('S',13,12,10,9) + cards('C',13,12,10,9),
     cards('H',8,7,6,5) + cards('S',8,7,6,5) + cards('C',8,7,6,5),
     cards('H',1,2,4) + cards('S',1,2,4) + cards('C',1,2,4) + cards('D',1,2,4),
-    cards('H',3,11) + cards('S',3,11) + cards('C',3,11) + cards('D',3,11,5,6),
+    cards('H',3,11) + cards('S',3,11) + cards('C',3,11) + cards('D',3,11,5,6,12,13),
     cards('D',7,8,9,10),
     C4, '48: N has A,2,4 each suit; W has 3,J each suit - strong defense'
   ));
@@ -627,27 +616,15 @@ function generateDecks(): RedTeamDeck[] {
   // Kitty cards look helpful but force discarding critical stoppers.
   // ========================================================================
 
-  // 51: Kitty has 4 hearts completing S's suit, but S must discard club stoppers
+  // 51: Kitty has 3 hearts completing S's suit, but S must discard club stoppers
   D.push(mk(
-    cards('H',1,13,12,11,10,9) + cards('C',1,13) + cards('S',5,6,7,8),
-    cards('S',1,13,12,11,10,9) + cards('D',5,6,7,8,9,10),
-    cards('C',2,3,4,5,6,7,8,9) + cards('D',1,13,12,11),
-    cards('H',2,3,4,5) + cards('S',2,3,4) + cards('C',10,11,12) + cards('D',2,3),
-    cards('H',6,7,8) + cards('C',3),
-    // Wait, H6,7,8 - but H9,10,11,12,13,1 already assigned to S. H2,3,4,5 to W. H6,7,8 in kitty = 13 hearts total. Good.
-    // But C3 - is it assigned? N has C2-9, so C3 is taken. Fix.
-    C5, '51: PLACEHOLDER'
-  ));
-
-  // Fix 51
-  D[D.length - 1] = mk(
     cards('H',1,13,12,11,10,9) + cards('C',1,13) + cards('S',5,6,7,8),
     cards('S',1,13,12,11,10,9) + cards('D',5,6,7,8,9,10),
     cards('C',2,3,4,5,6,7,8,9) + cards('D',1,13,12,11),
     cards('H',2,3,4,5) + cards('S',2,3,4) + cards('C',10,11,12) + cards('D',2,3),
     cards('H',6,7,8) + cards('D',4),
     C5, '51: Kitty has 3 hearts for S, but taking them means discarding C stoppers'
-  );
+  ));
 
   // 52: Kitty completes a long suit but creates void exploitable by defense
   D.push(mk(
@@ -737,8 +714,8 @@ function generateDecks(): RedTeamDeck[] {
   D.push(mk(
     cards('H',1,10,11,12) + cards('S',1,10,11,12) + cards('C',1,10,11,12),
     cards('H',5,6,7,8) + cards('S',5,6,7,8) + cards('C',5,6,7,8),
-    cards('D',1,10,11,12,13) + cards('H',3,4,9) + cards('S',3,4,9),
-    cards('H',13,2) + cards('S',13,2) + cards('C',13,2) + cards('D',2,3,4,5,6),
+    cards('D',1,10,11,12,13) + cards('H',3,4,9) + cards('S',3,4,9) + cards('C',3),
+    cards('H',13,2) + cards('S',13,2) + cards('C',13,2,4) + cards('D',2,3,4,5,6),
     cards('D',7,8,9) + cards('C',9),
     C6, '61: W has K+2 in 3 suits - bids 3 but direction unclear to partner'
   ));
@@ -851,22 +828,12 @@ function generateDecks(): RedTeamDeck[] {
   // 72: Complementary voids in 2 suits
   D.push(mk(
     cards('H',1,13,12,11,10,9,8,7) + cards('S',1,13,12,11),
-    cards('H',2,3,4,5,6) + cards('S',2,3,4,5,6) + cards('C',13,12),
-    cards('C',1,11,10,9,8,7,6,5,4,3) + cards('D',13,12),
-    cards('D',1,11,10,9,8,7,6,5,4,3) + cards('S',7,8),
-    cards('S',9,10) + cards('C',2) + cards('D',2),
-    // S9,10 already used by S. Fix.
-    C7, '72: PLACEHOLDER'
-  ));
-
-  D[D.length - 1] = mk(
-    cards('H',1,13,12,11,10,9,8,7) + cards('S',1,13,12,11),
     cards('H',2,3,4,5,6) + cards('S',2,3,4,5,6,7,8),
     cards('C',1,13,12,11,10,9,8,7,6,5) + cards('D',13,12),
     cards('D',1,11,10,9,8,7,6,5,4,3) + cards('S',9,10),
     cards('C',2,3,4) + cards('D',2),
     C7, '72: N void H+S (has C+D), W void H+C (has D+S) - cross-ruff'
-  );
+  ));
 
   // 73: Defense can ruff declarers trump
   D.push(mk(
@@ -1156,7 +1123,7 @@ function generateDecks(): RedTeamDeck[] {
     cards('S',13,12,11,10,9) + cards('C',1) + cards('D',8,9,10,11,12,13),
     cards('D',7,6,5,4,3,2) + cards('H',2,3,4,5,6,7),
     cards('S',2,3,4,5,6,7,8) + cards('C',2,3,4,5,6),
-    cards('H',8,9) + cards('D',1,13),
+    cards('H',8,9) + cards('D',1) + cards('C',7),
     C10, '99: S has 5H+AceS+6C, E has 5S+AceC+6D - multi-suit bidding war'
   ));
 

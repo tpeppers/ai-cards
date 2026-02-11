@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameEngine from './components/GameEngine.tsx';
 import BiddingOverlay from './components/BiddingOverlay.tsx';
 import TrumpSelectionOverlay from './components/TrumpSelectionOverlay.tsx';
@@ -6,12 +6,18 @@ import DiscardOverlay from './components/DiscardOverlay.tsx';
 import LastBook from './components/LastBook.tsx';
 import { BidWhistGame } from './games/BidWhistGame.ts';
 import { GameState } from './types/CardGame.ts';
+import { STRATEGY_REGISTRY } from './strategies/index.ts';
 
 const BidWhistGameComponent: React.FunctionComponent = () => {
   const gameRef = useRef<BidWhistGame>(new BidWhistGame());
   const [gameState, setGameState] = useState<GameState>(gameRef.current.getGameState());
   const [biddingState, setBiddingState] = useState(gameRef.current.getBiddingState());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
+  const [showStrategyMenu, setShowStrategyMenu] = useState(false);
+  const [autoPlaySignal, setAutoPlaySignal] = useState(0);
+  const [previewCardId, setPreviewCardId] = useState<string | null>(null);
+  const strategyMenuRef = useRef<HTMLDivElement>(null);
 
   const game = gameRef.current;
 
@@ -125,15 +131,90 @@ Card Rankings:
     return () => clearTimeout(timer);
   }, [gameState.gameStage]);
 
+  // Close strategy menu on outside click
+  useEffect(() => {
+    if (!showStrategyMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (strategyMenuRef.current && !strategyMenuRef.current.contains(e.target as Node)) {
+        setShowStrategyMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showStrategyMenu]);
+
+  // Determine whether Auto Play should be visible
+  const currentDeclarer = game.getDeclarer();
+  const showAutoPlay =
+    (gameState.gameStage === 'bidding' && gameState.currentPlayer === 0) ||
+    (gameState.gameStage === 'trumpSelection' && currentDeclarer === 0) ||
+    (gameState.gameStage === 'discarding') ||
+    (gameState.gameStage === 'play' && gameState.currentPlayer === 0);
+
+  // Phase-aware Auto Play handler
+  const handleAutoPlay = useCallback(() => {
+    // Load selected strategy or clear it
+    if (selectedStrategy) {
+      game.loadStrategy(selectedStrategy);
+    } else {
+      game.setStrategy(null);
+    }
+
+    const stage = game.getGameState().gameStage;
+
+    if (stage === 'bidding') {
+      const bid = game.getAIBid(0);
+      handleBid(bid);
+    } else if (stage === 'trumpSelection') {
+      const result = game.getAITrumpSelection(0);
+      handleTrumpSelection(result.suit, result.direction);
+    } else if (stage === 'discarding') {
+      game.simulateAutoDiscard(0);
+      updateStates();
+      setRefreshKey(prev => prev + 1);
+    } else if (stage === 'play') {
+      // Signal GameEngine to run its internal handleAutoPlay
+      setAutoPlaySignal(prev => prev + 1);
+    }
+  }, [selectedStrategy, game]);
+
+  // Preview: compute which card Auto Play would pick during play phase
+  const handleAutoPlayHover = useCallback(() => {
+    if (game.getGameState().gameStage !== 'play') return;
+    if (selectedStrategy) {
+      game.loadStrategy(selectedStrategy);
+    } else {
+      game.setStrategy(null);
+    }
+    const bestMove = game.getBestMove(0);
+    if (bestMove) {
+      setPreviewCardId(bestMove.id);
+    }
+  }, [selectedStrategy, game]);
+
+  const handleAutoPlayLeave = useCallback(() => {
+    setPreviewCardId(null);
+  }, []);
+
+  // Get the display name for the selected strategy
+  const selectedStrategyName = selectedStrategy
+    ? STRATEGY_REGISTRY.find(s => s.text === selectedStrategy)?.name || 'Custom'
+    : null;
+
+  // Track current game stage in a ref so the callback doesn't depend on gameState
+  const gameStageRef = useRef(gameState.gameStage);
+  gameStageRef.current = gameState.gameStage;
+
   // Handle game state changes from GameEngine
-  const handleGameStateChange = (newState: GameState) => {
+  const handleGameStateChange = useCallback((newState: GameState) => {
     // Define phase order - never allow regression to earlier phases
     const phaseOrder = ['deal', 'bidding', 'trumpSelection', 'discarding', 'play', 'scoring'];
-    const currentPhaseIndex = phaseOrder.indexOf(gameState.gameStage);
+    const currentStage = gameStageRef.current;
+    const currentPhaseIndex = phaseOrder.indexOf(currentStage);
     const newPhaseIndex = phaseOrder.indexOf(newState.gameStage);
 
     // Allow transition from scoring to deal/bidding (new hand)
-    const isNewHand = gameState.gameStage === 'scoring' &&
+    const isNewHand = currentStage === 'scoring' &&
       (newState.gameStage === 'deal' || newState.gameStage === 'bidding');
 
     // Don't allow GameEngine to regress to earlier phases (stale state)
@@ -143,9 +224,9 @@ Card Rankings:
     }
 
     // Don't let GameEngine overwrite state while in managed phases
-    if ((newState.gameStage === 'bidding' && gameState.gameStage === 'bidding') ||
-        (newState.gameStage === 'trumpSelection' && gameState.gameStage === 'trumpSelection') ||
-        (newState.gameStage === 'discarding' && gameState.gameStage === 'discarding')) {
+    if ((newState.gameStage === 'bidding' && currentStage === 'bidding') ||
+        (newState.gameStage === 'trumpSelection' && currentStage === 'trumpSelection') ||
+        (newState.gameStage === 'discarding' && currentStage === 'discarding')) {
       return;
     }
 
@@ -153,12 +234,14 @@ Card Rankings:
     const newBiddingState = game.getBiddingState();
     setGameState(newState);
     setBiddingState(newBiddingState);
-  };
+  }, [game]);
 
   const playerNames = gameState.players.map(p => p.name);
   const declarer = game.getDeclarer();
   const isHumanDeclarer = declarer === 0;
   const lastBook = game.getLastCompletedTrick();
+
+  const bidWhistStrategies = STRATEGY_REGISTRY.filter(s => s.game === 'bidwhist');
 
   return (
     <div className="relative w-full h-screen">
@@ -170,6 +253,9 @@ Card Rankings:
         hideMoveHistory={true}
         refreshKey={refreshKey}
         onGameStateChange={handleGameStateChange}
+        autoPlaySignal={autoPlaySignal}
+        hideAutoPlay={true}
+        previewCardId={previewCardId}
       />
 
       {/* Last Book display (replaces Move History for Bid Whist) */}
@@ -208,6 +294,56 @@ Card Rankings:
           trumpSuit={game.getTrumpSuit()}
           onDiscard={handleDiscard}
         />
+      )}
+
+      {/* Auto Play + Strategy Selector (z-60 to float above overlays) */}
+      {showAutoPlay && (
+        <div className="absolute top-10 right-4 z-[60]" ref={strategyMenuRef}>
+          <div className="flex flex-row gap-0">
+            <button
+              className="bg-green-600 text-white px-3 py-1 text-sm rounded-l hover:bg-green-700"
+              onClick={handleAutoPlay}
+              onMouseEnter={handleAutoPlayHover}
+              onMouseLeave={handleAutoPlayLeave}
+            >
+              Auto Play
+            </button>
+            <button
+              className="bg-green-600 text-white px-2 py-1 text-sm rounded-r hover:bg-green-700 border-l border-green-700"
+              onClick={() => setShowStrategyMenu(prev => !prev)}
+            >
+              ...
+            </button>
+          </div>
+          {selectedStrategyName && (
+            <div className="text-gray-300 text-xs mt-1 max-w-[140px] truncate">
+              {selectedStrategyName}
+            </div>
+          )}
+          {showStrategyMenu && (
+            <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border border-gray-300 w-56 max-h-80 overflow-y-auto">
+              <button
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                  selectedStrategy === null ? 'bg-blue-50 font-semibold' : ''
+                }`}
+                onClick={() => { setSelectedStrategy(null); setShowStrategyMenu(false); }}
+              >
+                Default AI
+              </button>
+              {bidWhistStrategies.map(s => (
+                <button
+                  key={s.name}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 border-t border-gray-100 ${
+                    selectedStrategy === s.text ? 'bg-blue-50 font-semibold' : ''
+                  }`}
+                  onClick={() => { setSelectedStrategy(s.text); setShowStrategyMenu(false); }}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
