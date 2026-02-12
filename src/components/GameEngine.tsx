@@ -33,7 +33,8 @@ interface GameEngineProps {
   hideAutoPlay?: boolean;
   hideDeal?: boolean;
   previewCardId?: string | null;
-  onBeforeAIMove?: () => void;
+  onBeforeAIMove?: (playerId: number) => void;
+  playerDisplayNames?: string[];
   extraControls?: React.ReactNode;
 }
 
@@ -55,6 +56,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   hideDeal = false,
   previewCardId = null,
   onBeforeAIMove,
+  playerDisplayNames,
   extraControls
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
@@ -234,7 +236,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   
     console.log(`Player ${currentPlayerObj.id}'s turn (${(game.players[currentPlayerObj.id].name)}) starts.`);
 
-    if (onBeforeAIMove) onBeforeAIMove();
+    if (onBeforeAIMove) onBeforeAIMove(currentPlayerObj.id);
     const card = game.getBestMove(currentPlayerObj.id);
     if (card) {
       console.log(`Player ${(game.players[currentPlayerObj.id].name)} plays card value: ${card.rank} of ${card.suit}`);
@@ -252,6 +254,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
 
   const startNewHand = () => {
     game.startNewHand();
+    window.location.hash = '';
     updateGameState();
   };
 
@@ -319,12 +322,14 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           playCard={handleCardPlay}
           showAllCards={showAllCards}
           previewCardId={player.id === 0 ? previewCardId : null}
+          displayName={playerDisplayNames?.[player.id]}
         />
       ))}
       {/* Turn indicator */}
-      <TurnIndicator 
-        currentPlayer={game.getCurrentPlayer()} 
+      <TurnIndicator
+        currentPlayer={game.getCurrentPlayer()}
         gameStage={gameState.gameStage}
+        displayName={game.getCurrentPlayer() ? playerDisplayNames?.[game.getCurrentPlayer()!.id] : undefined}
       />
       
       {/* Game table with current trick */}
@@ -398,7 +403,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
         </div>
         {gameState.players.map(player => (
           <div key={player.id} className="flex justify-between text-sm">
-            <span>{player.name}:</span>
+            <span>{playerDisplayNames?.[player.id] || player.name}:</span>
             <span className="ml-4">{player.totalScore}</span>
           </div>
         ))}
@@ -407,7 +412,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
             <div className="text-sm font-bold mb-1">Last Hand</div>
             {gameState.players.map(player => (
               <div key={`last_${player.id}`} className="flex justify-between text-sm">
-                <span>{player.name}:</span>
+                <span>{playerDisplayNames?.[player.id] || player.name}:</span>
                 <span className="ml-4">{player.score}</span>
               </div>
             ))}
@@ -423,11 +428,11 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
         <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg max-w-md text-center border-4 border-blue-800">
             <h2 className="text-2xl font-bold mb-4">Game Over!</h2>
-            <p className="text-xl mb-6">{gameState.winner.name} wins with {gameState.winner.totalScore} points!</p>
+            <p className="text-xl mb-6">{playerDisplayNames?.[gameState.winner.id] || gameState.winner.name} wins with {gameState.winner.totalScore} points!</p>
             <h3 className="font-bold mb-2">Final Scores:</h3>
             {gameState.players.sort((a, b) => a.totalScore - b.totalScore).map(player => (
               <div key={player.id} className="flex justify-between mb-1">
-                <span>{player.name}</span>
+                <span>{playerDisplayNames?.[player.id] || player.name}</span>
                 <span>{player.totalScore}</span>
               </div>
             ))}

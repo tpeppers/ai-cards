@@ -4,6 +4,7 @@ import BiddingOverlay from './components/BiddingOverlay.tsx';
 import TrumpSelectionOverlay from './components/TrumpSelectionOverlay.tsx';
 import DiscardOverlay from './components/DiscardOverlay.tsx';
 import LastBook from './components/LastBook.tsx';
+import StrategyConfigModal from './components/StrategyConfigModal.tsx';
 import { BidWhistGame } from './games/BidWhistGame.ts';
 import { GameState } from './types/CardGame.ts';
 import { STRATEGY_REGISTRY } from './strategies/index.ts';
@@ -14,17 +15,16 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const [gameState, setGameState] = useState<GameState>(gameRef.current.getGameState());
   const [biddingState, setBiddingState] = useState(gameRef.current.getBiddingState());
   const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
-  const [showStrategyMenu, setShowStrategyMenu] = useState(false);
   const [autoPlaySignal, setAutoPlaySignal] = useState(0);
   const [previewCardId, setPreviewCardId] = useState<string | null>(null);
   const [previewBid, setPreviewBid] = useState<number | null>(null);
   const [previewTrump, setPreviewTrump] = useState<{ suit: string; direction: string } | null>(null);
+
+  // Strategy configuration state
   const familyStrategyText = STRATEGY_REGISTRY.find(s => s.game === 'bidwhist' && s.name === 'Family')?.text || null;
-  const [opponentStrategy, setOpponentStrategy] = useState<string | null>(familyStrategyText);
-  const [showDealMenu, setShowDealMenu] = useState(false);
-  const strategyMenuRef = useRef<HTMLDivElement>(null);
-  const dealMenuRef = useRef<HTMLDivElement>(null);
+  const [tableStrategy, setTableStrategy] = useState<string | null>(familyStrategyText);
+  const [playerStrategyOverrides, setPlayerStrategyOverrides] = useState<(string | null)[]>([null, null, null, null]);
+  const [showStrategyModal, setShowStrategyModal] = useState(false);
 
   const game = gameRef.current;
 
@@ -64,14 +64,23 @@ Card Rankings:
     setBiddingState(game.getBiddingState());
   };
 
-  // Load the opponent strategy onto the game engine
-  const loadOpponentStrategy = useCallback(() => {
-    if (opponentStrategy) {
-      game.loadStrategy(opponentStrategy);
+  // Get the effective strategy text for a given player
+  const getEffectiveStrategy = useCallback((playerId: number): string | null => {
+    const override = playerStrategyOverrides[playerId];
+    if (override === null) return tableStrategy; // "Use table strategy"
+    if (override === '') return null;             // "Default AI"
+    return override;                              // specific strategy text
+  }, [tableStrategy, playerStrategyOverrides]);
+
+  // Load the effective strategy for a player onto the game engine
+  const loadStrategyForPlayer = useCallback((playerId: number) => {
+    const strategy = getEffectiveStrategy(playerId);
+    if (strategy) {
+      game.loadStrategy(strategy);
     } else {
       game.setStrategy(null);
     }
-  }, [opponentStrategy, game]);
+  }, [getEffectiveStrategy, game]);
 
   // Handle human bid
   const handleBid = (amount: number) => {
@@ -116,8 +125,8 @@ Card Rankings:
       if (state.gameStage !== 'bidding') return;
       if (state.currentPlayer !== currentPlayer) return;
 
-      // Load opponent strategy before AI decision
-      loadOpponentStrategy();
+      // Load strategy for this specific AI player
+      loadStrategyForPlayer(currentPlayer);
       // Process the AI bid
       game.processAIBid(currentPlayer);
 
@@ -140,7 +149,7 @@ Card Rankings:
 
     // AI player chooses trump
     const timer = setTimeout(() => {
-      loadOpponentStrategy();
+      loadStrategyForPlayer(declarer);
       game.processAITrumpSelection(declarer);
       updateStates();
       // Signal GameEngine to refresh for play phase (AI auto-discards)
@@ -149,21 +158,6 @@ Card Rankings:
 
     return () => clearTimeout(timer);
   }, [gameState.gameStage]);
-
-  // Close strategy menu on outside click
-  useEffect(() => {
-    if (!showStrategyMenu && !showDealMenu) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (showStrategyMenu && strategyMenuRef.current && !strategyMenuRef.current.contains(e.target as Node)) {
-        setShowStrategyMenu(false);
-      }
-      if (showDealMenu && dealMenuRef.current && !dealMenuRef.current.contains(e.target as Node)) {
-        setShowDealMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showStrategyMenu, showDealMenu]);
 
   // Determine whether Auto Play should be visible
   const currentDeclarer = game.getDeclarer();
@@ -175,12 +169,7 @@ Card Rankings:
 
   // Phase-aware Auto Play handler
   const handleAutoPlay = useCallback(() => {
-    // Load selected strategy or clear it
-    if (selectedStrategy) {
-      game.loadStrategy(selectedStrategy);
-    } else {
-      game.setStrategy(null);
-    }
+    loadStrategyForPlayer(0);
 
     const stage = game.getGameState().gameStage;
 
@@ -198,15 +187,11 @@ Card Rankings:
       // Signal GameEngine to run its internal handleAutoPlay
       setAutoPlaySignal(prev => prev + 1);
     }
-  }, [selectedStrategy, game]);
+  }, [loadStrategyForPlayer, game]);
 
   // Preview: compute what Auto Play would do on hover
   const handleAutoPlayHover = useCallback(() => {
-    if (selectedStrategy) {
-      game.loadStrategy(selectedStrategy);
-    } else {
-      game.setStrategy(null);
-    }
+    loadStrategyForPlayer(0);
 
     const stage = game.getGameState().gameStage;
 
@@ -222,7 +207,7 @@ Card Rankings:
         setPreviewCardId(bestMove.id);
       }
     }
-  }, [selectedStrategy, game]);
+  }, [loadStrategyForPlayer, game]);
 
   const handleAutoPlayLeave = useCallback(() => {
     setPreviewCardId(null);
@@ -238,14 +223,9 @@ Card Rankings:
   }, [game]);
 
   // Called by GameEngine before each AI card play
-  const handleBeforeAIMove = useCallback(() => {
-    loadOpponentStrategy();
-  }, [loadOpponentStrategy]);
-
-  // Get the display name for the selected strategy
-  const selectedStrategyName = selectedStrategy
-    ? STRATEGY_REGISTRY.find(s => s.text === selectedStrategy)?.name || 'Custom'
-    : null;
+  const handleBeforeAIMove = useCallback((playerId: number) => {
+    loadStrategyForPlayer(playerId);
+  }, [loadStrategyForPlayer]);
 
   // Track current game stage in a ref so the callback doesn't depend on gameState
   const gameStageRef = useRef(gameState.gameStage);
@@ -282,22 +262,45 @@ Card Rankings:
     setBiddingState(newBiddingState);
   }, [game]);
 
-  const playerNames = gameState.players.map(p => p.name);
+  // Strategy name helper
+  const strategyNameFromText = (text: string | null): string => {
+    if (text === null) return 'Default AI';
+    return STRATEGY_REGISTRY.find(s => s.text === text)?.name || 'Custom';
+  };
+
+  const tableStrategyName = strategyNameFromText(tableStrategy);
+
+  // Check if any player has an override
+  const hasAnyOverride = playerStrategyOverrides.some(o => o !== null);
+
+  // Compute display game name
+  const displayGameName = (!hasAnyOverride && tableStrategy !== null)
+    ? `Bid Whist (${tableStrategyName.toLowerCase()})`
+    : 'Bid Whist';
+
+  // Compute player display names
+  const basePlayerNames = gameState.players.map(p => p.name);
+  const playerDisplayNames = basePlayerNames.map((name, i) => {
+    if (!hasAnyOverride) return name; // all use table strategy, no suffixes
+    const override = playerStrategyOverrides[i];
+    if (override === null) return name; // using table strategy (the default), no suffix
+    const overrideName = override === '' ? 'default ai' : strategyNameFromText(override).toLowerCase();
+    return `${name} (${overrideName})`;
+  });
+
+  // Effective strategy name for player 0 (shown under Auto Play)
+  const player0EffectiveStrategy = getEffectiveStrategy(0);
+  const player0StrategyName = strategyNameFromText(player0EffectiveStrategy);
+
   const declarer = game.getDeclarer();
   const isHumanDeclarer = declarer === 0;
   const lastBook = game.getLastCompletedTrick();
-
-  const bidWhistStrategies = STRATEGY_REGISTRY.filter(s => s.game === 'bidwhist');
-
-  const opponentStrategyName = opponentStrategy
-    ? STRATEGY_REGISTRY.find(s => s.text === opponentStrategy)?.name || 'Custom'
-    : 'Default AI';
 
   return (
     <div className="relative w-full h-screen">
       <GameEngine
         game={game}
-        gameName="Bid Whist"
+        gameName={displayGameName}
         gameRules={gameRules}
         useUrlSeeding={true}
         hideMoveHistory={true}
@@ -308,11 +311,12 @@ Card Rankings:
         hideDeal={true}
         previewCardId={previewCardId}
         onBeforeAIMove={handleBeforeAIMove}
+        playerDisplayNames={playerDisplayNames}
         extraControls={
           <>
-            {/* Deal + Opponent Strategy Selector */}
+            {/* Deal + Strategy Config */}
             {gameState.gameStage === 'deal' && (
-              <div className="relative" ref={dealMenuRef}>
+              <div className="relative">
                 <div className="flex flex-row gap-0">
                   <button
                     className="bg-blue-600 text-white px-4 py-2 rounded-l hover:bg-blue-700"
@@ -323,40 +327,14 @@ Card Rankings:
                   </button>
                   <button
                     className="bg-blue-600 text-white px-2 py-2 rounded-r hover:bg-blue-700 border-l border-blue-700"
-                    onClick={() => setShowDealMenu(prev => !prev)}
+                    onClick={() => setShowStrategyModal(true)}
                   >
                     ...
                   </button>
                 </div>
                 <div className="text-gray-300 text-xs mt-1 max-w-[160px] truncate">
-                  vs {opponentStrategyName}
+                  {tableStrategyName}
                 </div>
-                {showDealMenu && (
-                  <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border border-gray-300 w-56 max-h-80 overflow-y-auto z-10">
-                    <div className="px-3 py-2 text-xs font-bold text-gray-500 border-b border-gray-200">
-                      Opponent AI Strategy
-                    </div>
-                    <button
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                        opponentStrategy === null ? 'bg-blue-50 font-semibold' : ''
-                      }`}
-                      onClick={() => { setOpponentStrategy(null); setShowDealMenu(false); }}
-                    >
-                      Default AI
-                    </button>
-                    {bidWhistStrategies.map(s => (
-                      <button
-                        key={s.name}
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 border-t border-gray-100 ${
-                          opponentStrategy === s.text ? 'bg-blue-50 font-semibold' : ''
-                        }`}
-                        onClick={() => { setOpponentStrategy(s.text); setShowDealMenu(false); }}
-                      >
-                        {s.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </>
@@ -365,7 +343,7 @@ Card Rankings:
 
       {/* Last Book display (replaces Move History for Bid Whist) */}
       {gameState.gameStage === 'play' && (
-        <LastBook lastBook={lastBook} playerNames={playerNames} />
+        <LastBook lastBook={lastBook} playerNames={playerDisplayNames} />
       )}
 
       {/* Bidding overlay */}
@@ -375,7 +353,7 @@ Card Rankings:
           currentHighBid={biddingState.currentHighBid}
           validBids={game.getValidBids()}
           bids={biddingState.bids}
-          playerNames={playerNames}
+          playerNames={playerDisplayNames}
           dealer={biddingState.dealer}
           currentBidder={gameState.currentPlayer}
           onBid={handleBid}
@@ -403,54 +381,35 @@ Card Rankings:
         />
       )}
 
-      {/* Auto Play + Strategy Selector (z-60 to float above overlays) */}
+      {/* Auto Play button (z-60 to float above overlays) */}
       {showAutoPlay && (
-        <div className="absolute top-10 right-4 z-[60]" ref={strategyMenuRef}>
-          <div className="flex flex-row gap-0">
-            <button
-              className="bg-green-600 text-white px-3 py-1 text-sm rounded-l hover:bg-green-700"
-              onClick={handleAutoPlay}
-              onMouseEnter={handleAutoPlayHover}
-              onMouseLeave={handleAutoPlayLeave}
-            >
-              Auto Play
-            </button>
-            <button
-              className="bg-green-600 text-white px-2 py-1 text-sm rounded-r hover:bg-green-700 border-l border-green-700"
-              onClick={() => setShowStrategyMenu(prev => !prev)}
-            >
-              ...
-            </button>
+        <div className="absolute top-10 right-4 z-[60]">
+          <button
+            className="bg-green-600 text-white px-3 py-1 text-sm rounded hover:bg-green-700"
+            onClick={handleAutoPlay}
+            onMouseEnter={handleAutoPlayHover}
+            onMouseLeave={handleAutoPlayLeave}
+          >
+            Auto Play
+          </button>
+          <div className="text-gray-300 text-xs mt-1 max-w-[140px] truncate">
+            {player0StrategyName}
           </div>
-          {selectedStrategyName && (
-            <div className="text-gray-300 text-xs mt-1 max-w-[140px] truncate">
-              {selectedStrategyName}
-            </div>
-          )}
-          {showStrategyMenu && (
-            <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border border-gray-300 w-56 max-h-80 overflow-y-auto">
-              <button
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                  selectedStrategy === null ? 'bg-blue-50 font-semibold' : ''
-                }`}
-                onClick={() => { setSelectedStrategy(null); setShowStrategyMenu(false); }}
-              >
-                Default AI
-              </button>
-              {bidWhistStrategies.map(s => (
-                <button
-                  key={s.name}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 border-t border-gray-100 ${
-                    selectedStrategy === s.text ? 'bg-blue-50 font-semibold' : ''
-                  }`}
-                  onClick={() => { setSelectedStrategy(s.text); setShowStrategyMenu(false); }}
-                >
-                  {s.name}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
+      )}
+
+      {/* Strategy Configuration Modal */}
+      {showStrategyModal && (
+        <StrategyConfigModal
+          tableStrategy={tableStrategy}
+          playerOverrides={playerStrategyOverrides}
+          onApply={(newTable, newOverrides) => {
+            setTableStrategy(newTable);
+            setPlayerStrategyOverrides(newOverrides);
+            setShowStrategyModal(false);
+          }}
+          onCancel={() => setShowStrategyModal(false)}
+        />
       )}
     </div>
   );

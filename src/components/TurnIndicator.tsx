@@ -4,9 +4,10 @@ import { Player } from '../types/CardGame';
 interface TurnIndicatorProps {
   currentPlayer: Player | null;
   gameStage: string;
+  displayName?: string;
 }
 
-const TurnIndicator: React.FC<TurnIndicatorProps> = ({ currentPlayer, gameStage }) => {
+const TurnIndicator: React.FC<TurnIndicatorProps> = ({ currentPlayer, gameStage, displayName }) => {
   if (gameStage !== 'play' || !currentPlayer) {
     return null;
   }
@@ -16,7 +17,7 @@ const TurnIndicator: React.FC<TurnIndicatorProps> = ({ currentPlayer, gameStage 
       <div className="flex items-center gap-2">
         <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
         <span className="font-bold text-gray-800">
-          {currentPlayer.name}'s Turn
+          {(displayName || currentPlayer.name)}'s Turn
         </span>
       </div>
     </div>

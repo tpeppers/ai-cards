@@ -171,7 +171,7 @@ bid:
     bid 4
   when bid_count == 2 and bid.current == 3 and king_ace_count() >= 3:
     bid 4
-  # Garbage hand: let a 3 pass through to dealer
+  # Garbage hand: let a 3 pass through to 3rd seat
   when bid_count == 2:
     pass
 
