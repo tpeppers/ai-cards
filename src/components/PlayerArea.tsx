@@ -8,10 +8,11 @@ interface PlayerAreaProps {
   isHuman: boolean;
   playCard: (card: any) => void;
   showAllCards: boolean;
+  previewCardId?: string | null;
 }
 
 // Player area component
-const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard, showAllCards }) => {
+const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard, showAllCards, previewCardId = null }) => {
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -32,7 +33,7 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
   }, []);
 
   // Create the fan-shaped layout for cards similar to classic Microsoft Hearts
-  const getPositionStyle = (index: number) => {
+  const getPositionStyle = (index: number, cardId?: string) => {
     if (isHuman) {
       // Bottom player (human) - fan out cards
       const totalWidth = Math.min(windowSize.width - 100, player.hand.length * 30);
@@ -42,7 +43,7 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
       return {
         x: startX + index * spacing,
         y: windowSize.height - 140,  // Position cards higher to stay within viewport
-        raised: false
+        raised: !!(previewCardId && cardId === previewCardId)
       };
     } else if (player.id === 1) {
       // Right player (East) - cards stacked sideways
@@ -86,7 +87,7 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
         <Card
           key={card.id}
           card={card}
-          position={getPositionStyle(index)}
+          position={getPositionStyle(index, card.id)}
           zIndex={index + 1}
           draggable={isHuman && isCurrentPlayer}
           onClick={isHuman && isCurrentPlayer ? () => playCard(card) : undefined}

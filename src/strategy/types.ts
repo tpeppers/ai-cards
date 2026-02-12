@@ -38,7 +38,7 @@ export type Expression =
 
 export interface BinaryExpr {
   type: 'binary';
-  op: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'and' | 'or';
+  op: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'and' | 'or' | '+' | '-';
   left: Expression;
   right: Expression;
 }
@@ -141,6 +141,17 @@ export interface StrategyContext {
   bids: BidInfo[];
   bidCount: number; // number of bids placed so far (0=first bidder)
   partnerBid: number; // partner's bid amount (0=pass)
+  enemyBid: number;   // enemy signal bid amount (0=none, 1=downtown, 2=uptown)
+
+  // Void discard signaling
+  haveSignaled: boolean;       // has this player already made a void discard?
+  partnerSignal: string;       // partner's first void discard suit ("" = none)
+  enemySignal1: string;        // first enemy's signal ("" = none)
+  enemySignal2: string;        // second enemy's signal ("" = none)
+
+  // Void tracking
+  enemyHasTrump: boolean;      // true until both enemies shown void in trump
+  partnerVoidSuits: string[];   // suits partner is observed void in
 
   // Card evaluation helpers (injected by game)
   getCardValue: (card: Card) => number;

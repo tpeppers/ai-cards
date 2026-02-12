@@ -21,6 +21,8 @@ interface BidWhistGameLike {
   compareCards(a: Card, b: Card): number;
   evaluateCurrentWinner(): number;
   getPlayedCards(): Card[];
+  getFirstDiscardSuits(): (string | null)[];
+  getPlayerVoidSuits(): Set<string>[];
 }
 
 interface HeartsGameLike {
@@ -68,11 +70,31 @@ export function buildBidWhistContext(game: BidWhistGameLike, playerId: number): 
     }
   }
 
+  // Find enemy signal bid (1 or 2)
+  let enemyBid = 0;
+  const enemy1Id = (playerId + 1) % 4;
+  const enemy2Id = (playerId + 3) % 4;
+  for (const bid of biddingState.bids) {
+    if ((bid.playerId === enemy1Id || bid.playerId === enemy2Id) && !bid.passed && bid.amount <= 2) {
+      enemyBid = bid.amount;
+    }
+  }
+
   // Is first trick: no tricks completed yet
   const isFirstTrick = state.players.every(p => p.tricks.length === 0) ||
     // Or if declarer has exactly 4 tricks (the discards)
     (declarer !== null && state.players[declarer].tricks.length === 4 &&
      state.players.filter(p => p.id !== declarer).every(p => p.tricks.length === 0));
+
+  // Void discard signals
+  const discardSuits = game.getFirstDiscardSuits();
+
+  // Void tracking
+  const voidSuits = game.getPlayerVoidSuits();
+  const enemy1VoidInTrump = trumpSuit ? voidSuits[enemy1Id].has(trumpSuit) : false;
+  const enemy2VoidInTrump = trumpSuit ? voidSuits[enemy2Id].has(trumpSuit) : false;
+  const enemyHasTrump = !(enemy1VoidInTrump && enemy2VoidInTrump);
+  const partnerVoidSuits = Array.from(voidSuits[partnerId]);
 
   return {
     hand: [...player.hand],
@@ -94,6 +116,13 @@ export function buildBidWhistContext(game: BidWhistGameLike, playerId: number): 
     bids: biddingState.bids.map(b => ({ playerId: b.playerId, amount: b.amount, passed: b.passed })),
     bidCount: biddingState.bids.length,
     partnerBid,
+    enemyBid,
+    haveSignaled: discardSuits[playerId] !== null,
+    partnerSignal: discardSuits[partnerId] ?? '',
+    enemySignal1: discardSuits[enemy1Id] ?? '',
+    enemySignal2: discardSuits[enemy2Id] ?? '',
+    enemyHasTrump,
+    partnerVoidSuits,
     getCardValue: (card: Card) => game.getCardValue(card),
     compareCards: (a: Card, b: Card) => game.compareCards(a, b),
     evaluateCurrentWinner: () => game.evaluateCurrentWinner(),
@@ -177,6 +206,13 @@ export function buildHeartsContext(game: HeartsGameLike, playerId: number): Stra
     bids: [],
     bidCount: 0,
     partnerBid: 0,
+    enemyBid: 0,
+    haveSignaled: false,
+    partnerSignal: '',
+    enemySignal1: '',
+    enemySignal2: '',
+    enemyHasTrump: false,
+    partnerVoidSuits: [],
     getCardValue,
     compareCards,
     evaluateCurrentWinner,

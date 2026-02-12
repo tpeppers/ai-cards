@@ -34,6 +34,8 @@ export class BidWhistGame extends CardGame {
   private booksWon: [number, number] = [0, 0];
   private dealer: number = 0; // Dealer position, rotates clockwise each hand
   private lastCompletedTrick: { playerId: number; card: Card }[] = []; // Last book played
+  private firstDiscardSuit: (string | null)[] = [null, null, null, null]; // Void signal tracking
+  private playerVoidSuits: Set<string>[] = [new Set(), new Set(), new Set(), new Set()]; // Track all voids
 
   constructor() {
     super(['You', 'East', 'North', 'West']);
@@ -577,6 +579,13 @@ export class BidWhistGame extends CardGame {
   protected processCardPlay(playerId: number, card: Card): void {
     if (this.currentTrick.length === 1) {
       this.leadSuit = card.suit;
+    } else if (this.leadSuit && card.suit !== this.leadSuit) {
+      // Player is void in lead suit — track it
+      this.playerVoidSuits[playerId].add(this.leadSuit);
+      // First non-trump void discard: record as this player's signal
+      if (card.suit !== this.trumpSuit && this.firstDiscardSuit[playerId] === null) {
+        this.firstDiscardSuit[playerId] = card.suit;
+      }
     }
 
     super.processCardPlay(playerId, card);
@@ -792,6 +801,8 @@ export class BidWhistGame extends CardGame {
     this.teamScores = [0, 0];
     this.booksWon = [0, 0];
     this.lastCompletedTrick = [];
+    this.firstDiscardSuit = [null, null, null, null];
+    this.playerVoidSuits = [new Set(), new Set(), new Set(), new Set()];
     // Randomly pick new dealer for new game
     this.dealer = Math.floor(Math.random() * 4);
     this.message = 'Welcome to Bid Whist!';
@@ -808,6 +819,8 @@ export class BidWhistGame extends CardGame {
     this.booksWon = [0, 0];
     this.declarer = null;
     this.lastCompletedTrick = [];
+    this.firstDiscardSuit = [null, null, null, null];
+    this.playerVoidSuits = [new Set(), new Set(), new Set(), new Set()];
     // Rotate dealer clockwise for new hand: 0→3→2→1→0
     this.dealer = (this.dealer + 3) % 4;
     // Now deal cards (uses the new dealer position)
@@ -856,5 +869,13 @@ export class BidWhistGame extends CardGame {
 
   getLastCompletedTrick(): { playerId: number; card: Card }[] {
     return this.lastCompletedTrick;
+  }
+
+  getFirstDiscardSuits(): (string | null)[] {
+    return [...this.firstDiscardSuit];
+  }
+
+  getPlayerVoidSuits(): Set<string>[] {
+    return this.playerVoidSuits;
   }
 }

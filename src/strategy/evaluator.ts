@@ -59,6 +59,29 @@ function cardSetLosers(cs: CardSet, ctx: StrategyContext): CardSet {
   };
 }
 
+function cardSetBoss(cs: CardSet, ctx: StrategyContext): CardSet {
+  const playedIds = new Set(ctx.playedCards.map(c => c.id));
+  const myIds = new Set(ctx.hand.map(c => c.id));
+  const trickIds = new Set(ctx.currentTrick.map(p => p.card.id));
+
+  return {
+    cards: cs.cards.filter(card => {
+      const val = ctx.getCardValue(card);
+      for (let rank = 1; rank <= 13; rank++) {
+        const id = `${card.suit}_${rank}`;
+        if (id === card.id) continue;
+        if (playedIds.has(id) || myIds.has(id) || trickIds.has(id)) continue;
+        // This card is still out there in an opponent's hand
+        const tempCard: Card = { suit: card.suit, rank, id };
+        if (ctx.getCardValue(tempCard) > val) {
+          return false; // A higher card of this suit is still unplayed
+        }
+      }
+      return true;
+    })
+  };
+}
+
 function cardSetAbove(cs: CardSet, card: Card, getCardValue: (c: Card) => number): CardSet {
   const val = getCardValue(card);
   return { cards: cs.cards.filter(c => c.suit === card.suit && getCardValue(c) > val) };
@@ -170,6 +193,13 @@ function maxSuitCount(ctx: StrategyContext): number {
   return Math.max(...Object.values(counts));
 }
 
+function minSuitCount(ctx: StrategyContext): number {
+  const counts: { [suit: string]: number } = { spades: 0, hearts: 0, diamonds: 0, clubs: 0 };
+  ctx.hand.forEach(c => { if (counts[c.suit] !== undefined) counts[c.suit]++; });
+  const nonZero = Object.values(counts).filter(v => v > 0);
+  return nonZero.length > 0 ? Math.min(...nonZero) : 0;
+}
+
 // ── Expression Evaluator ────────────────────────────────────────────
 
 function evalExpr(expr: Expression, ctx: StrategyContext): any {
@@ -209,7 +239,17 @@ function resolveVariable(name: string, ctx: StrategyContext): any {
     case 'is_first_trick': return ctx.isFirstTrick;
     case 'hearts_broken': return ctx.heartsBroken;
     case 'partner_bid': return ctx.partnerBid;
+    case 'enemy_bid': return ctx.enemyBid;
     case 'bid_count': return ctx.bidCount;
+    case 'have_signaled': return ctx.haveSignaled;
+    case 'partner_signal': return ctx.partnerSignal;
+    case 'enemy_signal_1': return ctx.enemySignal1;
+    case 'enemy_signal_2': return ctx.enemySignal2;
+    case 'enemy_has_trump': return ctx.enemyHasTrump;
+    case 'partner_shortsuit': {
+      const shortCards = ctx.hand.filter(c => ctx.partnerVoidSuits.includes(c.suit));
+      return makeCardSet(shortCards);
+    }
     case 'me': return { id: ctx.playerId };
     default:
       return undefined;
@@ -229,6 +269,8 @@ function evalBinary(expr: any, ctx: StrategyContext): any {
     case '<=': return left <= right;
     case 'and': return left && right;
     case 'or': return left || right;
+    case '+': return left + right;
+    case '-': return left - right;
     default: return false;
   }
 }
@@ -267,6 +309,8 @@ function evalCall(name: string, args: any[], ctx: StrategyContext): any {
       return kingCount(ctx);
     case 'max_suit_count':
       return maxSuitCount(ctx);
+    case 'min_suit_count':
+      return minSuitCount(ctx);
     default:
       return undefined;
   }
@@ -292,6 +336,7 @@ function evalProperty(expr: any, ctx: StrategyContext): any {
       case 'strongest_safe': return highestSafe(cs, ctx);
       case 'winners': return cardSetWinners(cs, ctx);
       case 'losers': return cardSetLosers(cs, ctx);
+      case 'boss': return cardSetBoss(cs, ctx);
       case 'count': return cs.cards.length;
       case 'above':
         return args.length > 0 ? cardSetAbove(cs, args[0] as Card, ctx.getCardValue) : cs;

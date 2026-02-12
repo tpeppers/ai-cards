@@ -118,6 +118,16 @@ function tokenize(source: string): Token[] {
         continue;
       }
 
+      // Arithmetic operators
+      if (trimmed[pos] === '+') { tokens.push({ type: 'op', value: '+', line: lineNum }); pos++; continue; }
+      if (trimmed[pos] === '-') {
+        // Treat as minus operator if the previous token is a value-like token
+        const lastTok = tokens.length > 0 ? tokens[tokens.length - 1] : null;
+        if (lastTok && ['number', 'rparen', 'ident'].includes(lastTok.type)) {
+          tokens.push({ type: 'op', value: '-', line: lineNum }); pos++; continue;
+        }
+      }
+
       // Single-char tokens
       if (trimmed[pos] === ':') { tokens.push({ type: 'colon', value: ':', line: lineNum }); pos++; continue; }
       if (trimmed[pos] === '.') { tokens.push({ type: 'dot', value: '.', line: lineNum }); pos++; continue; }
@@ -428,9 +438,19 @@ class Parser {
   }
 
   private parseComparison(): Expression {
-    let left = this.parseUnary();
+    let left = this.parseAdditive();
     const ops = ['==', '!=', '>', '<', '>=', '<='];
     while (this.peek().type === 'op' && ops.includes(this.peek().value)) {
+      const op = this.advance().value as BinaryExpr['op'];
+      const right = this.parseAdditive();
+      left = { type: 'binary', op, left, right } as BinaryExpr;
+    }
+    return left;
+  }
+
+  private parseAdditive(): Expression {
+    let left = this.parseUnary();
+    while (this.peek().type === 'op' && (this.peek().value === '+' || this.peek().value === '-')) {
       const op = this.advance().value as BinaryExpr['op'];
       const right = this.parseUnary();
       left = { type: 'binary', op, left, right } as BinaryExpr;

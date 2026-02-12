@@ -29,6 +29,9 @@ interface GameEngineProps {
   hideMoveHistory?: boolean;
   refreshKey?: number;
   onGameStateChange?: (gameState: GameState) => void;
+  autoPlaySignal?: number;
+  hideAutoPlay?: boolean;
+  previewCardId?: string | null;
 }
 
 // Global settings
@@ -43,7 +46,10 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   useUrlSeeding = true,
   hideMoveHistory = false,
   refreshKey = 0,
-  onGameStateChange
+  onGameStateChange,
+  autoPlaySignal = 0,
+  hideAutoPlay = false,
+  previewCardId = null
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
   const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
@@ -97,6 +103,13 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       setGameState(game.getGameState());
     }
   }, [refreshKey, game]);
+
+  // Respond to parent-triggered auto play signal
+  useEffect(() => {
+    if (autoPlaySignal > 0) {
+      handleAutoPlay();
+    }
+  }, [autoPlaySignal]);
 
   // Initialize game
   useEffect(() => {
@@ -298,6 +311,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           isHuman={player.id === 0}
           playCard={handleCardPlay}
           showAllCards={showAllCards}
+          previewCardId={player.id === 0 ? previewCardId : null}
         />
       ))}
       {/* Turn indicator */}
@@ -313,7 +327,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       />
       
       {/* Game controls */}
-      <div className="absolute top-8 right-4 flex flex-col gap-2 z-20">
+      <div className="absolute top-8 right-4 flex flex-col gap-2 z-[60]">
         {gameState.gameStage === 'deal' && (
           <button 
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -343,7 +357,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           </button>
         )}
         
-        {gameState.gameStage === 'play' && gameState.currentPlayer === 0 && (
+        {!hideAutoPlay && gameState.gameStage === 'play' && gameState.currentPlayer === 0 && (
           <button
             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
             onClick={handleAutoPlay}

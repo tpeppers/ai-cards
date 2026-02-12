@@ -106,8 +106,8 @@ const Card: React.FC<CardProps> = ({
       }}
       onMouseLeave={() => {
         if (cardRef.current && onClick) {
-          cardRef.current.style.transform = 'translateY(0px)';
-          cardRef.current.style.zIndex = String(zIndex);
+          cardRef.current.style.transform = `translateY(${position.raised ? '-20px' : '0px'})`;
+          cardRef.current.style.zIndex = String(position.raised ? 100 : zIndex);
         }
       }}
     >
