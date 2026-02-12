@@ -15,6 +15,7 @@ interface BiddingOverlayProps {
   dealer: number;
   currentBidder: number | null;
   onBid: (amount: number) => void;
+  previewBid?: number | null;
 }
 
 const BiddingOverlay: React.FC<BiddingOverlayProps> = ({
@@ -25,7 +26,8 @@ const BiddingOverlay: React.FC<BiddingOverlayProps> = ({
   playerNames,
   dealer,
   currentBidder,
-  onBid
+  onBid,
+  previewBid
 }) => {
   // Default to pass (0) - user can select a higher bid if they want
   const [selectedBid, setSelectedBid] = useState<number>(0);
@@ -106,6 +108,11 @@ const BiddingOverlay: React.FC<BiddingOverlayProps> = ({
             >
               {selectedBid === 0 ? 'Pass' : selectedBid === -1 ? 'Take It' : `Bid ${selectedBid}`}
             </button>
+            {previewBid != null && (
+              <div className="mt-2 text-center text-sm text-blue-400 animate-pulse">
+                Auto Play would: {getBidLabel(previewBid)}
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-4">

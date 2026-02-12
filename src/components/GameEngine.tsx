@@ -31,7 +31,10 @@ interface GameEngineProps {
   onGameStateChange?: (gameState: GameState) => void;
   autoPlaySignal?: number;
   hideAutoPlay?: boolean;
+  hideDeal?: boolean;
   previewCardId?: string | null;
+  onBeforeAIMove?: () => void;
+  extraControls?: React.ReactNode;
 }
 
 // Global settings
@@ -49,7 +52,10 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   onGameStateChange,
   autoPlaySignal = 0,
   hideAutoPlay = false,
-  previewCardId = null
+  hideDeal = false,
+  previewCardId = null,
+  onBeforeAIMove,
+  extraControls
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
   const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
@@ -227,7 +233,8 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
     if (!currentPlayerObj || currentPlayerObj.id === 0) return;
   
     console.log(`Player ${currentPlayerObj.id}'s turn (${(game.players[currentPlayerObj.id].name)}) starts.`);
-    
+
+    if (onBeforeAIMove) onBeforeAIMove();
     const card = game.getBestMove(currentPlayerObj.id);
     if (card) {
       console.log(`Player ${(game.players[currentPlayerObj.id].name)} plays card value: ${card.rank} of ${card.suit}`);
@@ -327,9 +334,10 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       />
       
       {/* Game controls */}
-      <div className="absolute top-8 right-4 flex flex-col gap-2 z-[60]">
-        {gameState.gameStage === 'deal' && (
-          <button 
+      <div className="absolute top-28 right-[140px] flex flex-col gap-2 z-[60]">
+        {extraControls}
+        {!hideDeal && gameState.gameStage === 'deal' && (
+          <button
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
             onClick={dealCards}
             id="dealButton"
@@ -384,7 +392,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       </div>
       
       {/* Score display */}
-      <div className="absolute top-8 left-4 bg-white bg-opacity-90 p-2 rounded border border-gray-400 shadow-md">
+      <div className="absolute top-28 left-[140px] bg-white bg-opacity-90 p-2 rounded border border-gray-400 shadow-md">
         <div className="text-sm font-bold border-b border-gray-400 mb-1 pb-1">
           Score
         </div>

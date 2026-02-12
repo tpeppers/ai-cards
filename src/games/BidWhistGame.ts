@@ -365,13 +365,13 @@ export class BidWhistGame extends CardGame {
     // Otherwise, AI auto-discards and goes straight to play
     if (this.declarer === 0) {
       this.gameStage = 'discarding';
-      this.message = `You chose ${directionDisplay} in ${suitDisplay}. Select 4 cards to discard.`;
+      this.message = `You called ${directionDisplay} ${suitDisplay}. Select 4 cards to discard.`;
     } else {
       // AI auto-discards
       this.autoDiscard(this.declarer);
       this.findStartingPlayer();
       this.gameStage = 'play';
-      this.message = `${this.players[this.declarer].name} chose ${directionDisplay} in ${suitDisplay}. Play begins!`;
+      this.message = `${this.players[this.declarer].name} called ${directionDisplay} ${suitDisplay}. Play begins!`;
     }
 
     return true;
@@ -396,7 +396,10 @@ export class BidWhistGame extends CardGame {
     // Start play phase
     this.findStartingPlayer();
     this.gameStage = 'play';
-    this.message = 'Play begins! You lead the first card.';
+    const suitDisplay = this.trumpSuit ? this.trumpSuit.charAt(0).toUpperCase() + this.trumpSuit.slice(1) : '';
+    const dirMap: { [key: string]: string } = { 'uptown': 'Uptown', 'downtown': 'Downtown', 'downtown-noaces': 'Downtown (Aces No Good)' };
+    const dirDisplay = dirMap[this.bidDirection] || this.bidDirection;
+    this.message = `You called ${dirDisplay} ${suitDisplay}. Play begins!`;
 
     return true;
   }

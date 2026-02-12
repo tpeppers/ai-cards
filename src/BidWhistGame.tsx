@@ -7,6 +7,7 @@ import LastBook from './components/LastBook.tsx';
 import { BidWhistGame } from './games/BidWhistGame.ts';
 import { GameState } from './types/CardGame.ts';
 import { STRATEGY_REGISTRY } from './strategies/index.ts';
+import { getGameStateFromUrl } from './urlGameState.js';
 
 const BidWhistGameComponent: React.FunctionComponent = () => {
   const gameRef = useRef<BidWhistGame>(new BidWhistGame());
@@ -17,7 +18,13 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const [showStrategyMenu, setShowStrategyMenu] = useState(false);
   const [autoPlaySignal, setAutoPlaySignal] = useState(0);
   const [previewCardId, setPreviewCardId] = useState<string | null>(null);
+  const [previewBid, setPreviewBid] = useState<number | null>(null);
+  const [previewTrump, setPreviewTrump] = useState<{ suit: string; direction: string } | null>(null);
+  const familyStrategyText = STRATEGY_REGISTRY.find(s => s.game === 'bidwhist' && s.name === 'Family')?.text || null;
+  const [opponentStrategy, setOpponentStrategy] = useState<string | null>(familyStrategyText);
+  const [showDealMenu, setShowDealMenu] = useState(false);
   const strategyMenuRef = useRef<HTMLDivElement>(null);
+  const dealMenuRef = useRef<HTMLDivElement>(null);
 
   const game = gameRef.current;
 
@@ -56,6 +63,15 @@ Card Rankings:
     setGameState(game.getGameState());
     setBiddingState(game.getBiddingState());
   };
+
+  // Load the opponent strategy onto the game engine
+  const loadOpponentStrategy = useCallback(() => {
+    if (opponentStrategy) {
+      game.loadStrategy(opponentStrategy);
+    } else {
+      game.setStrategy(null);
+    }
+  }, [opponentStrategy, game]);
 
   // Handle human bid
   const handleBid = (amount: number) => {
@@ -100,6 +116,8 @@ Card Rankings:
       if (state.gameStage !== 'bidding') return;
       if (state.currentPlayer !== currentPlayer) return;
 
+      // Load opponent strategy before AI decision
+      loadOpponentStrategy();
       // Process the AI bid
       game.processAIBid(currentPlayer);
 
@@ -122,6 +140,7 @@ Card Rankings:
 
     // AI player chooses trump
     const timer = setTimeout(() => {
+      loadOpponentStrategy();
       game.processAITrumpSelection(declarer);
       updateStates();
       // Signal GameEngine to refresh for play phase (AI auto-discards)
@@ -133,15 +152,18 @@ Card Rankings:
 
   // Close strategy menu on outside click
   useEffect(() => {
-    if (!showStrategyMenu) return;
+    if (!showStrategyMenu && !showDealMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (strategyMenuRef.current && !strategyMenuRef.current.contains(e.target as Node)) {
+      if (showStrategyMenu && strategyMenuRef.current && !strategyMenuRef.current.contains(e.target as Node)) {
         setShowStrategyMenu(false);
+      }
+      if (showDealMenu && dealMenuRef.current && !dealMenuRef.current.contains(e.target as Node)) {
+        setShowDealMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showStrategyMenu]);
+  }, [showStrategyMenu, showDealMenu]);
 
   // Determine whether Auto Play should be visible
   const currentDeclarer = game.getDeclarer();
@@ -178,23 +200,47 @@ Card Rankings:
     }
   }, [selectedStrategy, game]);
 
-  // Preview: compute which card Auto Play would pick during play phase
+  // Preview: compute what Auto Play would do on hover
   const handleAutoPlayHover = useCallback(() => {
-    if (game.getGameState().gameStage !== 'play') return;
     if (selectedStrategy) {
       game.loadStrategy(selectedStrategy);
     } else {
       game.setStrategy(null);
     }
-    const bestMove = game.getBestMove(0);
-    if (bestMove) {
-      setPreviewCardId(bestMove.id);
+
+    const stage = game.getGameState().gameStage;
+
+    if (stage === 'bidding') {
+      const bid = game.getAIBid(0);
+      setPreviewBid(bid);
+    } else if (stage === 'trumpSelection') {
+      const result = game.getAITrumpSelection(0);
+      setPreviewTrump({ suit: result.suit, direction: result.direction });
+    } else if (stage === 'play') {
+      const bestMove = game.getBestMove(0);
+      if (bestMove) {
+        setPreviewCardId(bestMove.id);
+      }
     }
   }, [selectedStrategy, game]);
 
   const handleAutoPlayLeave = useCallback(() => {
     setPreviewCardId(null);
+    setPreviewBid(null);
+    setPreviewTrump(null);
   }, []);
+
+  // Deal handler (replaces GameEngine's built-in Deal button)
+  const handleDeal = useCallback(() => {
+    game.dealCards(getGameStateFromUrl());
+    updateStates();
+    setRefreshKey(prev => prev + 1);
+  }, [game]);
+
+  // Called by GameEngine before each AI card play
+  const handleBeforeAIMove = useCallback(() => {
+    loadOpponentStrategy();
+  }, [loadOpponentStrategy]);
 
   // Get the display name for the selected strategy
   const selectedStrategyName = selectedStrategy
@@ -243,6 +289,10 @@ Card Rankings:
 
   const bidWhistStrategies = STRATEGY_REGISTRY.filter(s => s.game === 'bidwhist');
 
+  const opponentStrategyName = opponentStrategy
+    ? STRATEGY_REGISTRY.find(s => s.text === opponentStrategy)?.name || 'Custom'
+    : 'Default AI';
+
   return (
     <div className="relative w-full h-screen">
       <GameEngine
@@ -255,7 +305,62 @@ Card Rankings:
         onGameStateChange={handleGameStateChange}
         autoPlaySignal={autoPlaySignal}
         hideAutoPlay={true}
+        hideDeal={true}
         previewCardId={previewCardId}
+        onBeforeAIMove={handleBeforeAIMove}
+        extraControls={
+          <>
+            {/* Deal + Opponent Strategy Selector */}
+            {gameState.gameStage === 'deal' && (
+              <div className="relative" ref={dealMenuRef}>
+                <div className="flex flex-row gap-0">
+                  <button
+                    className="bg-blue-600 text-white px-4 py-2 rounded-l hover:bg-blue-700"
+                    onClick={handleDeal}
+                    id="dealButton"
+                  >
+                    Deal
+                  </button>
+                  <button
+                    className="bg-blue-600 text-white px-2 py-2 rounded-r hover:bg-blue-700 border-l border-blue-700"
+                    onClick={() => setShowDealMenu(prev => !prev)}
+                  >
+                    ...
+                  </button>
+                </div>
+                <div className="text-gray-300 text-xs mt-1 max-w-[160px] truncate">
+                  vs {opponentStrategyName}
+                </div>
+                {showDealMenu && (
+                  <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border border-gray-300 w-56 max-h-80 overflow-y-auto z-10">
+                    <div className="px-3 py-2 text-xs font-bold text-gray-500 border-b border-gray-200">
+                      Opponent AI Strategy
+                    </div>
+                    <button
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                        opponentStrategy === null ? 'bg-blue-50 font-semibold' : ''
+                      }`}
+                      onClick={() => { setOpponentStrategy(null); setShowDealMenu(false); }}
+                    >
+                      Default AI
+                    </button>
+                    {bidWhistStrategies.map(s => (
+                      <button
+                        key={s.name}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 border-t border-gray-100 ${
+                          opponentStrategy === s.text ? 'bg-blue-50 font-semibold' : ''
+                        }`}
+                        onClick={() => { setOpponentStrategy(s.text); setShowDealMenu(false); }}
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        }
       />
 
       {/* Last Book display (replaces Move History for Bid Whist) */}
@@ -274,6 +379,7 @@ Card Rankings:
           dealer={biddingState.dealer}
           currentBidder={gameState.currentPlayer}
           onBid={handleBid}
+          previewBid={previewBid}
         />
       )}
 
@@ -284,6 +390,7 @@ Card Rankings:
           winningBid={biddingState.currentHighBid}
           playerHand={gameState.players[0]?.hand || []}
           onSelectTrump={handleTrumpSelection}
+          previewTrump={previewTrump}
         />
       )}
 

@@ -8,6 +8,7 @@ interface TrumpSelectionOverlayProps {
   winningBid: number;
   playerHand: Card[];
   onSelectTrump: (suit: string, direction: BidDirection) => void;
+  previewTrump?: { suit: string; direction: string } | null;
 }
 
 const suits = [
@@ -29,7 +30,8 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
   isYourTurn,
   winningBid,
   playerHand,
-  onSelectTrump
+  onSelectTrump,
+  previewTrump
 }) => {
   const [selectedSuit, setSelectedSuit] = useState<string>('spades');
   const [isUptown, setIsUptown] = useState<boolean>(true);
@@ -100,14 +102,17 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
                 {playerHand.map((card) => {
                   const suitInfo = suits.find(s => s.id === card.suit);
                   const isSelected = card.suit === selectedSuit;
+                  const isPreview = previewTrump != null && card.suit === previewTrump.suit;
                   return (
                     <button
                       key={card.id}
                       onClick={() => handleCardClick(card)}
                       className={`w-10 h-14 bg-white rounded border-2 flex flex-col items-center justify-center text-xs font-bold transition-all hover:scale-105 ${
-                        isSelected
-                          ? 'border-blue-500 ring-2 ring-blue-300 bg-blue-50'
-                          : 'border-gray-300 hover:border-gray-400'
+                        isPreview
+                          ? 'border-green-400 ring-2 ring-green-300 bg-green-50 animate-pulse'
+                          : isSelected
+                            ? 'border-blue-500 ring-2 ring-blue-300 bg-blue-50'
+                            : 'border-gray-300 hover:border-gray-400'
                       }`}
                       style={{ color: suitInfo?.color === 'red' ? '#dc2626' : '#1f2937' }}
                     >
@@ -145,9 +150,11 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
                   <button
                     onClick={() => setIsUptown(true)}
                     className={`px-3 py-2 flex items-center gap-1 font-bold transition-colors ${
-                      isUptown
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-100'
+                      previewTrump != null && previewTrump.direction === 'uptown'
+                        ? 'bg-green-500 text-white animate-pulse'
+                        : isUptown
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
                     }`}
                     title="Uptown - High cards win (A K Q J 10...2)"
                   >
@@ -157,9 +164,11 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
                   <button
                     onClick={() => setIsUptown(false)}
                     className={`px-3 py-2 flex items-center gap-1 font-bold transition-colors ${
-                      !isUptown
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-100'
+                      previewTrump != null && previewTrump.direction !== 'uptown'
+                        ? 'bg-green-500 text-white animate-pulse'
+                        : !isUptown
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
                     }`}
                     title="Downtown - Low cards win (2 3 4...K)"
                   >
@@ -208,6 +217,12 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
             >
               {getAcceptLabel()}
             </button>
+            {previewTrump != null && (
+              <div className="mt-2 text-center text-sm text-green-500 animate-pulse">
+                Auto Play would: {getSuitSymbol(previewTrump.suit)}{' '}
+                {previewTrump.direction === 'uptown' ? 'Uptown' : previewTrump.direction === 'downtown' ? 'Downtown' : 'Downtown, Aces No Good'}
+              </div>
+            )}
           </>
         ) : (
           <div className="text-center py-8">
