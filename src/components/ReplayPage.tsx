@@ -34,6 +34,14 @@ const SUIT_SYMBOLS: { [k: string]: string } = {
   spades: '\u2660', hearts: '\u2665', diamonds: '\u2666', clubs: '\u2663',
 };
 
+const SUIT_COLORS: { [k: string]: string } = {
+  spades: 'black', clubs: 'black', hearts: 'red', diamonds: 'red',
+};
+
+const RANK_DISPLAY: { [k: number]: string } = {
+  1: 'A', 11: 'J', 12: 'Q', 13: 'K',
+};
+
 const ReplayPage: React.FC = () => {
   const gameRef = useRef<BidWhistGame | null>(null);
   const [strategies, setStrategies] = useState<(StrategyAST | null)[]>([null, null, null, null]);
@@ -51,6 +59,7 @@ const ReplayPage: React.FC = () => {
   const [trumpInfo, setTrumpInfo] = useState<string | null>(null);
   const [moveString, setMoveString] = useState('');
   const [nextCardPreview, setNextCardPreview] = useState<string | null>(null);
+  const [showCards, setShowCards] = useState(true);
   const dealerRef = useRef<number>(0);
 
   // Draggable overlays
@@ -460,7 +469,7 @@ const ReplayPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Player areas — all face-up */}
+      {/* Player areas */}
       {gameState.players.map(player => (
         <PlayerArea
           key={player.id}
@@ -468,7 +477,7 @@ const ReplayPage: React.FC = () => {
           isCurrentPlayer={gameState.currentPlayer === player.id}
           isHuman={player.id === 0}
           playCard={() => {}}
-          showAllCards={true}
+          showAllCards={showCards}
           previewCardId={nextCardPreview}
         />
       ))}
@@ -484,6 +493,27 @@ const ReplayPage: React.FC = () => {
         currentTrick={gameState.currentTrick}
         message={gameState.message}
       />
+
+      {/* Kitty display in center during bidding/trumpSelection */}
+      {(replayPhase === 'bidding' || replayPhase === 'trumpSelection') && gameRef.current && gameRef.current.getKitty().length > 0 && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div className="bg-white bg-opacity-95 rounded-lg shadow-lg p-3 pointer-events-auto">
+            <div className="text-xs font-semibold text-gray-500 mb-2 text-center">Kitty</div>
+            <div className="grid grid-cols-2 gap-1">
+              {gameRef.current.getKitty().map(card => (
+                <div
+                  key={card.id}
+                  className="w-10 h-14 bg-white border border-gray-300 rounded flex flex-col items-center justify-center text-xs font-bold shadow-sm"
+                  style={{ color: SUIT_COLORS[card.suit] || 'black' }}
+                >
+                  <span>{RANK_DISPLAY[card.rank] || card.rank}</span>
+                  <span className="text-base leading-none">{SUIT_SYMBOLS[card.suit]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Last Book display */}
       {lastBook.length > 0 && (
@@ -641,7 +671,7 @@ const ReplayPage: React.FC = () => {
             Step
           </button>
 
-          {/* Play/Pause */}
+          {/* Watch/Pause */}
           <button
             className={`px-3 py-1 rounded text-sm ${
               replayPhase === 'done'
@@ -653,7 +683,34 @@ const ReplayPage: React.FC = () => {
             onClick={togglePlay}
             disabled={replayPhase === 'done'}
           >
-            {isPlaying ? 'Pause' : 'Play'}
+            {isPlaying ? 'Pause' : 'Watch'}
+          </button>
+
+          <span className="text-gray-600">|</span>
+
+          {/* Hide/Show Cards */}
+          <button
+            className={`px-3 py-1 rounded text-sm ${
+              showCards
+                ? 'bg-gray-600 hover:bg-gray-500 text-white'
+                : 'bg-purple-600 hover:bg-purple-500 text-white'
+            }`}
+            onClick={() => setShowCards(prev => !prev)}
+          >
+            {showCards ? 'Hide Cards' : 'Show Cards'}
+          </button>
+
+          {/* Play this deal */}
+          <button
+            className="bg-teal-600 hover:bg-teal-500 text-white px-3 py-1 rounded text-sm"
+            onClick={() => {
+              if (config?.deckUrl) {
+                window.open(`/bidwhist#${config.deckUrl}`, '_blank');
+              }
+            }}
+            disabled={!config?.deckUrl}
+          >
+            Play
           </button>
         </div>
 
