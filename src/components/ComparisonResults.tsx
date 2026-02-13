@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { StrategyComparisonResult, GameResult, HandResult } from '../simulation/types.ts';
 import { BidWhistSimulator } from '../simulation/BidWhistSimulator.ts';
 import { computeAllHandStrengths } from '../simulation/handStrength.ts';
+import WeaknessesTab from './WeaknessesTab.tsx';
 
 interface ComparisonResultsProps {
   result: StrategyComparisonResult;
@@ -436,6 +437,8 @@ interface BidAnalysisHand {
   maxDeclarerBooks: number;
   minDeclarerBooks: number;
   avgDeclarerBooks: number;
+  team0StrategyIndex: number;
+  team1StrategyIndex: number;
 }
 
 interface BidAnalysisShutout {
@@ -512,6 +515,8 @@ function computeBidAnalysis(result: StrategyComparisonResult): BidAnalysisData {
       maxDeclarerBooks: maxBooks,
       minDeclarerBooks: minBooks,
       avgDeclarerBooks: avgBooks,
+      team0StrategyIndex: validGames[0].game.team0StrategyIndex,
+      team1StrategyIndex: validGames[0].game.team1StrategyIndex,
     };
 
     if (classification === 'always-set') alwaysSet.push(entry);
@@ -666,7 +671,7 @@ interface HandFilter {
 
 // ── Tab types ────────────────────────────────────────────────────────
 
-type TabId = 'results' | 'interesting' | 'stats' | 'bidAnalysis' | 'handStrength' | 'filtered';
+type TabId = 'results' | 'interesting' | 'stats' | 'bidAnalysis' | 'handStrength' | 'weaknesses' | 'filtered';
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -772,6 +777,7 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
           { id: 'interesting' as TabId, label: `Interesting Games (${interestingGames.length})` },
           { id: 'stats' as TabId, label: 'Stats Overview' },
           { id: 'bidAnalysis' as TabId, label: 'Bid Analysis' },
+          { id: 'weaknesses' as TabId, label: 'Weaknesses' },
         ]
       : [
           { id: 'results' as TabId, label: 'Results' },
@@ -779,6 +785,7 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
           { id: 'stats' as TabId, label: 'Stats Overview' },
           { id: 'bidAnalysis' as TabId, label: 'Bid Analysis' },
           { id: 'handStrength' as TabId, label: 'Hand Strength' },
+          { id: 'weaknesses' as TabId, label: 'Weaknesses' },
         ]),
     ...(handFilter
       ? [{ id: 'filtered' as TabId, label: `Filtered: ${handFilter.label}` }]
@@ -1022,11 +1029,11 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                     <th style={thStyle}>A Call</th>
                     <th style={thStyle}>A Books</th>
                     <th style={{ ...thStyle, textAlign: 'center' }}>A Made?</th>
+                    <th style={{ ...thStyle, textAlign: 'center' }}>Play</th>
                     <th style={{ ...thStyle, borderLeft: '1px solid #374151' }}>B Bidder</th>
                     <th style={thStyle}>B Call</th>
                     <th style={thStyle}>B Books</th>
                     <th style={{ ...thStyle, textAlign: 'center' }}>B Made?</th>
-                    <th style={{ ...thStyle, textAlign: 'center' }}>Play</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1052,18 +1059,6 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           {formatMadeIt(handA)}
                         </td>
-                        <td style={{ ...tdStyle, borderLeft: '1px solid #374151' }}>
-                          {handB ? formatBidder(handB) : '\u2014'}
-                        </td>
-                        <td style={tdStyle}>
-                          {handB ? formatCall(handB) : '\u2014'}
-                        </td>
-                        <td style={tdStyle}>
-                          {handB ? `${handB.booksWon[0]}-${handB.booksWon[1]}` : '\u2014'}
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          {formatMadeIt(handB)}
-                        </td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <HandTip label="S" deckUrl={rotatedUrl} player={0}>
                             <a
@@ -1080,6 +1075,18 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                             style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
                             Replay
                           </a>
+                        </td>
+                        <td style={{ ...tdStyle, borderLeft: '1px solid #374151' }}>
+                          {handB ? formatBidder(handB) : '\u2014'}
+                        </td>
+                        <td style={tdStyle}>
+                          {handB ? formatCall(handB) : '\u2014'}
+                        </td>
+                        <td style={tdStyle}>
+                          {handB ? `${handB.booksWon[0]}-${handB.booksWon[1]}` : '\u2014'}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          {formatMadeIt(handB)}
                         </td>
                       </tr>
                     );
@@ -1103,9 +1110,9 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                   <tr style={{ borderBottom: '2px solid #374151', position: 'sticky', top: 0, backgroundColor: '#0f1f15', zIndex: 1 }}>
                     <th style={thStyle}>#</th>
                     <th style={thStyle}>Score</th>
+                    <th style={{ ...thStyle, textAlign: 'center' }}>Play</th>
                     <th style={thStyle}>Rot</th>
                     <th style={{ ...thStyle, width: '40%' }}>Summary</th>
-                    <th style={{ ...thStyle, textAlign: 'center' }}>Play</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1144,13 +1151,6 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                           <td style={{ ...tdStyle, fontWeight: 'bold', color: '#fbbf24' }}>
                             {game.interestingnessScore ?? 0}
                           </td>
-                          <td style={tdStyle}>{game.rotation}</td>
-                          <td style={{ ...tdStyle, fontSize: '12px' }}>
-                            <span style={{ marginRight: '6px', color: '#9ca3af' }}>
-                              {isExpanded ? '\u25bc' : '\u25b6'}
-                            </span>
-                            {summaryParts}
-                          </td>
                           <td style={{ ...tdStyle, textAlign: 'center' }}>
                             <HandTip label="S" deckUrl={rotatedUrl} player={0}>
                               <a
@@ -1172,6 +1172,13 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                                 </a>
                               </>
                             )}
+                          </td>
+                          <td style={tdStyle}>{game.rotation}</td>
+                          <td style={{ ...tdStyle, fontSize: '12px' }}>
+                            <span style={{ marginRight: '6px', color: '#9ca3af' }}>
+                              {isExpanded ? '\u25bc' : '\u25b6'}
+                            </span>
+                            {summaryParts}
                           </td>
                         </tr>
                         {isExpanded && allRes.map((r, ri) => {
@@ -1843,10 +1850,11 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       <th style={sThStyle}>Rot</th>
                       <th style={sThLeftStyle}>Bidder</th>
                       <th style={sThLeftStyle}>Call</th>
+                      <th style={{ ...sThStyle, textAlign: 'center' }}>Play</th>
+                      <th style={{ ...sThStyle, textAlign: 'center' }}>Replay</th>
                       <th style={sThStyle}>Avg Books</th>
                       <th style={sThStyle}>Book Range</th>
                       <th style={sThStyle}>Pairs Tested</th>
-                      <th style={{ ...sThStyle, textAlign: 'center' }}>Play</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1862,13 +1870,6 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                           <td style={sTdStyle}>{entry.rotation}</td>
                           <td style={sTdLeftStyle}>{formatBidder(h)} (T{declarerTeam})</td>
                           <td style={sTdLeftStyle}>{formatCall(h)}</td>
-                          <td style={{ ...sTdStyle, color: '#f56565' }}>
-                            {entry.avgDeclarerBooks.toFixed(1)} vs {defBooks.toFixed(1)}
-                          </td>
-                          <td style={sTdStyle}>
-                            {entry.minDeclarerBooks}–{entry.maxDeclarerBooks}
-                          </td>
-                          <td style={sTdStyle}>{entry.totalResults}</td>
                           <td style={{ ...sTdStyle, textAlign: 'center' }}>
                             <a
                               href={playUrl}
@@ -1879,6 +1880,19 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                               Play
                             </a>
                           </td>
+                          <td style={{ ...sTdStyle, textAlign: 'center' }}>
+                            <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, entry.team0StrategyIndex, entry.team1StrategyIndex, entry.rotation); }}
+                              style={{ color: '#a78bfa', textDecoration: 'underline' }}>
+                              Replay
+                            </a>
+                          </td>
+                          <td style={{ ...sTdStyle, color: '#f56565' }}>
+                            {entry.avgDeclarerBooks.toFixed(1)} vs {defBooks.toFixed(1)}
+                          </td>
+                          <td style={sTdStyle}>
+                            {entry.minDeclarerBooks}–{entry.maxDeclarerBooks}
+                          </td>
+                          <td style={sTdStyle}>{entry.totalResults}</td>
                         </tr>
                       );
                     })}
@@ -1907,10 +1921,11 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       <th style={sThStyle}>Rot</th>
                       <th style={sThLeftStyle}>Bidder</th>
                       <th style={sThLeftStyle}>Call</th>
+                      <th style={{ ...sThStyle, textAlign: 'center' }}>Play</th>
+                      <th style={{ ...sThStyle, textAlign: 'center' }}>Replay</th>
                       <th style={sThStyle}>Avg Books</th>
                       <th style={sThStyle}>Book Range</th>
                       <th style={sThStyle}>Pairs Tested</th>
-                      <th style={{ ...sThStyle, textAlign: 'center' }}>Play</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1926,13 +1941,6 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                           <td style={sTdStyle}>{entry.rotation}</td>
                           <td style={sTdLeftStyle}>{formatBidder(h)} (T{declarerTeam})</td>
                           <td style={sTdLeftStyle}>{formatCall(h)}</td>
-                          <td style={{ ...sTdStyle, color: '#68d391' }}>
-                            {entry.avgDeclarerBooks.toFixed(1)} vs {defBooks.toFixed(1)}
-                          </td>
-                          <td style={sTdStyle}>
-                            {entry.minDeclarerBooks}–{entry.maxDeclarerBooks}
-                          </td>
-                          <td style={sTdStyle}>{entry.totalResults}</td>
                           <td style={{ ...sTdStyle, textAlign: 'center' }}>
                             <a
                               href={playUrl}
@@ -1943,6 +1951,19 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                               Play
                             </a>
                           </td>
+                          <td style={{ ...sTdStyle, textAlign: 'center' }}>
+                            <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, entry.team0StrategyIndex, entry.team1StrategyIndex, entry.rotation); }}
+                              style={{ color: '#a78bfa', textDecoration: 'underline' }}>
+                              Replay
+                            </a>
+                          </td>
+                          <td style={{ ...sTdStyle, color: '#68d391' }}>
+                            {entry.avgDeclarerBooks.toFixed(1)} vs {defBooks.toFixed(1)}
+                          </td>
+                          <td style={sTdStyle}>
+                            {entry.minDeclarerBooks}–{entry.maxDeclarerBooks}
+                          </td>
+                          <td style={sTdStyle}>{entry.totalResults}</td>
                         </tr>
                       );
                     })}
@@ -1973,9 +1994,9 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       <th style={sThLeftStyle}>Call</th>
                       <th style={sThStyle}>Books</th>
                       <th style={{ ...sThStyle, textAlign: 'center' }}>Made?</th>
+                      <th style={{ ...sThStyle, textAlign: 'center' }}>Play</th>
                       <th style={sThLeftStyle}>T0 Strategy</th>
                       <th style={sThLeftStyle}>T1 Strategy</th>
-                      <th style={{ ...sThStyle, textAlign: 'center' }}>Play</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1999,12 +2020,6 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                           <td style={{ ...sTdStyle, textAlign: 'center' }}>
                             {formatMadeIt(h)}
                           </td>
-                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
-                            {t0Name.length > 18 ? t0Name.slice(0, 16) + '..' : t0Name}
-                          </td>
-                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
-                            {t1Name.length > 18 ? t1Name.slice(0, 16) + '..' : t1Name}
-                          </td>
                           <td style={{ ...sTdStyle, textAlign: 'center' }}>
                             <a
                               href={playUrl}
@@ -2019,6 +2034,12 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                               style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
                               Replay
                             </a>
+                          </td>
+                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
+                            {t0Name.length > 18 ? t0Name.slice(0, 16) + '..' : t0Name}
+                          </td>
+                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
+                            {t1Name.length > 18 ? t1Name.slice(0, 16) + '..' : t1Name}
                           </td>
                         </tr>
                       );
@@ -2072,9 +2093,9 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       <th style={sThLeftStyle}>Call</th>
                       <th style={sThStyle}>Books</th>
                       <th style={{ ...sThStyle, textAlign: 'center' }}>Made?</th>
+                      <th style={{ ...sThStyle, textAlign: 'center' }}>Play</th>
                       <th style={sThLeftStyle}>T0 Strategy</th>
                       <th style={sThLeftStyle}>T1 Strategy</th>
-                      <th style={{ ...sThStyle, textAlign: 'center' }}>Play</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2092,12 +2113,6 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                           <td style={sTdLeftStyle}>{formatCall(h)}</td>
                           <td style={sTdStyle}>{h.booksWon[0]}-{h.booksWon[1]}</td>
                           <td style={{ ...sTdStyle, textAlign: 'center' }}>{formatMadeIt(h)}</td>
-                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
-                            {t0Name.length > 18 ? t0Name.slice(0, 16) + '..' : t0Name}
-                          </td>
-                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
-                            {t1Name.length > 18 ? t1Name.slice(0, 16) + '..' : t1Name}
-                          </td>
                           <td style={{ ...sTdStyle, textAlign: 'center' }}>
                             <HandTip label="S" deckUrl={rotatedUrl} player={0}>
                               <a
@@ -2114,6 +2129,12 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                               style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
                               Replay
                             </a>
+                          </td>
+                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
+                            {t0Name.length > 18 ? t0Name.slice(0, 16) + '..' : t0Name}
+                          </td>
+                          <td style={{ ...sTdLeftStyle, fontSize: '11px' }}>
+                            {t1Name.length > 18 ? t1Name.slice(0, 16) + '..' : t1Name}
                           </td>
                         </tr>
                       );
@@ -2152,9 +2173,9 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       <th style={{ ...sThStyle, borderBottom: '1px solid #374151' }}></th>
                       <th colSpan={6} style={{ ...sThStyle, borderLeft: '2px solid #4b5563', borderBottom: '1px solid #374151', textAlign: 'center' }}>Pre-Bid</th>
                       <th colSpan={2} style={{ ...sThStyle, borderLeft: '2px solid #4b5563', borderBottom: '1px solid #374151', textAlign: 'center' }}>Calls</th>
+                      <th style={{ ...sThStyle, borderLeft: '2px solid #4b5563', borderBottom: '1px solid #374151' }}></th>
                       <th colSpan={6} style={{ ...sThStyle, borderLeft: '2px solid #4b5563', borderBottom: '1px solid #374151', textAlign: 'center' }}>Post-Trump</th>
                       <th colSpan={2} style={{ ...sThStyle, borderLeft: '2px solid #4b5563', borderBottom: '1px solid #374151', textAlign: 'center' }}>Won</th>
-                      <th style={{ ...sThStyle, borderLeft: '2px solid #4b5563', borderBottom: '1px solid #374151' }}></th>
                     </tr>
                     <tr style={{ borderBottom: '2px solid #374151', position: 'sticky', top: '27px', backgroundColor: '#0f1f15', zIndex: 2 }}>
                       <th style={{ ...sThStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleHsSort('id')}>
@@ -2180,6 +2201,8 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {/* Calls group */}
                       <th style={{ ...sThStyle, borderLeft: '2px solid #4b5563' }}>A</th>
                       <th style={sThStyle}>B</th>
+                      {/* Play link */}
+                      <th style={{ ...sThStyle, borderLeft: '2px solid #4b5563' }}>Play</th>
                       {/* Post-Trump group */}
                       {(['S', 'E', 'N', 'W'] as const).map((lbl, i) => {
                         const key = `post${lbl}` as HsSortKey;
@@ -2200,8 +2223,6 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                       {/* Won group */}
                       <th style={{ ...sThStyle, borderLeft: '2px solid #4b5563' }}>A</th>
                       <th style={sThStyle}>B</th>
-                      {/* Play link */}
-                      <th style={{ ...sThStyle, borderLeft: '2px solid #4b5563' }}>Play</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2255,6 +2276,24 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                           }}>
                             {handB ? (callsDiffer ? formatCall(handB) : '\u2014') : '\u2014'}
                           </td>
+                          {/* Play link */}
+                          <td style={{ ...sTdStyle, borderLeft: '2px solid #4b5563', textAlign: 'center' }}>
+                            <HandTip label="S" deckUrl={rotatedUrl} player={0}>
+                              <a
+                                href={playUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: '#60a5fa', textDecoration: 'underline' }}
+                              >
+                                Play
+                              </a>
+                            </HandTip>
+                            {' '}
+                            <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, 0, 1, game.rotation); }}
+                              style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
+                              Replay
+                            </a>
+                          </td>
                           {/* Post-Trump (based on A's call) */}
                           {([0, 1, 2, 3] as const).map(p => (
                             <td key={`pt${p}`} style={{
@@ -2281,24 +2320,6 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
                           <td style={{ ...sTdStyle, color: wonB === 0 ? '#68d391' : '#f6ad55', fontWeight: 'bold' }}>
                             {wonB === 0 ? 'S/N' : 'E/W'}
                           </td>
-                          {/* Play link */}
-                          <td style={{ ...sTdStyle, borderLeft: '2px solid #4b5563', textAlign: 'center' }}>
-                            <HandTip label="S" deckUrl={rotatedUrl} player={0}>
-                              <a
-                                href={playUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: '#60a5fa', textDecoration: 'underline' }}
-                              >
-                                Play
-                              </a>
-                            </HandTip>
-                            {' '}
-                            <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, 0, 1, game.rotation); }}
-                              style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
-                              Replay
-                            </a>
-                          </td>
                         </tr>
                       );
                     })}
@@ -2308,6 +2329,11 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
             </>
           )}
         </div>
+      )}
+
+      {/* ── Weaknesses tab ──────────────────────────────────────── */}
+      {activeTab === 'weaknesses' && (
+        <WeaknessesTab result={result} />
       )}
     </div>
   );
