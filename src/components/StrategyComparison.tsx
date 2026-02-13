@@ -38,7 +38,8 @@ const StrategyComparison: React.FC = () => {
 
   // A/B Test state
   const [abBaseSelection, setAbBaseSelection] = useState('0');
-  const [abSection, setAbSection] = useState<'play' | 'bid' | 'trump'>('trump');
+  const [abSection, setAbSection] = useState<'play' | 'bid' | 'trump' | 'discard'>('trump');
+  const [abOverrideSource, setAbOverrideSource] = useState('0'); // index into bidWhistStrategies, or 'manual'
   const [abSectionText, setAbSectionText] = useState(() => {
     const sections = splitStrategySections(bidWhistStrategies[0].text);
     return sections.trump;
@@ -85,14 +86,26 @@ const StrategyComparison: React.FC = () => {
 
   const handleAbBaseChange = (value: string) => {
     setAbBaseSelection(value);
+    // Reset override source to base strategy and load its section
+    setAbOverrideSource(value);
     const sections = splitStrategySections(bidWhistStrategies[Number(value)].text);
     setAbSectionText(sections[abSection]);
   };
 
-  const handleAbSectionChange = (section: 'play' | 'bid' | 'trump') => {
+  const handleAbSectionChange = (section: 'play' | 'bid' | 'trump' | 'discard') => {
     setAbSection(section);
-    const sections = splitStrategySections(bidWhistStrategies[Number(abBaseSelection)].text);
+    // Load section from current override source (or base if manual)
+    const sourceIdx = abOverrideSource === 'manual' ? Number(abBaseSelection) : Number(abOverrideSource);
+    const sections = splitStrategySections(bidWhistStrategies[sourceIdx].text);
     setAbSectionText(sections[section]);
+  };
+
+  const handleAbOverrideSourceChange = (value: string) => {
+    setAbOverrideSource(value);
+    if (value !== 'manual') {
+      const sections = splitStrategySections(bidWhistStrategies[Number(value)].text);
+      setAbSectionText(sections[abSection]);
+    }
   };
 
   const handleRun = async () => {
@@ -105,10 +118,14 @@ const StrategyComparison: React.FC = () => {
     if (assignmentMode === 'ab-test') {
       const baseEntry = bidWhistStrategies[Number(abBaseSelection)];
       const modifiedText = replaceStrategySection(baseEntry.text, abSection, abSectionText);
+      const sourceEntry = abOverrideSource !== 'manual' ? bidWhistStrategies[Number(abOverrideSource)] : null;
+      const modLabel = sourceEntry && sourceEntry.name !== baseEntry.name
+        ? `${sourceEntry.name} ${abSection}`
+        : `modified ${abSection}`;
       config = {
         strategies: [
           { name: baseEntry.name, strategyText: baseEntry.text },
-          { name: `${baseEntry.name} (modified ${abSection})`, strategyText: modifiedText },
+          { name: `${baseEntry.name} (${modLabel})`, strategyText: modifiedText },
         ],
         assignmentMode: 'by-team',
         numGames: effectiveNumGames,
@@ -412,7 +429,7 @@ const StrategyComparison: React.FC = () => {
               Section to Override
             </label>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              {(['play', 'bid', 'trump'] as const).map(sec => (
+              {(['play', 'bid', 'trump', 'discard'] as const).map(sec => (
                 <button
                   key={sec}
                   onClick={() => handleAbSectionChange(sec)}
@@ -431,12 +448,43 @@ const StrategyComparison: React.FC = () => {
               ))}
             </div>
 
-            {/* Side-by-side textareas */}
-            <div style={{ display: 'flex', gap: '16px' }}>
+            {/* Override source dropdown */}
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '6px' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
                   Original
                 </label>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
+                  Modified
+                </label>
+                <select
+                  value={abOverrideSource}
+                  onChange={(e) => handleAbOverrideSourceChange(e.target.value)}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #4b5563',
+                    backgroundColor: '#374151',
+                    color: '#e5e7eb',
+                    width: '100%',
+                    fontSize: '12px',
+                  }}
+                >
+                  {bidWhistStrategies.map((s, i) => (
+                    <option key={i} value={String(i)}>
+                      {s.name}{String(i) === abBaseSelection ? ' (base)' : ''} — {abSection}:
+                    </option>
+                  ))}
+                  <option value="manual">Manual edit</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Side-by-side textareas */}
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <textarea
                   value={abOriginalSectionText}
                   readOnly
@@ -449,12 +497,9 @@ const StrategyComparison: React.FC = () => {
                 />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-                  Modified
-                </label>
                 <textarea
                   value={abSectionText}
-                  onChange={(e) => setAbSectionText(e.target.value)}
+                  onChange={(e) => { setAbSectionText(e.target.value); setAbOverrideSource('manual'); }}
                   rows={14}
                   style={textareaBase}
                 />

@@ -21,6 +21,7 @@ interface CardProps {
     x: number;
     y: number;
     raised?: boolean;
+    raiseTransform?: string; // custom CSS transform when raised, e.g. 'translateX(-20px)'
   };
   zIndex?: number;
   draggable?: boolean;
@@ -91,9 +92,11 @@ const Card: React.FC<CardProps> = ({
         height: '96px',
         top: position.y,
         left: position.x,
-        zIndex: zIndex,
-        transform: `translateY(${position.raised ? '-20px' : '0px'})`,
-        transition: 'transform 0.2s ease',
+        zIndex: position.raised ? 100 : zIndex,
+        transform: position.raised
+          ? (position.raiseTransform || 'translateY(-20px)')
+          : 'translateY(0px)',
+        transition: 'transform 0.2s ease, z-index 0.2s ease',
         boxShadow: '2px 2px 5px rgba(0, 0, 0, 0.2)',
         borderRadius: '3px'
       }}
@@ -106,7 +109,8 @@ const Card: React.FC<CardProps> = ({
       }}
       onMouseLeave={() => {
         if (cardRef.current && onClick) {
-          cardRef.current.style.transform = `translateY(${position.raised ? '-20px' : '0px'})`;
+          const raisedTransform = position.raiseTransform || 'translateY(-20px)';
+          cardRef.current.style.transform = position.raised ? raisedTransform : 'translateY(0px)';
           cardRef.current.style.zIndex = String(position.raised ? 100 : zIndex);
         }
       }}

@@ -35,8 +35,10 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
 
   // Create the fan-shaped layout for cards similar to classic Microsoft Hearts
   const getPositionStyle = (index: number, cardId?: string) => {
+    const isPreview = !!(previewCardId && cardId === previewCardId);
+
     if (isHuman) {
-      // Bottom player (human) - fan out cards
+      // Bottom player (human) - fan out cards, pull UP toward center
       const totalWidth = Math.min(windowSize.width - 100, player.hand.length * 30);
       const spacing = totalWidth / Math.max(player.hand.length - 1, 1);
       const startX = (windowSize.width - totalWidth) / 2;
@@ -44,28 +46,32 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
       return {
         x: startX + index * spacing,
         y: windowSize.height - 140,  // Position cards higher to stay within viewport
-        raised: !!(previewCardId && cardId === previewCardId)
+        raised: isPreview,
+        // default raiseTransform = translateY(-20px), no override needed
       };
     } else if (player.id === 1) {
-      // Right player (East) - cards stacked sideways
+      // Right player (East) - cards stacked sideways, pull LEFT toward center
       return {
         x: windowSize.width - 100,
         y: 120 + index * 25,
-        raised: false
+        raised: isPreview,
+        raiseTransform: 'translateX(-20px)',
       };
     } else if (player.id === 2) {
-      // Top player (North) - cards stacked horizontally, below message bar
+      // Top player (North) - cards stacked horizontally, pull DOWN toward center
       return {
         x: (windowSize.width / 2) - (player.hand.length * 30 / 2) + index * 30,
         y: 70,
-        raised: false
+        raised: isPreview,
+        raiseTransform: 'translateY(20px)',
       };
     } else {
-      // Left player (West) - cards stacked sideways
+      // Left player (West) - cards stacked sideways, pull RIGHT toward center
       return {
         x: 30,
         y: 120 + index * 25,
-        raised: false
+        raised: isPreview,
+        raiseTransform: 'translateX(20px)',
       };
     }
   };

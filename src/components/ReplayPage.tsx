@@ -50,6 +50,7 @@ const ReplayPage: React.FC = () => {
   const [trickPause, setTrickPause] = useState(false);
   const [trumpInfo, setTrumpInfo] = useState<string | null>(null);
   const [moveString, setMoveString] = useState('');
+  const [nextCardPreview, setNextCardPreview] = useState<string | null>(null);
   const dealerRef = useRef<number>(0);
 
   // Draggable overlays
@@ -128,6 +129,22 @@ const ReplayPage: React.FC = () => {
     setBiddingState(game.getBiddingState());
     setLastBook(game.getLastCompletedTrick());
   }, []);
+
+  // Compute preview of the next card to be played (without mutating game state)
+  const computeNextPreview = useCallback((game: BidWhistGame, phase: ReplayPhase) => {
+    if (phase !== 'play') {
+      setNextCardPreview(null);
+      return;
+    }
+    const gs = game.getGameState();
+    if (gs.gameStage !== 'play' || gs.currentPlayer === null) {
+      setNextCardPreview(null);
+      return;
+    }
+    game.setStrategy(strategies[gs.currentPlayer]);
+    const card = game.getBestMove(gs.currentPlayer);
+    setNextCardPreview(card ? card.id : null);
+  }, [strategies]);
 
   // Rebuild game from scratch, fast-replaying to the position encoded by targetMoves.
   // Each character in the string = one atomic step (bid digit, '!' trump, '#' discard, card letter).
@@ -213,7 +230,8 @@ const ReplayPage: React.FC = () => {
     setLastBook(game.getLastCompletedTrick());
     setTrickPause(false);
     refreshState(game);
-  }, [config, strategies, refreshState]);
+    computeNextPreview(game, newPhase);
+  }, [config, strategies, refreshState, computeNextPreview]);
 
   // Execute one step
   const executeStep = useCallback(() => {
@@ -286,6 +304,7 @@ const ReplayPage: React.FC = () => {
       if (newGs.gameStage === 'play') {
         // AI auto-discarded in setTrumpSuit
         setReplayPhase('play');
+        computeNextPreview(game, 'play');
       } else if (newGs.gameStage === 'discarding') {
         setReplayPhase('discarding');
       }
@@ -298,6 +317,7 @@ const ReplayPage: React.FC = () => {
       // Encode discard step
       setMoveString(prev => prev + '#');
       setReplayPhase('play');
+      computeNextPreview(game, 'play');
     } else if (replayPhase === 'play') {
       const cp = gs.currentPlayer;
       if (cp === null) return;
@@ -306,6 +326,7 @@ const ReplayPage: React.FC = () => {
       const card = game.getBestMove(cp);
       if (!card) {
         setReplayPhase('done');
+        setNextCardPreview(null);
         return;
       }
       game.playCard(cp, card);
@@ -319,6 +340,7 @@ const ReplayPage: React.FC = () => {
       // Check if hand/game is done
       if (newGs.gameStage === 'scoring') {
         setReplayPhase('done');
+        setNextCardPreview(null);
         return;
       }
 
@@ -327,6 +349,8 @@ const ReplayPage: React.FC = () => {
         setTrickPause(true);
         setLastBook(game.getLastCompletedTrick());
       }
+
+      computeNextPreview(game, 'play');
     }
 
     setStepIndex(prev => prev + 1);
@@ -359,6 +383,7 @@ const ReplayPage: React.FC = () => {
     setTrickPause(false);
     setTrumpInfo(null);
     setMoveString('');
+    setNextCardPreview(null);
   };
 
   const handleStepForward = () => {
@@ -444,6 +469,7 @@ const ReplayPage: React.FC = () => {
           isHuman={player.id === 0}
           playCard={() => {}}
           showAllCards={true}
+          previewCardId={nextCardPreview}
         />
       ))}
 
