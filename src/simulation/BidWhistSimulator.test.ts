@@ -2,7 +2,7 @@ import { BidWhistSimulator } from './BidWhistSimulator.ts';
 import { BatchRunner } from './BatchRunner.ts';
 import { parseStrategy } from '../strategy/parser.ts';
 import { generateRandomDeckUrl } from '../urlGameState.js';
-import { BIDWHIST_STANDARD, BIDWHIST_AGGRESSIVE, BIDWHIST_CONSERVATIVE } from '../strategies/index.ts';
+import { BIDWHIST_STANDARD, BIDWHIST_CLAUDE, BIDWHIST_CONSERVATIVE } from '../strategies/index.ts';
 
 describe('BidWhistSimulator', () => {
   describe('rotateDeck', () => {
@@ -80,9 +80,9 @@ describe('BidWhistSimulator', () => {
         handUrls.push(generateRandomDeckUrl());
       }
 
-      const aggressive = parseStrategy(BIDWHIST_AGGRESSIVE);
+      const claude = parseStrategy(BIDWHIST_CLAUDE);
       const conservative = parseStrategy(BIDWHIST_CONSERVATIVE);
-      const strategies = [aggressive, conservative, aggressive, conservative];
+      const strategies = [claude, conservative, claude, conservative];
 
       const result = simulator.simulateGame(deckUrl, strategies, handUrls, 0);
 
@@ -98,7 +98,7 @@ describe('BidWhistSimulator', () => {
       const result = await runner.runComparison({
         strategies: [
           { name: 'Standard', strategyText: BIDWHIST_STANDARD },
-          { name: 'Aggressive', strategyText: BIDWHIST_AGGRESSIVE },
+          { name: 'Claude', strategyText: BIDWHIST_CLAUDE },
         ],
         assignmentMode: 'by-team',
         numGames: 10,

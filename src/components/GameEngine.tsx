@@ -36,6 +36,8 @@ interface GameEngineProps {
   onBeforeAIMove?: (playerId: number) => void;
   playerDisplayNames?: string[];
   extraControls?: React.ReactNode;
+  showAllCards?: boolean;
+  onToggleShowAllCards?: () => void;
 }
 
 // Global settings
@@ -57,11 +59,14 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   previewCardId = null,
   onBeforeAIMove,
   playerDisplayNames,
-  extraControls
+  extraControls,
+  showAllCards: showAllCardsProp,
+  onToggleShowAllCards
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
   const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
-  const [showAllCards, setShowAllCards] = useState<boolean>(false);
+  const [showAllCardsLocal, setShowAllCardsLocal] = useState<boolean>(false);
+  const showAllCards = showAllCardsProp !== undefined ? showAllCardsProp : showAllCardsLocal;
   
   // Window resize handling
   useEffect(() => {
@@ -278,7 +283,11 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   };
 
   const toggleCardVisibility = () => {
-    setShowAllCards(!showAllCards);
+    if (onToggleShowAllCards) {
+      onToggleShowAllCards();
+    } else {
+      setShowAllCardsLocal(!showAllCardsLocal);
+    }
   };
 
   // Auto-play for AI players

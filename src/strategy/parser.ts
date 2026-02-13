@@ -3,6 +3,7 @@ import {
   Expression, BinaryExpr, UnaryExpr, VariableExpr,
   LiteralExpr, FunctionCallExpr, PropertyAccessExpr,
   PlayAction, BidAction, PassAction, ChooseAction,
+  KeepAction, DropAction,
 } from './types.ts';
 
 // ── Tokenizer ───────────────────────────────────────────────────────
@@ -14,8 +15,8 @@ interface Token {
 }
 
 const KEYWORDS = new Set([
-  'strategy', 'game', 'play', 'bid', 'trump', 'leading', 'following', 'void',
-  'when', 'default', 'pass', 'choose', 'suit', 'direction',
+  'strategy', 'game', 'play', 'bid', 'trump', 'discard', 'leading', 'following', 'void',
+  'when', 'default', 'pass', 'choose', 'keep', 'drop', 'suit', 'direction',
   'and', 'or', 'not', 'true', 'false',
 ]);
 
@@ -255,6 +256,11 @@ class Parser {
         this.expect('colon');
         this.skipNewlines();
         ast.trump = this.parseRuleBlock();
+      } else if (tok.type === 'keyword' && tok.value === 'discard') {
+        this.advance();
+        this.expect('colon');
+        this.skipNewlines();
+        ast.discard = this.parseRuleBlock();
       } else {
         this.advance(); // skip unknown
       }
@@ -395,6 +401,20 @@ class Parser {
       return { type: 'pass' } as PassAction;
     }
 
+    if (tok.type === 'keyword' && tok.value === 'keep') {
+      this.advance();
+      const cardSetExpr = this.parseExpression();
+      this.skipNewlines();
+      return { type: 'keep', cardSetExpr } as KeepAction;
+    }
+
+    if (tok.type === 'keyword' && tok.value === 'drop') {
+      this.advance();
+      const cardSetExpr = this.parseExpression();
+      this.skipNewlines();
+      return { type: 'drop', cardSetExpr } as DropAction;
+    }
+
     if (tok.type === 'keyword' && tok.value === 'choose') {
       this.advance();
       // choose suit: <expr> direction: <expr>
@@ -408,7 +428,7 @@ class Parser {
       return { type: 'choose', suitExpr, directionExpr } as ChooseAction;
     }
 
-    throw new Error(`Parse error at line ${tok.line + 1}: expected action (play/bid/pass/choose), got ${tok.type} "${tok.value}"`);
+    throw new Error(`Parse error at line ${tok.line + 1}: expected action (play/bid/pass/choose/keep/drop), got ${tok.type} "${tok.value}"`);
   }
 
   // ── Expression Parsing (precedence climbing) ──────────────────────

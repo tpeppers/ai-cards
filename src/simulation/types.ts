@@ -20,6 +20,7 @@ export interface HandResult {
   discards: string[];      // card IDs discarded by declarer
   booksWon: [number, number]; // tricks won by team 0 / team 1
   teamScoresAfter: [number, number]; // cumulative scores after this hand
+  dealer: number;          // dealer position for this hand (0-3)
 }
 
 export interface GameResult {

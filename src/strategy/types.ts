@@ -8,6 +8,7 @@ export interface StrategyAST {
   play?: PlaySection;
   bid?: RuleBlock;
   trump?: RuleBlock;
+  discard?: RuleBlock;
 }
 
 export interface PlaySection {
@@ -78,7 +79,9 @@ export type Action =
   | PlayAction
   | BidAction
   | PassAction
-  | ChooseAction;
+  | ChooseAction
+  | KeepAction
+  | DropAction;
 
 export interface PlayAction {
   type: 'play';
@@ -98,6 +101,16 @@ export interface ChooseAction {
   type: 'choose';
   suitExpr: Expression;
   directionExpr: Expression;
+}
+
+export interface KeepAction {
+  type: 'keep';
+  cardSetExpr: Expression;
+}
+
+export interface DropAction {
+  type: 'drop';
+  cardSetExpr: Expression;
 }
 
 // ── Runtime Context ─────────────────────────────────────────────────

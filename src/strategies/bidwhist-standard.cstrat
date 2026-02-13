@@ -65,14 +65,14 @@ bid:
 trump:
   # Partner signaled downtown (bid 1 = low cards)
   when partner_bid == 1:
-    choose suit: best_suit() direction: downtown
+    choose suit: best_suit(downtown) direction: downtown
   # Partner signaled uptown (bid 2 = high cards)
   when partner_bid == 2:
-    choose suit: best_suit() direction: uptown
+    choose suit: best_suit(uptown) direction: uptown
   # Partner bid 3+ or no signal - read own hand
   when low_count() > high_count() and ace_count() >= 2:
-    choose suit: best_suit() direction: downtown
+    choose suit: best_suit(downtown) direction: downtown
   when low_count() > high_count():
-    choose suit: best_suit() direction: downtown-noaces
+    choose suit: best_suit(downtown-noaces) direction: downtown-noaces
   default:
-    choose suit: best_suit() direction: uptown
+    choose suit: best_suit(uptown) direction: uptown

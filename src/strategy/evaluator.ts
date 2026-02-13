@@ -1,9 +1,30 @@
 import { Card } from '../types/CardGame.ts';
 import {
-  StrategyAST, RuleBlock, Rule, Action, Expression,
+  StrategyAST, RuleBlock, Action, Expression,
   PlayAction, BidAction, ChooseAction, KeepAction, DropAction,
   StrategyContext, CardSet,
 } from './types.ts';
+import { postTrumpCardValue } from '../simulation/handStrength.ts';
+
+// ── Debug Logging ───────────────────────────────────────────────────
+
+let strategyDebugEnabled = true;
+
+export function setStrategyDebug(enabled: boolean): void {
+  strategyDebugEnabled = enabled;
+}
+
+function debugLog(...args: any[]): void {
+  if (strategyDebugEnabled) console.log('[Strategy]', ...args);
+}
+
+function debugGroup(label: string): void {
+  if (strategyDebugEnabled) console.groupCollapsed('[Strategy]', label);
+}
+
+function debugGroupEnd(): void {
+  if (strategyDebugEnabled) console.groupEnd();
+}
 
 // ── CardSet helpers ─────────────────────────────────────────────────
 
@@ -148,7 +169,24 @@ function suitCount(suit: string, ctx: StrategyContext): number {
   return ctx.hand.filter(c => c.suit === suit).length;
 }
 
-function bestSuit(ctx: StrategyContext): string {
+function bestSuit(ctx: StrategyContext, direction?: string): string {
+  if (direction) {
+    // Direction-aware: score each suit by summing postTrumpCardValue for its cards
+    const scores: { [suit: string]: number } = { spades: 0, hearts: 0, diamonds: 0, clubs: 0 };
+    ctx.hand.forEach(c => {
+      if (scores[c.suit] !== undefined) {
+        // TODO: Figure out if this produces "the right" feel for hands that get made...
+        scores[c.suit] += postTrumpCardValue(c.rank, true, direction) + 13; // NOTE: MANUALLY Added +13 here as BIAS for long-not-strong
+      }
+    });
+    let best = 'spades';
+    let max = -1;
+    for (const [suit, score] of Object.entries(scores)) {
+      if (score > max) { max = score; best = suit; }
+    }
+    return best;
+  }
+  // No direction: fall back to longest suit (original behavior)
   const counts: { [suit: string]: number } = { spades: 0, hearts: 0, diamonds: 0, clubs: 0 };
   ctx.hand.forEach(c => { if (counts[c.suit] !== undefined) counts[c.suit]++; });
   let best = 'spades';
@@ -304,6 +342,10 @@ function resolveVariable(name: string, ctx: StrategyContext): any {
     }
     case 'bid_direction': return ctx.bidDirection;
     case 'me': return { id: ctx.playerId };
+    // Direction literals (parsed as variable references, resolve to themselves)
+    case 'downtown': return 'downtown';
+    case 'uptown': return 'uptown';
+    case 'downtown-noaces': return 'downtown-noaces';
     default:
       return undefined;
   }
@@ -329,54 +371,63 @@ function evalBinary(expr: any, ctx: StrategyContext): any {
 }
 
 function evalCall(name: string, args: any[], ctx: StrategyContext): any {
+  let result: any;
   switch (name) {
     case 'cards_above':
-      return typeof args[0] === 'object' && args[0]?.id ? cardsAbove(args[0] as Card, ctx) : 0;
+      result = typeof args[0] === 'object' && args[0]?.id ? cardsAbove(args[0] as Card, ctx) : 0; break;
     case 'gap':
-      return (args[0] && args[1]) ? gap(args[0] as Card, args[1] as Card, ctx) : 0;
+      result = (args[0] && args[1]) ? gap(args[0] as Card, args[1] as Card, ctx) : 0; break;
     case 'suit_count':
-      return typeof args[0] === 'string' ? suitCount(args[0], ctx) : 0;
+      result = typeof args[0] === 'string' ? suitCount(args[0], ctx) : 0; break;
     case 'best_suit':
-      return bestSuit(ctx);
+      result = bestSuit(ctx, typeof args[0] === 'string' ? args[0] : undefined); break;
     case 'low_count':
-      return lowCount(ctx);
+      result = lowCount(ctx); break;
     case 'high_count':
-      return highCount(ctx);
+      result = highCount(ctx); break;
     case 'ace_count':
-      return aceCount(ctx);
+      result = aceCount(ctx); break;
     case 'have':
-      return typeof args[0] === 'string' ? haveCard(args[0], ctx) : false;
+      result = typeof args[0] === 'string' ? haveCard(args[0], ctx) : false; break;
     case 'min':
-      return Math.min(args[0], args[1]);
+      result = Math.min(args[0], args[1]); break;
     case 'max':
-      return Math.max(args[0], args[1]);
+      result = Math.max(args[0], args[1]); break;
     case 'partner_card':
-      return getPartnerCard(ctx);
+      result = getPartnerCard(ctx); break;
     case 'best_direction':
-      return lowCount(ctx) > highCount(ctx) ? 'downtown' : 'uptown';
+      result = lowCount(ctx) > highCount(ctx) ? 'downtown' : 'uptown'; break;
     case 'deuce_trey_count':
-      return deuceTreyCount(ctx);
+      result = deuceTreyCount(ctx); break;
     case 'king_ace_count':
-      return kingAceCount(ctx);
+      result = kingAceCount(ctx); break;
     case 'king_count':
-      return kingCount(ctx);
+      result = kingCount(ctx); break;
     case 'max_suit_count':
-      return maxSuitCount(ctx);
+      result = maxSuitCount(ctx); break;
     case 'min_suit_count':
-      return minSuitCount(ctx);
+      result = minSuitCount(ctx); break;
     case 'stopper_cards':
-      return computeStopperCards(ctx);
+      result = computeStopperCards(ctx); break;
     case 'suit_keepers':
-      return computeSuitKeepers(typeof args[0] === 'number' ? args[0] : 1, ctx);
+      result = computeSuitKeepers(typeof args[0] === 'number' ? args[0] : 1, ctx); break;
     case 'void_candidates':
-      return computeVoidCandidates(ctx);
+      result = computeVoidCandidates(ctx); break;
     case 'outstanding_trump':
-      return countOutstandingTrump(ctx);
+      result = countOutstandingTrump(ctx); break;
     case 'outstanding_threats':
-      return countOutstandingThreats(ctx);
+      result = countOutstandingThreats(ctx); break;
     default:
-      return undefined;
+      result = undefined;
   }
+  if (strategyDebugEnabled) {
+    const argStr = args.map(a => typeof a === 'object' && a?.id ? a.id : JSON.stringify(a)).join(', ');
+    const resStr = typeof result === 'object' && result?.cards
+      ? `CardSet(${result.cards.length})`
+      : typeof result === 'object' && result?.id ? result.id : JSON.stringify(result);
+    debugLog(`    ${name}(${argStr}) → ${resStr}`);
+  }
+  return result;
 }
 
 function evalProperty(expr: any, ctx: StrategyContext): any {
@@ -538,16 +589,35 @@ export type PlayResult = Card | null;
 export type BidResult = number | null; // number = bid amount, -1 = take, 0 = pass
 export type TrumpResult = { suit: string; direction: string } | null;
 
+function formatExpr(expr: Expression): string {
+  switch (expr.type) {
+    case 'literal': return JSON.stringify(expr.value);
+    case 'variable': return expr.name;
+    case 'binary': return `${formatExpr((expr as any).left)} ${(expr as any).op} ${formatExpr((expr as any).right)}`;
+    case 'unary': return `${(expr as any).op} ${formatExpr((expr as any).operand)}`;
+    case 'call': return `${expr.name}(${(expr as any).args.map(formatExpr).join(', ')})`;
+    case 'property': return `${formatExpr((expr as any).object)}.${(expr as any).property}`;
+    default: return '?';
+  }
+}
+
 function evalRuleBlock(block: RuleBlock, ctx: StrategyContext): Action | null {
-  for (const rule of block.rules) {
+  for (let i = 0; i < block.rules.length; i++) {
+    const rule = block.rules[i];
     const condResult = evalExpr(rule.condition, ctx);
+    if (strategyDebugEnabled) {
+      debugLog(`  rule ${i}: ${formatExpr(rule.condition)} → ${condResult}`);
+    }
     if (condResult) {
+      debugLog(`  ✓ matched rule ${i}, action: ${rule.action.type}`);
       return rule.action;
     }
   }
   if (block.defaultAction) {
+    debugLog(`  → default action: ${block.defaultAction.type}`);
     return block.defaultAction;
   }
+  debugLog(`  → no match, no default`);
   return null;
 }
 
@@ -556,77 +626,100 @@ export function evaluatePlay(ast: StrategyAST, ctx: StrategyContext): PlayResult
 
   // Determine which sub-section to use
   let block: RuleBlock | undefined;
+  let section = 'leading';
 
   if (ctx.currentTrick.length === 0) {
-    // Leading
     block = ast.play.leading;
   } else {
     const hasSuit = ctx.leadSuit ? ctx.hand.some(c => c.suit === ctx.leadSuit) : false;
     if (hasSuit) {
-      // Following suit
+      section = 'following';
       block = ast.play.following;
     } else {
-      // Void in lead suit
+      section = 'void';
       block = ast.play.void;
     }
   }
 
-  if (!block) return null;
+  debugGroup(`evaluatePlay P${ctx.playerId} [${section}] lead=${ctx.leadSuit || 'none'} trump=${ctx.trumpSuit || 'none'}`);
+
+  if (!block) { debugLog('no block'); debugGroupEnd(); return null; }
 
   const action = evalRuleBlock(block, ctx);
-  if (!action) return null;
+  if (!action) { debugGroupEnd(); return null; }
 
   if (action.type === 'play') {
     const result = evalExpr((action as PlayAction).cardExpr, ctx);
     if (result && typeof result === 'object') {
-      if ('id' in result) return result as Card;
+      if ('id' in result) {
+        debugLog(`→ play ${(result as Card).id}`);
+        debugGroupEnd();
+        return result as Card;
+      }
       if ('cards' in result) {
-        // CardSet was returned instead of a card - this shouldn't happen normally
-        // but treat it as the first card
         const cs = result as CardSet;
-        return cs.cards.length > 0 ? cs.cards[0] : null;
+        const card = cs.cards.length > 0 ? cs.cards[0] : null;
+        debugLog(`→ play ${card?.id || 'null'} (from CardSet)`);
+        debugGroupEnd();
+        return card;
       }
     }
+    debugGroupEnd();
     return null;
   }
 
+  debugGroupEnd();
   return null;
 }
 
 export function evaluateBid(ast: StrategyAST, ctx: StrategyContext): BidResult {
   if (!ast.bid) return null;
 
+  debugGroup(`evaluateBid P${ctx.playerId} bidCount=${ctx.bidCount} currentHigh=${ctx.currentHighBid} isDealer=${ctx.isDealer}`);
+
   const action = evalRuleBlock(ast.bid, ctx);
-  if (!action) return null;
+  if (!action) { debugGroupEnd(); return null; }
 
   if (action.type === 'bid') {
     const amount = evalExpr((action as BidAction).amountExpr, ctx);
+    debugLog(`→ bid ${amount}`);
+    debugGroupEnd();
     return typeof amount === 'number' ? amount : null;
   }
 
   if (action.type === 'pass') {
+    debugLog(`→ pass`);
+    debugGroupEnd();
     return 0;
   }
 
+  debugGroupEnd();
   return null;
 }
 
 export function evaluateTrump(ast: StrategyAST, ctx: StrategyContext): TrumpResult {
   if (!ast.trump) return null;
 
+  debugGroup(`evaluateTrump P${ctx.playerId} partnerBid=${ctx.partnerBid} enemyBid=${ctx.enemyBid}`);
+
   const action = evalRuleBlock(ast.trump, ctx);
-  if (!action) return null;
+  if (!action) { debugGroupEnd(); return null; }
 
   if (action.type === 'choose') {
     const chooseAction = action as ChooseAction;
     const suit = evalExpr(chooseAction.suitExpr, ctx);
     const direction = evalExpr(chooseAction.directionExpr, ctx);
     if (typeof suit === 'string' && typeof direction === 'string') {
+      debugLog(`→ choose ${suit} ${direction}`);
+      debugGroupEnd();
       return { suit, direction };
     }
+    debugLog(`→ choose FAILED: suit=${suit} direction=${direction}`);
+    debugGroupEnd();
     return null;
   }
 
+  debugGroupEnd();
   return null;
 }
 
@@ -640,6 +733,8 @@ export function evaluateTrump(ast: StrategyAST, ctx: StrategyContext): TrumpResu
 export function evaluateDiscard(ast: StrategyAST, ctx: StrategyContext): string[] | null {
   if (!ast.discard) return null;
 
+  debugGroup(`evaluateDiscard P${ctx.playerId} trump=${ctx.trumpSuit || 'none'}`);
+
   const block = ast.discard;
   const keepIds = new Set<string>();
   const dropIds = new Set<string>();
@@ -652,6 +747,9 @@ export function evaluateDiscard(ast: StrategyAST, ctx: StrategyContext): string[
   // Evaluate ALL rules (collect-all-matches, not first-match)
   for (const rule of block.rules) {
     const condResult = evalExpr(rule.condition, ctx);
+    if (strategyDebugEnabled) {
+      debugLog(`  discard rule: ${formatExpr(rule.condition)} → ${condResult}`);
+    }
     if (condResult) {
       collectDiscardAction(rule.action, ctx, keepIds, dropIds);
     }
@@ -677,7 +775,10 @@ export function evaluateDiscard(ast: StrategyAST, ctx: StrategyContext): string[
 
   // Sort ascending by score, take 4 lowest
   scored.sort((a, b) => a.score - b.score);
-  return scored.slice(0, 4).map(s => s.id);
+  const discards = scored.slice(0, 4).map(s => s.id);
+  debugLog(`→ discard: ${discards.join(', ')} | keep: ${[...keepIds].join(', ')} | drop: ${[...dropIds].join(', ')}`);
+  debugGroupEnd();
+  return discards;
 }
 
 function collectDiscardAction(

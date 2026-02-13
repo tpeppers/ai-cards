@@ -1,10 +1,57 @@
 import { BidWhistGame } from '../games/BidWhistGame.ts';
+import { Card } from '../types/CardGame.ts';
 import { StrategyAST } from '../strategy/types.ts';
 import { GameResult, HandResult } from './types.ts';
 import { generateRandomDeckUrl } from '../urlGameState.js';
+import {
+  computePreBidStrength,
+  computePostTrumpStrength,
+  extractPlayerHand,
+} from './handStrength.ts';
 
 const MAX_REDEALS = 10;
 const MAX_HANDS = 30;
+
+// ── Detailed hand types (for Weaknesses tab) ─────────────────────
+
+export interface TrickDetail {
+  number: number;
+  leader: number;
+  plays: { playerId: number; card: Card }[];
+  winner: number;
+  team0Books: number;
+  team1Books: number;
+}
+
+export interface DetailedHandData {
+  dealer: number;
+  declarer: number;
+  bidAmount: number;
+  trumpSuit: string;
+  direction: string;
+  booksWon: [number, number];
+  contract: number;
+  deficit: number;
+
+  bids: { playerId: number; amount: number }[];
+  startingHands: Card[][];
+  kitty: Card[];
+  postKittyHand: Card[];
+  discards: Card[];
+  playHands: Card[][];
+  tricks: TrickDetail[];
+
+  preBidStrengths: [number, number, number, number];
+  postTrumpStrengths: [number, number, number, number];
+
+  gameIndex: number;
+  handIndex: number;
+  deckUrl: string;
+  configIndex: number;
+  strategyNames: [string, string];
+  team0StrategyIndex: number;
+  team1StrategyIndex: number;
+}
 
 export class BidWhistSimulator {
   /**
@@ -95,6 +142,7 @@ export class BidWhistSimulator {
    * Returns HandResult with details, or null if redealt (everyone passed).
    */
   private runHand(game: BidWhistGame, strategies: (StrategyAST | null)[]): HandResult | null {
+    const dealer = game.getDealer();
     const state = game.getGameState();
 
     // Phase: Bidding
@@ -126,6 +174,7 @@ export class BidWhistSimulator {
     if (afterTrump.gameStage === 'discarding') {
       const declarer = game.getDeclarer();
       if (declarer !== null) {
+        game.setStrategy(strategies[declarer]);
         game.simulateAutoDiscard(declarer);
       }
     }
@@ -154,6 +203,7 @@ export class BidWhistSimulator {
       discards,
       booksWon: [...booksWon],
       teamScoresAfter: [...teamScoresAfter],
+      dealer,
     };
   }
 
@@ -195,5 +245,169 @@ export class BidWhistSimulator {
         game.playCard(currentPlayer, bestMove);
       }
     }
+  }
+
+  /**
+   * Re-simulate a single hand with full detail capture for the Weaknesses tab.
+   */
+  static simulateDetailedHand(
+    deckUrl: string,
+    playerStrategies: (StrategyAST | null)[],
+    dealer: number,
+  ): DetailedHandData | null {
+    const game = new BidWhistGame();
+    game.setDealer(dealer);
+    game.dealCards(deckUrl);
+
+    // 1. Snapshot starting hands (12 cards each, after deal)
+    const startingHands: Card[][] = game.getGameState().players.map(
+      p => p.hand.map(c => ({ ...c }))
+    );
+    const kitty = game.getKitty();
+
+    // 2. Bidding — record each bid
+    const bids: { playerId: number; amount: number }[] = [];
+    for (let i = 0; i < 4; i++) {
+      const gs = game.getGameState();
+      if (gs.gameStage !== 'bidding') break;
+      const cp = gs.currentPlayer;
+      if (cp === null) break;
+      game.setStrategy(playerStrategies[cp]);
+      const bidState = game.getBiddingState();
+      const bidsBefore = bidState.bids.length;
+      game.processAIBid(cp);
+      const bidsAfter = game.getBiddingState().bids;
+      if (bidsAfter.length > bidsBefore) {
+        const lastBid = bidsAfter[bidsAfter.length - 1];
+        bids.push({ playerId: lastBid.playerId, amount: lastBid.amount });
+      }
+    }
+
+    // Check redeal
+    const afterBid = game.getGameState();
+    if (afterBid.gameStage === 'bidding') return null;
+
+    const declarer = game.getDeclarer();
+    if (declarer === null) return null;
+    const bidAmount = game.getCurrentHighBid();
+
+    // 3. Trump selection
+    game.setStrategy(playerStrategies[declarer]);
+    game.processAITrumpSelection(declarer);
+    const trumpSuit = game.getTrumpSuit() ?? '';
+    const direction = game.getBidDirection();
+
+    // 4. Snapshot post-kitty hand (declarer has 16 cards before discard)
+    const afterTrump = game.getGameState();
+    let postKittyHand: Card[] = [];
+    const discards: Card[] = [];
+
+    if (afterTrump.gameStage === 'discarding') {
+      // Declarer is player 0 — kitty was added but not yet discarded
+      postKittyHand = afterTrump.players[declarer].hand.map(c => ({ ...c }));
+      game.setStrategy(playerStrategies[declarer]);
+      game.simulateAutoDiscard(declarer);
+    } else {
+      // setTrumpSuit auto-discarded: postKittyHand = startingHands + kitty
+      postKittyHand = [...startingHands[declarer], ...kitty];
+    }
+
+    // Capture discards from declarer's tricks (first 4 cards are the discards)
+    const declarerTricks = game.getGameState().players[declarer].tricks;
+    for (let i = 0; i < Math.min(4, declarerTricks.length); i++) {
+      discards.push({ ...declarerTricks[i] });
+    }
+
+    // 5. Snapshot play hands (12 cards each at start of play)
+    const playHands: Card[][] = game.getGameState().players.map(
+      p => p.hand.map(c => ({ ...c }))
+    );
+
+    // 6. Play 12 tricks, capturing detail
+    const tricks: TrickDetail[] = [];
+    for (let t = 0; t < 12; t++) {
+      const gs = game.getGameState();
+      if (gs.gameStage !== 'play') break;
+
+      const leader = gs.currentPlayer;
+      if (leader === null) break;
+
+      const plays: { playerId: number; card: Card }[] = [];
+      for (let c = 0; c < 4; c++) {
+        const gs2 = game.getGameState();
+        if (gs2.gameStage !== 'play') break;
+        const cp = gs2.currentPlayer;
+        if (cp === null) break;
+        game.setStrategy(playerStrategies[cp]);
+        const move = game.getBestMove(cp);
+        if (!move) break;
+        plays.push({ playerId: cp, card: { ...move } });
+        game.playCard(cp, move);
+      }
+
+      const booksWon = game.getBooksWon();
+      // Determine winner: the trick winner is the current player after finalizeTrick
+      // (since the game sets currentPlayer to the winner)
+      const winner = game.getGameState().currentPlayer ?? leader;
+
+      tricks.push({
+        number: t + 1,
+        leader,
+        plays,
+        winner,
+        team0Books: booksWon[0],
+        team1Books: booksWon[1],
+      });
+    }
+
+    const booksWon = game.getBooksWon();
+    const contract = bidAmount + 6;
+    const declarerTeam = declarer % 2;
+    const declarerBooks = booksWon[declarerTeam] + 1; // kitty counts as a book
+    const deficit = contract - declarerBooks;
+
+    // Compute hand strengths
+    const preBidHands = [0, 1, 2, 3].map(p => extractPlayerHand(deckUrl, p));
+    const preBidStrengths: [number, number, number, number] = [
+      computePreBidStrength(preBidHands[0]),
+      computePreBidStrength(preBidHands[1]),
+      computePreBidStrength(preBidHands[2]),
+      computePreBidStrength(preBidHands[3]),
+    ];
+    const postTrumpStrengths: [number, number, number, number] = trumpSuit
+      ? [
+          computePostTrumpStrength(preBidHands[0], trumpSuit, direction),
+          computePostTrumpStrength(preBidHands[1], trumpSuit, direction),
+          computePostTrumpStrength(preBidHands[2], trumpSuit, direction),
+          computePostTrumpStrength(preBidHands[3], trumpSuit, direction),
+        ]
+      : [0, 0, 0, 0];
+
+    return {
+      dealer,
+      declarer,
+      bidAmount,
+      trumpSuit,
+      direction,
+      booksWon: [...booksWon],
+      contract,
+      deficit,
+      bids,
+      startingHands,
+      kitty,
+      postKittyHand,
+      discards,
+      playHands,
+      tricks,
+      preBidStrengths,
+      postTrumpStrengths,
+      gameIndex: 0,
+      handIndex: 0,
+      deckUrl,
+      configIndex: 0,
+      strategyNames: ['', ''],
+      team0StrategyIndex: 0,
+      team1StrategyIndex: 0,
+    };
   }
 }

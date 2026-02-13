@@ -77,6 +77,12 @@ const HandCreator: React.FC = () => {
   const [handSize, setHandSize] = useState<number>(12);
   const [storedHands, setStoredHands] = useState<string[]>([]);
   const [selectedStoredHand, setSelectedStoredHand] = useState<string>('');
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importDealString, setImportDealString] = useState('');
+  const [importPlayer, setImportPlayer] = useState(0);
+  const [importIncludeKitty, setImportIncludeKitty] = useState(false);
+  const [sortMode, setSortMode] = useState<string>('none');
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const handleHandSizeChange = (newSize: number) => {
     setHandSize(newSize);
@@ -118,21 +124,19 @@ const HandCreator: React.FC = () => {
   };
 
   const exportHand = () => {
-    // TODO: This needs to actually seed-in _s as every 4th card, to properly stack the deck
-    // NOTE: Is the kitty really just ganna be the last 4 ?! REALLY?!
-    //const letters = selectedCards.map(card => cardToLetter(card)).join('');
-    //const exportString = letters + '_'.repeat(40);
+    const letters = selectedCards.map(card => cardToLetter(card));
+    const deal = new Array(52).fill('_');
 
-    var letters = selectedCards.map(card => cardToLetter(card)).join('');
-    var exportString = '';
-    for(let i = 0; i < letters.length; i = i + 1) {
-      exportString = exportString + letters[i] + "___"; // +3x '_' after each letter
+    // First 12 cards go to player 0 slots: positions 0, 4, 8, ..., 44
+    for (let i = 0; i < Math.min(letters.length, 12); i++) {
+      deal[i * 4] = letters[i];
+    }
+    // Cards 13-16 go to kitty slots: positions 48, 49, 50, 51
+    for (let i = 12; i < letters.length; i++) {
+      deal[48 + (i - 12)] = letters[i];
     }
 
-    // then add "___"s on to the end until the total length is 52
-    var amountToAdd = 52 - exportString.length;
-    exportString = exportString + '_'.repeat(amountToAdd);
-    exportString = "http://localhost:3000/#" + exportString;
+    const exportString = "http://localhost:3000/#" + deal.join('');
     navigator.clipboard.writeText(exportString);
   };
 
@@ -258,9 +262,107 @@ const HandCreator: React.FC = () => {
   };
 
 
+  const importFromClipboard = async () => {
+    try {
+      let text = await navigator.clipboard.readText();
+      // Strip URL prefix if present
+      const hashIndex = text.indexOf('#');
+      if (hashIndex !== -1) {
+        text = text.substring(hashIndex + 1);
+      }
+      // Validate: exactly 52 chars, all valid card letters or underscore
+      if (text.length !== 52 || !/^[a-zA-Z_]{52}$/.test(text)) {
+        alert('Clipboard does not contain a valid 52-character deal string.');
+        return;
+      }
+      const hasUnderscores = text.includes('_');
+      if (hasUnderscores) {
+        // Partial deal: extract player 0's hand directly
+        const cards: Card[] = [];
+        for (let i = 0; i < 12; i++) {
+          const letter = text[i * 4];
+          if (letter !== '_') {
+            try {
+              cards.push(letterToCard(letter));
+            } catch { /* skip invalid */ }
+          }
+        }
+        // Also grab kitty positions for player 0's extended hand
+        for (let i = 48; i < 52; i++) {
+          const letter = text[i];
+          if (letter !== '_') {
+            try {
+              cards.push(letterToCard(letter));
+            } catch { /* skip invalid */ }
+          }
+        }
+        setSelectedCards(cards);
+        setHandSize(cards.length);
+      } else {
+        // Full deal: show dialog to pick player
+        setImportDealString(text);
+        setImportPlayer(0);
+        setImportIncludeKitty(false);
+        setShowImportDialog(true);
+      }
+    } catch (err) {
+      alert('Failed to read clipboard. Make sure you have granted clipboard permissions.');
+    }
+  };
+
+  const getImportPreviewCards = (dealString: string, player: number, includeKitty: boolean): Card[] => {
+    const cards: Card[] = [];
+    for (let i = 0; i < 12; i++) {
+      const letter = dealString[player + i * 4];
+      if (letter && letter !== '_') {
+        try { cards.push(letterToCard(letter)); } catch { /* skip */ }
+      }
+    }
+    if (includeKitty) {
+      for (let i = 48; i < 52; i++) {
+        const letter = dealString[i];
+        if (letter && letter !== '_') {
+          try { cards.push(letterToCard(letter)); } catch { /* skip */ }
+        }
+      }
+    }
+    return cards;
+  };
+
+  const confirmImport = () => {
+    const cards = getImportPreviewCards(importDealString, importPlayer, importIncludeKitty);
+    setSelectedCards(cards);
+    setHandSize(cards.length);
+    setShowImportDialog(false);
+  };
+
   const resetHand = () => {
     setSelectedCards([]);
     setSelectedStoredHand('');
+    setSortMode('none');
+  };
+
+  const sortHand = () => {
+    const modes = ['none', 'default', 'uptown', 'downtown', 'downtown-noaces'];
+    const nextIdx = (modes.indexOf(sortMode) + 1) % modes.length;
+    const next = modes[nextIdx];
+    setSortMode(next);
+
+    if (next === 'none') return;
+
+    const suitOrder: Record<string, number> = { spades: 1, hearts: 2, clubs: 3, diamonds: 4 };
+
+    const getCardValue = (rank: number, mode: string): number => {
+      if (mode === 'default') return rank;
+      if (mode === 'uptown') return rank === 1 ? 14 : rank;
+      if (mode === 'downtown') return rank === 1 ? 14 : (14 - rank);
+      /* downtown-noaces */ return rank === 1 ? 1 : (14 - rank);
+    };
+
+    setSelectedCards(prev => [...prev].sort((a, b) => {
+      if (suitOrder[a.suit] !== suitOrder[b.suit]) return suitOrder[a.suit] - suitOrder[b.suit];
+      return getCardValue(a.rank, next) - getCardValue(b.rank, next);
+    }));
   };
 
   useEffect(() => {
@@ -298,14 +400,14 @@ const HandCreator: React.FC = () => {
             id="handSize"
             type="range"
             min="1"
-            max="13"
+            max="16"
             value={handSize}
             onChange={(e) => handleHandSizeChange(Number(e.target.value))}
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
           />
           <div className="flex justify-between text-sm text-gray-600 mt-1">
             <span>1</span>
-            <span>13</span>
+            <span>16</span>
           </div>
         </div>
         <p className="text-lg mb-2">
@@ -315,12 +417,29 @@ const HandCreator: React.FC = () => {
           <div className="mb-4">
             <div className="text-sm text-gray-600 mb-2">Selected cards:</div>
             <div className="flex flex-wrap gap-1">
-              {selectedCards.length === 0 ? `None` : selectedCards.map(card => (
-                <CardImage
+              {selectedCards.length === 0 ? `None` : selectedCards.map((card, index) => (
+                <div
                   key={card.id}
-                  suit={card.suit}
-                  rank={card.rank}
-                />
+                  draggable
+                  onDragStart={() => setDragIndex(index)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (dragIndex === null || dragIndex === index) return;
+                    setSelectedCards(prev => {
+                      const next = [...prev];
+                      const [moved] = next.splice(dragIndex, 1);
+                      next.splice(index, 0, moved);
+                      return next;
+                    });
+                    setSortMode('none');
+                    setDragIndex(null);
+                  }}
+                  onDragEnd={() => setDragIndex(null)}
+                  style={{ cursor: 'grab' }}
+                  className={dragIndex !== null && dragIndex !== index ? 'border-l-2 border-blue-400' : ''}
+                >
+                  <CardImage suit={card.suit} rank={card.rank} />
+                </div>
               ))}
             </div>
           </div>
@@ -433,6 +552,23 @@ const HandCreator: React.FC = () => {
             Reset Hand
           </button>
           <button
+            onClick={sortHand}
+            disabled={selectedCards.length < 2}
+            className={`
+              px-6 py-3 font-semibold rounded-lg text-lg
+              ${selectedCards.length >= 2
+                ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }
+              transition-colors duration-200
+            `}
+          >
+            Sort Hand{sortMode !== 'none' ? ` (${sortMode === 'default' ? 'Low→High'
+              : sortMode === 'uptown' ? 'Uptown'
+              : sortMode === 'downtown' ? 'Downtown'
+              : 'No Aces'})` : ''}
+          </button>
+          <button
             onClick={exportHand}
             disabled={selectedCards.length !== handSize}
             className={`
@@ -468,6 +604,12 @@ const HandCreator: React.FC = () => {
           >
             Import from Disk
           </button>
+          <button
+            onClick={importFromClipboard}
+            className="px-6 py-2 font-semibold rounded-lg text-base bg-teal-600 hover:bg-teal-700 text-white cursor-pointer transition-colors duration-200"
+          >
+            Import from Clipboard
+          </button>
         </div>
         {selectedCards.length === handSize && (
           <p className="text-sm text-gray-600">
@@ -485,6 +627,72 @@ const HandCreator: React.FC = () => {
           <p>Hands are automatically deduplicated and sorted alphabetically</p>
         </div>
       </div>
+      {showImportDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70]">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-bold mb-4">Import Hand from Deal</h2>
+
+            <div className="mb-4">
+              <label className="block font-semibold mb-2">Select player:</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 0, label: 'South' },
+                  { value: 1, label: 'East' },
+                  { value: 2, label: 'North' },
+                  { value: 3, label: 'West' },
+                ].map(({ value, label }) => (
+                  <label key={value} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="importPlayer"
+                      checked={importPlayer === value}
+                      onChange={() => setImportPlayer(value)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={importIncludeKitty}
+                  onChange={(e) => setImportIncludeKitty(e.target.checked)}
+                />
+                Include kitty (4 cards)
+              </label>
+            </div>
+
+            <div className="mb-4">
+              <div className="text-sm text-gray-600 mb-1">
+                Preview ({getImportPreviewCards(importDealString, importPlayer, importIncludeKitty).length} cards):
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {getImportPreviewCards(importDealString, importPlayer, importIncludeKitty).map(card => (
+                  <CardImage key={card.id} suit={card.suit} rank={card.rank} />
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowImportDialog(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmImport}
+                className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold transition-colors"
+              >
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

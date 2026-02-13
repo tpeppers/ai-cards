@@ -77,6 +77,7 @@ function replayHand(
   if (afterTrump.gameStage === 'discarding') {
     const declarer = game.getDeclarer();
     if (declarer !== null) {
+      game.setStrategy(playerStrategies[declarer]);
       game.simulateAutoDiscard(declarer);
     }
   }
@@ -177,6 +178,7 @@ function simulatorHand(
   if (afterTrump.gameStage === 'discarding') {
     const declarer = game.getDeclarer();
     if (declarer !== null) {
+      game.setStrategy(playerStrategies[declarer]);
       game.simulateAutoDiscard(declarer);
     }
   }
@@ -225,8 +227,8 @@ function simulatorHand(
 
 describe('Replay vs Simulator consistency (100-RED dataset)', () => {
   // Use two different strategies for the two teams (the common comparison case)
-  const team0Strat = parseStrategy(bidWhistStrategies[1].text); // Standard (Partner Signals)
-  const team1Strat = parseStrategy(bidWhistStrategies[4].text); // Aggressive (Partner Signals)
+  const team0Strat = parseStrategy(bidWhistStrategies.find(s => s.name === 'Standard (Partner Signals)')!.text);
+  const team1Strat = parseStrategy(bidWhistStrategies.find(s => s.name === 'Claude')!.text);
   const playerStrategies: (StrategyAST | null)[] = [team0Strat, team1Strat, team0Strat, team1Strat];
 
   // Run all 100 RED decks at all 4 rotations
