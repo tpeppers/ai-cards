@@ -1,7 +1,7 @@
 import { Card } from '../types/CardGame.ts';
 import {
   StrategyAST, RuleBlock, Rule, Action, Expression,
-  PlayAction, BidAction, ChooseAction,
+  PlayAction, BidAction, ChooseAction, KeepAction, DropAction,
   StrategyContext, CardSet,
 } from './types.ts';
 
@@ -160,11 +160,11 @@ function bestSuit(ctx: StrategyContext): string {
 }
 
 function lowCount(ctx: StrategyContext): number {
-  return ctx.hand.filter(c => c.rank >= 2 && c.rank <= 7).length;
+  return ctx.hand.filter(c => c.rank >= 2 && c.rank <= 5).length;
 }
 
 function highCount(ctx: StrategyContext): number {
-  return ctx.hand.filter(c => c.rank === 1 || c.rank >= 8).length;
+  return ctx.hand.filter(c => c.rank === 1 || c.rank >= 11).length;
 }
 
 function aceCount(ctx: StrategyContext): number {
@@ -185,6 +185,58 @@ function kingAceCount(ctx: StrategyContext): number {
 
 function kingCount(ctx: StrategyContext): number {
   return ctx.hand.filter(c => c.rank === 13).length;
+}
+
+function countOutstandingThreats(ctx: StrategyContext): number {
+  // Count cards held by opponents that could beat the current trick winner.
+  // Threats are: higher same-suit cards, plus any outstanding trump (if winner is non-trump).
+  if (ctx.currentTrick.length === 0) return 0;
+  const winIdx = ctx.evaluateCurrentWinner();
+  if (winIdx < 0) return 0;
+  const winCard = ctx.currentTrick[winIdx].card;
+
+  const playedIds = new Set(ctx.playedCards.map(c => c.id));
+  const myIds = new Set(ctx.hand.map(c => c.id));
+  const trickIds = new Set(ctx.currentTrick.map(p => p.card.id));
+
+  const winVal = ctx.getCardValue(winCard);
+  let count = 0;
+
+  // Higher cards of the same suit as the winner
+  for (let rank = 1; rank <= 13; rank++) {
+    const id = `${winCard.suit}_${rank}`;
+    if (playedIds.has(id) || myIds.has(id) || trickIds.has(id)) continue;
+    const tempCard: Card = { suit: winCard.suit, rank, id };
+    if (ctx.getCardValue(tempCard) > winVal) {
+      count++;
+    }
+  }
+
+  // If winner is non-trump, any outstanding trump card also beats it
+  if (ctx.trumpSuit && winCard.suit !== ctx.trumpSuit) {
+    for (let rank = 1; rank <= 13; rank++) {
+      const id = `${ctx.trumpSuit}_${rank}`;
+      if (playedIds.has(id) || myIds.has(id) || trickIds.has(id)) continue;
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function countOutstandingTrump(ctx: StrategyContext): number {
+  if (!ctx.trumpSuit) return 0;
+  const playedIds = new Set(ctx.playedCards.map(c => c.id));
+  const myIds = new Set(ctx.hand.map(c => c.id));
+  const trickIds = new Set(ctx.currentTrick.map(p => p.card.id));
+
+  let count = 0;
+  for (let rank = 1; rank <= 13; rank++) {
+    const id = `${ctx.trumpSuit}_${rank}`;
+    if (playedIds.has(id) || myIds.has(id) || trickIds.has(id)) continue;
+    count++;
+  }
+  return count;
 }
 
 function maxSuitCount(ctx: StrategyContext): number {
@@ -250,6 +302,7 @@ function resolveVariable(name: string, ctx: StrategyContext): any {
       const shortCards = ctx.hand.filter(c => ctx.partnerVoidSuits.includes(c.suit));
       return makeCardSet(shortCards);
     }
+    case 'bid_direction': return ctx.bidDirection;
     case 'me': return { id: ctx.playerId };
     default:
       return undefined;
@@ -311,6 +364,16 @@ function evalCall(name: string, args: any[], ctx: StrategyContext): any {
       return maxSuitCount(ctx);
     case 'min_suit_count':
       return minSuitCount(ctx);
+    case 'stopper_cards':
+      return computeStopperCards(ctx);
+    case 'suit_keepers':
+      return computeSuitKeepers(typeof args[0] === 'number' ? args[0] : 1, ctx);
+    case 'void_candidates':
+      return computeVoidCandidates(ctx);
+    case 'outstanding_trump':
+      return countOutstandingTrump(ctx);
+    case 'outstanding_threats':
+      return countOutstandingThreats(ctx);
     default:
       return undefined;
   }
@@ -367,6 +430,106 @@ function evalProperty(expr: any, ctx: StrategyContext): any {
   }
 
   return undefined;
+}
+
+// ── Discard Helper Functions ────────────────────────────────────────
+
+/**
+ * Compute stopper cards: cards involved in stopper structures.
+ * For each non-trump suit, find the best card and determine how many
+ * protectors it needs (= number of higher unseen cards). Collect the
+ * best card + its protectors as the stopper set.
+ */
+function computeStopperCards(ctx: StrategyContext): CardSet {
+  const trumpSuit = ctx.trumpSuit;
+  const suits = ['spades', 'hearts', 'diamonds', 'clubs'].filter(s => s !== trumpSuit);
+  const playedIds = new Set(ctx.playedCards.map(c => c.id));
+  const myIds = new Set(ctx.hand.map(c => c.id));
+  const stopperCards: Card[] = [];
+
+  for (const suit of suits) {
+    const suitCards = ctx.hand.filter(c => c.suit === suit);
+    if (suitCards.length === 0) continue;
+
+    // Sort by value descending
+    suitCards.sort((a, b) => ctx.getCardValue(b) - ctx.getCardValue(a));
+    const bestCard = suitCards[0];
+    const bestVal = ctx.getCardValue(bestCard);
+
+    // Count cards with higher value that are NOT in hand and NOT played
+    let protectorsNeeded = 0;
+    for (let rank = 1; rank <= 13; rank++) {
+      const id = `${suit}_${rank}`;
+      if (myIds.has(id) || playedIds.has(id)) continue;
+      const tempCard: Card = { suit, rank, id };
+      if (ctx.getCardValue(tempCard) > bestVal) {
+        protectorsNeeded++;
+      }
+    }
+
+    // If protectorsNeeded == 0, it's a boss card - naturally kept by value
+    if (protectorsNeeded === 0) continue;
+
+    // Collect the best card + up to protectorsNeeded lower-value cards
+    stopperCards.push(bestCard);
+    for (let i = 1; i < suitCards.length && i <= protectorsNeeded; i++) {
+      stopperCards.push(suitCards[i]);
+    }
+  }
+
+  return { cards: stopperCards };
+}
+
+/**
+ * Compute suit keepers: the n weakest cards from each non-trump suit.
+ * This enables "keep at least n cards of each suit" strategies.
+ */
+function computeSuitKeepers(n: number, ctx: StrategyContext): CardSet {
+  const trumpSuit = ctx.trumpSuit;
+  const suits = ['spades', 'hearts', 'diamonds', 'clubs'].filter(s => s !== trumpSuit);
+  const keepers: Card[] = [];
+
+  for (const suit of suits) {
+    const suitCards = ctx.hand.filter(c => c.suit === suit);
+    if (suitCards.length === 0) continue;
+
+    // Sort by value ascending, take n weakest
+    suitCards.sort((a, b) => ctx.getCardValue(a) - ctx.getCardValue(b));
+    for (let i = 0; i < Math.min(n, suitCards.length); i++) {
+      keepers.push(suitCards[i]);
+    }
+  }
+
+  return { cards: keepers };
+}
+
+/**
+ * Compute void candidates: all cards in the shortest non-trump suit(s).
+ * Used for voiding a suit to enable trumping.
+ */
+function computeVoidCandidates(ctx: StrategyContext): CardSet {
+  const trumpSuit = ctx.trumpSuit;
+  const suits = ['spades', 'hearts', 'diamonds', 'clubs'].filter(s => s !== trumpSuit);
+
+  const suitCounts: { [suit: string]: number } = {};
+  for (const suit of suits) {
+    suitCounts[suit] = ctx.hand.filter(c => c.suit === suit).length;
+  }
+
+  // Find the minimum non-zero count
+  const nonZeroCounts = Object.values(suitCounts).filter(v => v > 0);
+  if (nonZeroCounts.length === 0) return { cards: [] };
+  const minCount = Math.min(...nonZeroCounts);
+
+  // Collect all cards from suits with the minimum count
+  const candidates: Card[] = [];
+  for (const suit of suits) {
+    if (suitCounts[suit] === minCount) {
+      candidates.push(...ctx.hand.filter(c => c.suit === suit));
+    }
+  }
+
+  return { cards: candidates };
 }
 
 // ── Strategy Evaluator ──────────────────────────────────────────────
@@ -465,4 +628,77 @@ export function evaluateTrump(ast: StrategyAST, ctx: StrategyContext): TrumpResu
   }
 
   return null;
+}
+
+/**
+ * Evaluate the discard: section using collect-all-matches semantics.
+ * Unlike play/bid/trump (which stop at first match), discard evaluates
+ * ALL matching rules and collects keep/drop card sets additively.
+ * Returns the IDs of the 4 lowest-scored cards to discard, or null if
+ * no discard section exists.
+ */
+export function evaluateDiscard(ast: StrategyAST, ctx: StrategyContext): string[] | null {
+  if (!ast.discard) return null;
+
+  const block = ast.discard;
+  const keepIds = new Set<string>();
+  const dropIds = new Set<string>();
+
+  // Collect cards from the default action (always applies)
+  if (block.defaultAction) {
+    collectDiscardAction(block.defaultAction, ctx, keepIds, dropIds);
+  }
+
+  // Evaluate ALL rules (collect-all-matches, not first-match)
+  for (const rule of block.rules) {
+    const condResult = evalExpr(rule.condition, ctx);
+    if (condResult) {
+      collectDiscardAction(rule.action, ctx, keepIds, dropIds);
+    }
+  }
+
+  // Score each card in hand
+  const scored = ctx.hand.map(card => {
+    let score = ctx.getCardValue(card);
+    // Trump bonus
+    if (ctx.trumpSuit && card.suit === ctx.trumpSuit) {
+      score += 100;
+    }
+    // Keep bonus
+    if (keepIds.has(card.id)) {
+      score += 1000;
+    }
+    // Drop penalty
+    if (dropIds.has(card.id)) {
+      score -= 1000;
+    }
+    return { id: card.id, score };
+  });
+
+  // Sort ascending by score, take 4 lowest
+  scored.sort((a, b) => a.score - b.score);
+  return scored.slice(0, 4).map(s => s.id);
+}
+
+function collectDiscardAction(
+  action: Action,
+  ctx: StrategyContext,
+  keepIds: Set<string>,
+  dropIds: Set<string>
+): void {
+  if (action.type === 'keep') {
+    const result = evalExpr((action as KeepAction).cardSetExpr, ctx);
+    if (result && typeof result === 'object' && 'cards' in result) {
+      for (const card of (result as CardSet).cards) {
+        keepIds.add(card.id);
+      }
+    }
+  } else if (action.type === 'drop') {
+    const result = evalExpr((action as DropAction).cardSetExpr, ctx);
+    if (result && typeof result === 'object' && 'cards' in result) {
+      for (const card of (result as CardSet).cards) {
+        dropIds.add(card.id);
+      }
+    }
+  }
 }

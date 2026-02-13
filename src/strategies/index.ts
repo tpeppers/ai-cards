@@ -437,10 +437,10 @@ bid:
   when bid_count < 2 and king_ace_count() >= 3 and deuce_trey_count() >= 3 and bid.current < 3:
     bid 3
   # Signal 2: high cards (uptown signal)
-  when bid_count < 2 and high_count() > low_count() and bid.current < 2:
+  when bid_count < 2 and king_ace_count() >= 3 and bid.current < 2:
     bid 2
   # Signal 1: low cards (downtown signal)
-  when bid_count < 2 and low_count() >= high_count() and bid.current < 1:
+  when bid_count < 2 and deuce_trey_count() >= 3 and bid.current < 1:
     bid 1
 
   # ── Seat 3 (hot seat): ALWAYS bid at least 4 ──
@@ -502,70 +502,116 @@ trump:
 const FAMILY_PLAY = `\
 play:
   leading:
-    # Cash boss cards (guaranteed winners)
+    # Last run: only 1 non-trump left — run out all trump then play it
+    when on_declarer_team and has_trump and hand.nontrump.count == 1:
+      play hand.trump.strongest
+    # Cash boss cards (guaranteed winners, safe anytime)
+    # Pull trump: both void-based AND count-based signals say enemies have trump
+    when on_declarer_team and has_trump and enemy_has_trump and outstanding_trump() > 0:
+      play hand.trump.strongest
     when hand.boss.count > 0:
       play hand.boss.weakest
     # Lead partner's shortsuit (they can trump it)
     when partner_shortsuit.count > 0:
       play partner_shortsuit.weakest
-    # Pull trump ONLY when enemies still have trump (never pull partner's trump)
-    when on_declarer_team and has_trump and enemy_has_trump:
-      play hand.trump.strongest
     # Lead partner's signal suit
     when partner_signal != "" and hand.suit(partner_signal).count > 0:
       play hand.suit(partner_signal).weakest
+    # Prefer non-trump: reserve trump for regaining control via void section
+    when hand.nontrump.count > 0:
+      play hand.nontrump.weakest
     default:
       play hand.weakest
 
   following:
-    # Standard: play weakest winner, else weakest of suit
+    # Partner is winning and no one can beat them — play weakest, don't overtake
+    when partner_winning and outstanding_threats() == 0:
+      play hand.suit(lead_suit).weakest
+    # Partner is winning but at risk — overtake only with a boss winner (guaranteed hold)
+    when partner_winning and hand.suit(lead_suit).winners.boss.count > 0:
+      play hand.suit(lead_suit).winners.boss.weakest
+    # Partner is winning, threats exist but we can't guarantee — don't waste high cards
+    when partner_winning:
+      play hand.suit(lead_suit).weakest
+    # Not partner winning — try to win with weakest winner
     when hand.suit(lead_suit).winners.count > 0:
       play hand.suit(lead_suit).winners.weakest
     default:
       play hand.suit(lead_suit).weakest
 
   void:
-    # Trump immediately when void (family style), unless partner winning
+    # Partner not winning — trump to take the trick
     when not partner_winning and has_trump:
       play hand.trump.weakest
-    # Signal with non-trump after
+    # Partner winning but at risk — trump to protect
+    when partner_winning and outstanding_threats() > 0 and has_trump:
+      play hand.trump.weakest
+    # Signal with non-trump when safe
     when not have_signaled and hand.nontrump.count > 0:
       play hand.nontrump.weakest
     default:
       play hand.weakest`;
 
+// ── Discard sections ────────────────────────────────────────────────
+
+const BASE_DISCARD = `\
+discard:
+  default:
+    keep stopper_cards()
+  when has_trump:
+    keep hand.trump`;
+
+const FAMILY_DISCARD = `\
+discard:
+  default:
+    keep stopper_cards()
+  when has_trump:
+    keep hand.trump
+  when partner_bid == 3:
+    keep suit_keepers(1)
+  when partner_bid == 1 and bid_direction != "uptown":
+    keep suit_keepers(1)
+  when partner_bid == 2 and bid_direction == "uptown":
+    keep suit_keepers(1)
+  when enemy_bid == 1 and bid_direction != "uptown" and partner_bid != 3:
+    drop void_candidates()
+  when enemy_bid == 2 and bid_direction == "uptown" and partner_bid != 3:
+    drop void_candidates()`;
+
 // ── Strategy builder ────────────────────────────────────────────────
 
-function buildStrategy(name: string, play: string, bid: string, trump: string): string {
-  return `strategy "${name}"\ngame: bidwhist\n\n${play}\n\n${bid}\n\n${trump}\n`;
+function buildStrategy(name: string, play: string, bid: string, trump: string, discard: string = ''): string {
+  const parts = [`strategy "${name}"\ngame: bidwhist`, play, bid, trump];
+  if (discard) parts.push(discard);
+  return parts.join('\n\n') + '\n';
 }
 
 // ── Composed Bid Whist strategies (3 base × 3 signal modes = 9) ─────
 
 export const BIDWHIST_STANDARD_NOSIGNAL = buildStrategy(
-  'Standard (Ignore Signals)', STANDARD_PLAY_NOSIGNAL, STANDARD_BID, TRUMP_SECTION_NOSIGNAL);
+  'Standard (Ignore Signals)', STANDARD_PLAY_NOSIGNAL, STANDARD_BID, TRUMP_SECTION_NOSIGNAL, BASE_DISCARD);
 export const BIDWHIST_STANDARD_PARTNER = buildStrategy(
-  'Standard (Partner Signals)', STANDARD_PLAY_PARTNER, STANDARD_BID, TRUMP_SECTION);
+  'Standard (Partner Signals)', STANDARD_PLAY_PARTNER, STANDARD_BID, TRUMP_SECTION, BASE_DISCARD);
 export const BIDWHIST_STANDARD_ALL = buildStrategy(
-  'Standard (All Signals)', STANDARD_PLAY_ALL, STANDARD_BID, TRUMP_SECTION_ALL);
+  'Standard (All Signals)', STANDARD_PLAY_ALL, STANDARD_BID, TRUMP_SECTION_ALL, BASE_DISCARD);
 
 export const BIDWHIST_AGGRESSIVE_NOSIGNAL = buildStrategy(
-  'Aggressive (Ignore Signals)', AGGRESSIVE_PLAY_NOSIGNAL, AGGRESSIVE_BID, TRUMP_SECTION_NOSIGNAL);
+  'Aggressive (Ignore Signals)', AGGRESSIVE_PLAY_NOSIGNAL, AGGRESSIVE_BID, TRUMP_SECTION_NOSIGNAL, BASE_DISCARD);
 export const BIDWHIST_AGGRESSIVE_PARTNER = buildStrategy(
-  'Aggressive (Partner Signals)', AGGRESSIVE_PLAY_PARTNER, AGGRESSIVE_BID, TRUMP_SECTION);
+  'Aggressive (Partner Signals)', AGGRESSIVE_PLAY_PARTNER, AGGRESSIVE_BID, TRUMP_SECTION, BASE_DISCARD);
 export const BIDWHIST_AGGRESSIVE_ALL = buildStrategy(
-  'Aggressive (All Signals)', AGGRESSIVE_PLAY_ALL, AGGRESSIVE_BID, TRUMP_SECTION_ALL);
+  'Aggressive (All Signals)', AGGRESSIVE_PLAY_ALL, AGGRESSIVE_BID, TRUMP_SECTION_ALL, BASE_DISCARD);
 
 export const BIDWHIST_CONSERVATIVE_NOSIGNAL = buildStrategy(
-  'Conservative (Ignore Signals)', CONSERVATIVE_PLAY_NOSIGNAL, CONSERVATIVE_BID, TRUMP_SECTION_NOSIGNAL);
+  'Conservative (Ignore Signals)', CONSERVATIVE_PLAY_NOSIGNAL, CONSERVATIVE_BID, TRUMP_SECTION_NOSIGNAL, BASE_DISCARD);
 export const BIDWHIST_CONSERVATIVE_PARTNER = buildStrategy(
-  'Conservative (Partner Signals)', CONSERVATIVE_PLAY_PARTNER, CONSERVATIVE_BID, TRUMP_SECTION);
+  'Conservative (Partner Signals)', CONSERVATIVE_PLAY_PARTNER, CONSERVATIVE_BID, TRUMP_SECTION, BASE_DISCARD);
 export const BIDWHIST_CONSERVATIVE_ALL = buildStrategy(
-  'Conservative (All Signals)', CONSERVATIVE_PLAY_ALL, CONSERVATIVE_BID, TRUMP_SECTION_ALL);
+  'Conservative (All Signals)', CONSERVATIVE_PLAY_ALL, CONSERVATIVE_BID, TRUMP_SECTION_ALL, BASE_DISCARD);
 
 // ── Family strategy ──────────────────────────────────────────────────
 
-export const BIDWHIST_FAMILY = buildStrategy('Family', FAMILY_PLAY, FAMILY_BID, FAMILY_TRUMP);
+export const BIDWHIST_FAMILY = buildStrategy('Family', FAMILY_PLAY, FAMILY_BID, FAMILY_TRUMP, FAMILY_DISCARD);
 
 // Backward-compatible aliases (point to Partner Signals variants)
 export const BIDWHIST_STANDARD = BIDWHIST_STANDARD_PARTNER;
@@ -619,9 +665,10 @@ export interface StrategySections {
   play: string;
   bid: string;
   trump: string;
+  discard: string;
 }
 
-const SECTION_KEYWORDS = ['play', 'bid', 'trump'] as const;
+const SECTION_KEYWORDS = ['play', 'bid', 'trump', 'discard'] as const;
 type SectionKey = typeof SECTION_KEYWORDS[number];
 
 /**
@@ -631,9 +678,9 @@ type SectionKey = typeof SECTION_KEYWORDS[number];
  */
 export function splitStrategySections(text: string): StrategySections {
   const lines = text.split('\n');
-  const result: StrategySections = { header: '', play: '', bid: '', trump: '' };
+  const result: StrategySections = { header: '', play: '', bid: '', trump: '', discard: '' };
   let currentSection: SectionKey | 'header' = 'header';
-  const buckets: Record<string, string[]> = { header: [], play: [], bid: [], trump: [] };
+  const buckets: Record<string, string[]> = { header: [], play: [], bid: [], trump: [], discard: [] };
 
   for (const line of lines) {
     const trimmed = line.trimStart();
@@ -672,7 +719,7 @@ export function splitStrategySections(text: string): StrategySections {
 export function replaceStrategySection(text: string, section: SectionKey, newSectionText: string): string {
   const sections = splitStrategySections(text);
   sections[section] = newSectionText;
-  const parts = [sections.header, sections.play, sections.bid, sections.trump].filter(s => s.length > 0);
+  const parts = [sections.header, sections.play, sections.bid, sections.trump, sections.discard].filter(s => s.length > 0);
   return parts.join('\n\n') + '\n';
 }
 
