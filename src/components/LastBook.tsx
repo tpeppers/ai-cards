@@ -9,13 +9,16 @@ interface LastBookEntry {
 interface LastBookProps {
   lastBook: LastBookEntry[];
   playerNames: string[];
+  dragOffset?: { x: number; y: number };
+  onDragStart?: (e: React.MouseEvent) => void;
+  onTouchDragStart?: (e: React.TouchEvent) => void;
 }
 
 const suits: { [key: string]: { symbol: string; color: string } } = {
-  spades: { symbol: '♠', color: 'black' },
-  hearts: { symbol: '♥', color: 'red' },
-  diamonds: { symbol: '♦', color: 'red' },
-  clubs: { symbol: '♣', color: 'black' },
+  spades: { symbol: '\u2660', color: 'black' },
+  hearts: { symbol: '\u2665', color: 'red' },
+  diamonds: { symbol: '\u2666', color: 'red' },
+  clubs: { symbol: '\u2663', color: 'black' },
 };
 
 const getRankDisplay = (rank: number): string => {
@@ -26,10 +29,18 @@ const getRankDisplay = (rank: number): string => {
   return rank.toString();
 };
 
-const LastBook: React.FC<LastBookProps> = ({ lastBook, playerNames }) => {
+const LastBook: React.FC<LastBookProps> = ({ lastBook, playerNames, dragOffset, onDragStart, onTouchDragStart }) => {
   return (
-    <div className="absolute bottom-4 right-4 bg-white bg-opacity-90 p-3 rounded border border-gray-400 shadow-md w-48 z-10">
-      <div className="text-sm font-bold border-b border-gray-400 mb-2 pb-1">
+    <div
+      className="absolute bottom-4 right-4 bg-white bg-opacity-90 p-3 rounded border border-gray-400 shadow-md w-48 z-10"
+      style={dragOffset ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined}
+    >
+      <div
+        className="text-sm font-bold border-b border-gray-400 mb-2 pb-1"
+        style={onDragStart ? { cursor: 'grab' } : undefined}
+        onMouseDown={onDragStart}
+        onTouchStart={onTouchDragStart}
+      >
         Last Book
       </div>
       <div className="space-y-1">

@@ -1,6 +1,6 @@
 import { CardGame, Card } from '../types/CardGame.ts';
 import { cardToLetter, letterToCard } from '../urlGameState.js';
-import { evaluatePlay, evaluateBid, evaluateTrump } from '../strategy/evaluator.ts';
+import { evaluatePlay, evaluateBid, evaluateTrump, evaluateDiscard } from '../strategy/evaluator.ts';
 import { buildBidWhistContext } from '../strategy/context.ts';
 
 type BidDirection = 'uptown' | 'downtown' | 'downtown-noaces';
@@ -34,6 +34,7 @@ export class BidWhistGame extends CardGame {
   private booksWon: [number, number] = [0, 0];
   private dealer: number = 0; // Dealer position, rotates clockwise each hand
   private lastCompletedTrick: { playerId: number; card: Card }[] = []; // Last book played
+  private lastDealtDeckUrl: string = ''; // URL-encoded deck string from most recent deal
   private firstDiscardSuit: (string | null)[] = [null, null, null, null]; // Void signal tracking
   private playerVoidSuits: Set<string>[] = [new Set(), new Set(), new Set(), new Set()]; // Track all voids
 
@@ -100,6 +101,9 @@ export class BidWhistGame extends CardGame {
 
   dealCards(urlToDeal?: string): void {
     const deck = urlToDeal ? this.rigDeck(urlToDeal) : this.shuffleDeck(this.createDeck());
+
+    // Store the deck URL for later retrieval
+    this.lastDealtDeckUrl = deck.map(c => cardToLetter(c)).join('');
 
     // Deal 12 cards to each player (48 cards)
     for (let i = 0; i < 48; i++) {
@@ -501,6 +505,30 @@ export class BidWhistGame extends CardGame {
   }
 
   private autoDiscard(playerId: number): void {
+    // Try strategy-driven discard first
+    if (this.strategy) {
+      const ctx = buildBidWhistContext(this, playerId);
+      const discardIds = evaluateDiscard(this.strategy, ctx);
+      if (discardIds && discardIds.length === 4) {
+        const player = this.players[playerId];
+        const handIds = new Set(player.hand.map(c => c.id));
+        // Validate all returned IDs are in hand
+        if (discardIds.every(id => handIds.has(id))) {
+          const discardSet = new Set(discardIds);
+          const discards = player.hand.filter(c => discardSet.has(c.id));
+          player.hand = player.hand.filter(c => !discardSet.has(c.id));
+          player.tricks.push(...discards);
+          this.sortHand(player.hand);
+          return;
+        }
+      }
+    }
+
+    // Fallback to default logic
+    this.defaultAutoDiscard(playerId);
+  }
+
+  private defaultAutoDiscard(playerId: number): void {
     const player = this.players[playerId];
 
     // Separate trump and non-trump cards
@@ -508,9 +536,7 @@ export class BidWhistGame extends CardGame {
     const nonTrumpCards = player.hand.filter(c => c.suit !== this.trumpSuit);
 
     // Sort non-trump cards by their value in the chosen direction (worst first)
-    // We want to discard the cards that are least likely to win
     nonTrumpCards.sort((a, b) => {
-      // Compare by card value - lower value = worse = discard first
       return this.getCardValue(a) - this.getCardValue(b);
     });
 
@@ -525,7 +551,6 @@ export class BidWhistGame extends CardGame {
 
     // Only if we don't have enough non-trump, reluctantly discard trump (worst trump first)
     if (discards.length < 4) {
-      // Sort trump by value (worst first)
       trumpCards.sort((a, b) => this.getCardValue(a) - this.getCardValue(b));
       for (const card of trumpCards) {
         if (discards.length >= 4) break;
@@ -845,6 +870,10 @@ export class BidWhistGame extends CardGame {
     return this.booksWon;
   }
 
+  getLastDealtDeckUrl(): string {
+    return this.lastDealtDeckUrl;
+  }
+
   getCurrentHighBid(): number {
     return this.currentHighBid;
   }
@@ -868,6 +897,10 @@ export class BidWhistGame extends CardGame {
 
   getDealer(): number {
     return this.dealer;
+  }
+
+  getKitty(): Card[] {
+    return [...this.kitty];
   }
 
   getLastCompletedTrick(): { playerId: number; card: Card }[] {

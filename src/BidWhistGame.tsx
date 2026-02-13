@@ -9,6 +9,19 @@ import { BidWhistGame } from './games/BidWhistGame.ts';
 import { GameState } from './types/CardGame.ts';
 import { STRATEGY_REGISTRY } from './strategies/index.ts';
 import { getGameStateFromUrl } from './urlGameState.js';
+import { useDraggable } from './hooks/useDraggable.ts';
+
+const SUIT_SYMBOLS: { [key: string]: string } = {
+  spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣'
+};
+
+const SUIT_COLORS: { [key: string]: string } = {
+  spades: 'black', hearts: 'red', diamonds: 'red', clubs: 'black'
+};
+
+const RANK_DISPLAY: { [key: number]: string } = {
+  1: 'A', 11: 'J', 12: 'Q', 13: 'K'
+};
 
 const BidWhistGameComponent: React.FunctionComponent = () => {
   const gameRef = useRef<BidWhistGame>(new BidWhistGame());
@@ -19,6 +32,7 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const [previewCardId, setPreviewCardId] = useState<string | null>(null);
   const [previewBid, setPreviewBid] = useState<number | null>(null);
   const [previewTrump, setPreviewTrump] = useState<{ suit: string; direction: string } | null>(null);
+  const [showAllCards, setShowAllCards] = useState(false);
 
   // Strategy configuration state
   const familyStrategyText = STRATEGY_REGISTRY.find(s => s.game === 'bidwhist' && s.name === 'Family')?.text || null;
@@ -27,6 +41,10 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const [showStrategyModal, setShowStrategyModal] = useState(false);
 
   const game = gameRef.current;
+
+  // Draggable overlays
+  const lastBookDrag = useDraggable();
+  const booksDrag = useDraggable();
 
   const gameRules = `Bid Whist Rules:
 
@@ -312,6 +330,8 @@ Card Rankings:
         previewCardId={previewCardId}
         onBeforeAIMove={handleBeforeAIMove}
         playerDisplayNames={playerDisplayNames}
+        showAllCards={showAllCards}
+        onToggleShowAllCards={() => setShowAllCards(prev => !prev)}
         extraControls={
           <>
             {/* Deal + Strategy Config */}
@@ -337,14 +357,61 @@ Card Rankings:
                 </div>
               </div>
             )}
+            {/* Push dealt hand to URL */}
+            {gameState.gameStage !== 'deal' && game.getLastDealtDeckUrl() && (
+              <button
+                className="bg-gray-600 text-white px-3 py-1 text-sm rounded hover:bg-gray-500"
+                title="Update browser URL with this deal (for sharing/bookmarking)"
+                onClick={() => {
+                  const deckUrl = game.getLastDealtDeckUrl();
+                  window.history.replaceState(null, '', `#${deckUrl}`);
+                }}
+              >
+                Push to URL
+              </button>
+            )}
           </>
         }
       />
 
       {/* Last Book display (replaces Move History for Bid Whist) */}
       {gameState.gameStage === 'play' && (
-        <LastBook lastBook={lastBook} playerNames={playerDisplayNames} />
+        <LastBook
+          lastBook={lastBook}
+          playerNames={playerDisplayNames}
+          dragOffset={lastBookDrag.position}
+          onDragStart={lastBookDrag.handleMouseDown}
+          onTouchDragStart={lastBookDrag.handleTouchStart}
+        />
       )}
+
+      {/* Books indicator */}
+      {gameState.gameStage === 'play' && (() => {
+        const books = game.getBooksWon();
+        return (
+          <div
+            className="absolute top-8 right-4 bg-white bg-opacity-90 p-2 rounded border border-gray-400 shadow-md z-10"
+            style={{ transform: `translate(${booksDrag.position.x}px, ${booksDrag.position.y}px)` }}
+          >
+            <div
+              className="text-sm font-bold border-b border-gray-400 mb-1 pb-1"
+              style={{ cursor: 'grab' }}
+              onMouseDown={booksDrag.handleMouseDown}
+              onTouchStart={booksDrag.handleTouchStart}
+            >
+              Books
+            </div>
+            <div className="text-xs flex justify-between">
+              <span>S/N:</span>
+              <span className="ml-4 font-bold">{books[0]}</span>
+            </div>
+            <div className="text-xs flex justify-between">
+              <span>E/W:</span>
+              <span className="ml-4 font-bold">{books[1]}</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Bidding overlay */}
       {biddingState.biddingPhase && (
@@ -370,6 +437,28 @@ Card Rankings:
           onSelectTrump={handleTrumpSelection}
           previewTrump={previewTrump}
         />
+      )}
+
+      {/* Kitty display when Show All Cards is enabled during bidding/trump phases */}
+      {showAllCards && (biddingState.biddingPhase || game.isTrumpSelectionPhase()) && game.getKitty().length > 0 && (
+        <div className="absolute top-1/2 -translate-y-1/2 z-[51] pointer-events-none"
+          style={{ left: 'calc(50% + 230px)' }}>
+          <div className="bg-white bg-opacity-95 rounded-lg shadow-lg p-3 pointer-events-auto">
+            <div className="text-xs font-semibold text-gray-500 mb-2 text-center">Kitty</div>
+            <div className="grid grid-cols-2 gap-1">
+              {game.getKitty().map(card => (
+                <div
+                  key={card.id}
+                  className="w-10 h-14 bg-white border border-gray-300 rounded flex flex-col items-center justify-center text-xs font-bold shadow-sm"
+                  style={{ color: SUIT_COLORS[card.suit] || 'black' }}
+                >
+                  <span>{RANK_DISPLAY[card.rank] || card.rank}</span>
+                  <span className="text-base leading-none">{SUIT_SYMBOLS[card.suit]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Discard overlay */}

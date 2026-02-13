@@ -8,6 +8,7 @@ import PlayerArea from './PlayerArea.tsx';
 import GameTable from './GameTable.tsx';
 import TurnIndicator from './TurnIndicator.tsx';
 import LastBook from './LastBook.tsx';
+import { useDraggable } from '../hooks/useDraggable.ts';
 
 type ReplayPhase = 'loading' | 'bidding' | 'trumpSelection' | 'discarding' | 'play' | 'done';
 
@@ -50,6 +51,11 @@ const ReplayPage: React.FC = () => {
   const [trumpInfo, setTrumpInfo] = useState<string | null>(null);
   const [moveString, setMoveString] = useState('');
   const dealerRef = useRef<number>(0);
+
+  // Draggable overlays
+  const lastBookDrag = useDraggable();
+  const bidLogDrag = useDraggable();
+  const booksDrag = useDraggable();
 
   // Load config from sessionStorage and URL hash
   useEffect(() => {
@@ -455,14 +461,25 @@ const ReplayPage: React.FC = () => {
 
       {/* Last Book display */}
       {lastBook.length > 0 && (
-        <LastBook lastBook={lastBook} playerNames={PLAYER_NAMES} />
+        <LastBook
+          lastBook={lastBook}
+          playerNames={PLAYER_NAMES}
+          dragOffset={lastBookDrag.position}
+          onDragStart={lastBookDrag.handleMouseDown}
+          onTouchDragStart={lastBookDrag.handleTouchStart}
+        />
       )}
 
       {/* Bid Log Panel */}
       {(replayPhase === 'bidding' || bidLog.length > 0) && (
         <div className="absolute top-8 left-4 bg-white bg-opacity-90 p-3 rounded border border-gray-400 shadow-md z-10"
-          style={{ maxWidth: '220px', maxHeight: '300px', overflowY: 'auto' }}>
-          <div className="text-sm font-bold border-b border-gray-400 mb-2 pb-1">
+          style={{ maxWidth: '220px', maxHeight: '300px', overflowY: 'auto', transform: `translate(${bidLogDrag.position.x}px, ${bidLogDrag.position.y}px)` }}>
+          <div
+            className="text-sm font-bold border-b border-gray-400 mb-2 pb-1"
+            style={{ cursor: 'grab' }}
+            onMouseDown={bidLogDrag.handleMouseDown}
+            onTouchStart={bidLogDrag.handleTouchStart}
+          >
             Bid Log
           </div>
           {bidLog.length === 0 ? (
@@ -506,8 +523,16 @@ const ReplayPage: React.FC = () => {
 
       {/* Score display */}
       {replayPhase === 'play' && (
-        <div className="absolute top-8 right-4 bg-white bg-opacity-90 p-2 rounded border border-gray-400 shadow-md z-10">
-          <div className="text-sm font-bold border-b border-gray-400 mb-1 pb-1">Books</div>
+        <div className="absolute top-8 right-4 bg-white bg-opacity-90 p-2 rounded border border-gray-400 shadow-md z-10"
+          style={{ transform: `translate(${booksDrag.position.x}px, ${booksDrag.position.y}px)` }}>
+          <div
+            className="text-sm font-bold border-b border-gray-400 mb-1 pb-1"
+            style={{ cursor: 'grab' }}
+            onMouseDown={booksDrag.handleMouseDown}
+            onTouchStart={booksDrag.handleTouchStart}
+          >
+            Books
+          </div>
           <div className="text-xs flex justify-between">
             <span>S/N:</span>
             <span className="ml-4 font-bold">{gameState.players[0]?.score ?? 0}</span>
