@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { STRATEGY_REGISTRY, splitStrategySections, replaceStrategySection } from '../strategies/index.ts';
 import { BatchRunner } from '../simulation/BatchRunner.ts';
 import { ComparisonConfig, StrategyComparisonResult } from '../simulation/types.ts';
@@ -22,6 +22,196 @@ const textareaBase: React.CSSProperties = {
   resize: 'vertical',
   boxSizing: 'border-box',
 };
+
+// --- Diff types and algorithm ---
+
+type DiffLineType = 'same' | 'added' | 'removed' | 'changed' | 'comment' | 'blank';
+type DiffLine = { text: string; type: DiffLineType };
+type DiffResult = { left: DiffLine[]; right: DiffLine[] };
+
+const isComment = (line: string): boolean => line.trimStart().startsWith('#');
+
+function lcs(a: string[], b: string[]): [number, number][] {
+  const n = a.length, m = b.length;
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      if (a[i].trim() === b[j].trim()) {
+        dp[i][j] = dp[i + 1][j + 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+      }
+    }
+  }
+  const matches: [number, number][] = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[i].trim() === b[j].trim()) {
+      matches.push([i, j]);
+      i++; j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      i++;
+    } else {
+      j++;
+    }
+  }
+  return matches;
+}
+
+function computeDiff(textA: string, textB: string): DiffResult {
+  const linesA = textA.split('\n');
+  const linesB = textB.split('\n');
+
+  // Build index maps for non-comment, non-blank lines
+  const contentA: { idx: number; text: string }[] = [];
+  const contentB: { idx: number; text: string }[] = [];
+  linesA.forEach((line, i) => {
+    if (!isComment(line) && line.trim() !== '') contentA.push({ idx: i, text: line });
+  });
+  linesB.forEach((line, i) => {
+    if (!isComment(line) && line.trim() !== '') contentB.push({ idx: i, text: line });
+  });
+
+  const matches = lcs(contentA.map(c => c.text), contentB.map(c => c.text));
+
+  // Build sets of matched original indices
+  const matchedA = new Set<number>();
+  const matchedB = new Set<number>();
+  const matchPairs: [number, number][] = matches.map(([ci, cj]) => {
+    const origA = contentA[ci].idx;
+    const origB = contentB[cj].idx;
+    matchedA.add(origA);
+    matchedB.add(origB);
+    return [origA, origB];
+  });
+
+  // Walk both arrays building aligned output
+  const left: DiffLine[] = [];
+  const right: DiffLine[] = [];
+  let ai = 0, bi = 0, mi = 0;
+
+  while (ai < linesA.length || bi < linesB.length) {
+    // If we're at a match pair, emit it
+    if (mi < matchPairs.length && ai === matchPairs[mi][0] && bi === matchPairs[mi][1]) {
+      left.push({ text: linesA[ai], type: 'same' });
+      right.push({ text: linesB[bi], type: 'same' });
+      ai++; bi++; mi++;
+      continue;
+    }
+
+    // Emit unmatched lines before the next match
+    const nextMatchA = mi < matchPairs.length ? matchPairs[mi][0] : linesA.length;
+    const nextMatchB = mi < matchPairs.length ? matchPairs[mi][1] : linesB.length;
+
+    const unmatchedA: string[] = [];
+    const unmatchedB: string[] = [];
+    while (ai < nextMatchA) { unmatchedA.push(linesA[ai]); ai++; }
+    while (bi < nextMatchB) { unmatchedB.push(linesB[bi]); bi++; }
+
+    // Pair up changed lines, then emit remaining as added/removed
+    const pairCount = Math.min(unmatchedA.length, unmatchedB.length);
+    for (let k = 0; k < pairCount; k++) {
+      const lineA = unmatchedA[k];
+      const lineB = unmatchedB[k];
+      const typeA = isComment(lineA) ? 'comment' : lineA.trim() === '' ? 'blank' : 'changed';
+      const typeB = isComment(lineB) ? 'comment' : lineB.trim() === '' ? 'blank' : 'changed';
+      // If both are comments or blanks, keep them as-is
+      if ((typeA === 'comment' || typeA === 'blank') && (typeB === 'comment' || typeB === 'blank')) {
+        left.push({ text: lineA, type: typeA });
+        right.push({ text: lineB, type: typeB });
+      } else {
+        left.push({ text: lineA, type: isComment(lineA) ? 'comment' : 'changed' });
+        right.push({ text: lineB, type: isComment(lineB) ? 'comment' : 'changed' });
+      }
+    }
+    for (let k = pairCount; k < unmatchedA.length; k++) {
+      const line = unmatchedA[k];
+      left.push({ text: line, type: isComment(line) ? 'comment' : line.trim() === '' ? 'blank' : 'removed' });
+      right.push({ text: '', type: 'blank' });
+    }
+    for (let k = pairCount; k < unmatchedB.length; k++) {
+      const line = unmatchedB[k];
+      left.push({ text: '', type: 'blank' });
+      right.push({ text: line, type: isComment(line) ? 'comment' : line.trim() === '' ? 'blank' : 'added' });
+    }
+  }
+
+  return { left, right };
+}
+
+// --- Diff display ---
+
+const DIFF_BG: Record<DiffLineType, string> = {
+  same: 'transparent',
+  added: 'rgba(34, 197, 94, 0.15)',
+  removed: 'rgba(239, 68, 68, 0.15)',
+  changed: 'rgba(234, 179, 8, 0.12)',
+  comment: 'transparent',
+  blank: 'rgba(75, 85, 99, 0.15)',
+};
+
+const DIFF_TEXT_COLOR: Record<DiffLineType, string> = {
+  same: '#e5e7eb',
+  added: '#4ade80',
+  removed: '#f87171',
+  changed: '#fbbf24',
+  comment: '#6b7280',
+  blank: 'transparent',
+};
+
+const DIFF_BORDER_COLOR: Record<string, string> = {
+  added: '#4ade80',
+  removed: '#f87171',
+  changed: '#fbbf24',
+};
+
+const DIFF_LINE_HEIGHT = 20;
+
+const DiffPane: React.FC<{
+  lines: DiffLine[];
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  onScroll: () => void;
+}> = ({ lines, scrollRef, onScroll }) => (
+  <div
+    ref={scrollRef}
+    onScroll={onScroll}
+    style={{
+      flex: 1,
+      minWidth: 0,
+      overflowY: 'auto',
+      overflowX: 'auto',
+      height: `${14 * DIFF_LINE_HEIGHT + 16}px`,
+      padding: '8px',
+      borderRadius: '4px',
+      border: '1px solid #4b5563',
+      backgroundColor: '#374151',
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      boxSizing: 'border-box',
+      whiteSpace: 'pre',
+    }}
+  >
+    {lines.map((line, i) => (
+      <div
+        key={i}
+        style={{
+          height: `${DIFF_LINE_HEIGHT}px`,
+          lineHeight: `${DIFF_LINE_HEIGHT}px`,
+          backgroundColor: DIFF_BG[line.type],
+          color: DIFF_TEXT_COLOR[line.type],
+          borderLeft: DIFF_BORDER_COLOR[line.type]
+            ? `3px solid ${DIFF_BORDER_COLOR[line.type]}`
+            : '3px solid transparent',
+          paddingLeft: '6px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {line.text || '\u00A0'}
+      </div>
+    ))}
+  </div>
+);
 
 const StrategyComparison: React.FC = () => {
   const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'round-robin' | 'ab-test'>('by-team');
@@ -51,6 +241,29 @@ const StrategyComparison: React.FC = () => {
 
   const runnerRef = useRef<BatchRunner | null>(null);
 
+  // Diff view state
+  const [diffEnabled, setDiffEnabled] = useState(false);
+  const diffLeftRef = useRef<HTMLDivElement | null>(null);
+  const diffRightRef = useRef<HTMLDivElement | null>(null);
+  const isSyncingScroll = useRef(false);
+
+  const handleLeftScroll = () => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (diffLeftRef.current && diffRightRef.current) {
+      diffRightRef.current.scrollTop = diffLeftRef.current.scrollTop;
+    }
+    isSyncingScroll.current = false;
+  };
+  const handleRightScroll = () => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (diffLeftRef.current && diffRightRef.current) {
+      diffLeftRef.current.scrollTop = diffRightRef.current.scrollTop;
+    }
+    isSyncingScroll.current = false;
+  };
+
   const isCustom0 = team0Selection === CUSTOM_VALUE;
   const isCustom1 = team1Selection === CUSTOM_VALUE;
 
@@ -68,6 +281,14 @@ const StrategyComparison: React.FC = () => {
     const idx = Number(selection);
     return bidWhistStrategies[idx]?.text ?? '';
   };
+
+  const diffResult = useMemo<DiffResult | null>(() => {
+    if (!diffEnabled || assignmentMode !== 'by-team') return null;
+    const textA = getDisplayText(team0Selection, custom0Text);
+    const textB = getDisplayText(team1Selection, custom1Text);
+    return computeDiff(textA, textB);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diffEnabled, assignmentMode, team0Selection, team1Selection, custom0Text, custom1Text]);
 
   const toggleRrStrategy = (idx: number) => {
     setRrSelected(prev => {
@@ -250,79 +471,113 @@ const StrategyComparison: React.FC = () => {
 
         {/* By-team: two strategy slots side-by-side */}
         {assignmentMode === 'by-team' && (
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-            {/* Slot 0 */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-                Team 0 (You & North)
-              </label>
-              <select
-                value={team0Selection}
-                onChange={(e) => setTeam0Selection(e.target.value)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '4px',
-                  border: '1px solid #4b5563',
-                  backgroundColor: '#374151',
-                  color: '#e5e7eb',
-                  width: '100%',
-                  marginBottom: '8px',
-                }}
-              >
-                {bidWhistStrategies.map((s, i) => (
-                  <option key={i} value={String(i)}>{s.name}</option>
-                ))}
-                <option value={CUSTOM_VALUE}>Custom</option>
-              </select>
-              <textarea
-                value={getDisplayText(team0Selection, custom0Text)}
-                onChange={(e) => { if (isCustom0) setCustom0Text(e.target.value); }}
-                readOnly={!isCustom0}
-                rows={14}
-                style={{
-                  ...textareaBase,
-                  opacity: isCustom0 ? 1 : 0.7,
-                  cursor: isCustom0 ? 'text' : 'default',
-                }}
-                placeholder={isCustom0 ? 'Paste .cstrat strategy here...' : ''}
-              />
+          <div style={{ marginBottom: '16px' }}>
+            {/* Dropdowns row */}
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
+                  Team 0 (You & North)
+                </label>
+                <select
+                  value={team0Selection}
+                  onChange={(e) => setTeam0Selection(e.target.value)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    border: '1px solid #4b5563',
+                    backgroundColor: '#374151',
+                    color: '#e5e7eb',
+                    width: '100%',
+                  }}
+                >
+                  {bidWhistStrategies.map((s, i) => (
+                    <option key={i} value={String(i)}>{s.name}</option>
+                  ))}
+                  <option value={CUSTOM_VALUE}>Custom</option>
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
+                  Team 1 (East & West)
+                </label>
+                <select
+                  value={team1Selection}
+                  onChange={(e) => setTeam1Selection(e.target.value)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    border: '1px solid #4b5563',
+                    backgroundColor: '#374151',
+                    color: '#e5e7eb',
+                    width: '100%',
+                  }}
+                >
+                  {bidWhistStrategies.map((s, i) => (
+                    <option key={i} value={String(i)}>{s.name}</option>
+                  ))}
+                  <option value={CUSTOM_VALUE}>Custom</option>
+                </select>
+              </div>
             </div>
 
-            {/* Slot 1 */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>
-                Team 1 (East & West)
-              </label>
-              <select
-                value={team1Selection}
-                onChange={(e) => setTeam1Selection(e.target.value)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '4px',
-                  border: '1px solid #4b5563',
-                  backgroundColor: '#374151',
-                  color: '#e5e7eb',
-                  width: '100%',
-                  marginBottom: '8px',
-                }}
-              >
-                {bidWhistStrategies.map((s, i) => (
-                  <option key={i} value={String(i)}>{s.name}</option>
-                ))}
-                <option value={CUSTOM_VALUE}>Custom</option>
-              </select>
-              <textarea
-                value={getDisplayText(team1Selection, custom1Text)}
-                onChange={(e) => { if (isCustom1) setCustom1Text(e.target.value); }}
-                readOnly={!isCustom1}
-                rows={14}
-                style={{
-                  ...textareaBase,
-                  opacity: isCustom1 ? 1 : 0.7,
-                  cursor: isCustom1 ? 'text' : 'default',
-                }}
-                placeholder={isCustom1 ? 'Paste .cstrat strategy here...' : ''}
+            {/* Diff checkbox */}
+            <label style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginBottom: '8px',
+              fontSize: '13px',
+              cursor: 'pointer',
+              color: '#9ca3af',
+            }}>
+              <input
+                type="checkbox"
+                checked={diffEnabled}
+                onChange={() => setDiffEnabled(d => !d)}
+                style={{ accentColor: '#3b82f6' }}
               />
+              Diff
+            </label>
+
+            {/* Content panes */}
+            <div style={{ display: 'flex', gap: '16px' }}>
+              {diffEnabled && diffResult ? (
+                <>
+                  <DiffPane lines={diffResult.left} scrollRef={diffLeftRef} onScroll={handleLeftScroll} />
+                  <DiffPane lines={diffResult.right} scrollRef={diffRightRef} onScroll={handleRightScroll} />
+                </>
+              ) : (
+                <>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <textarea
+                      value={getDisplayText(team0Selection, custom0Text)}
+                      onChange={(e) => { if (isCustom0) setCustom0Text(e.target.value); }}
+                      readOnly={!isCustom0}
+                      rows={14}
+                      style={{
+                        ...textareaBase,
+                        opacity: isCustom0 ? 1 : 0.7,
+                        cursor: isCustom0 ? 'text' : 'default',
+                      }}
+                      placeholder={isCustom0 ? 'Paste .cstrat strategy here...' : ''}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <textarea
+                      value={getDisplayText(team1Selection, custom1Text)}
+                      onChange={(e) => { if (isCustom1) setCustom1Text(e.target.value); }}
+                      readOnly={!isCustom1}
+                      rows={14}
+                      style={{
+                        ...textareaBase,
+                        opacity: isCustom1 ? 1 : 0.7,
+                        cursor: isCustom1 ? 'text' : 'default',
+                      }}
+                      placeholder={isCustom1 ? 'Paste .cstrat strategy here...' : ''}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
