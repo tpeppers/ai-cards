@@ -28,6 +28,7 @@ const textareaBase: React.CSSProperties = {
 type DiffLineType = 'same' | 'added' | 'removed' | 'changed' | 'comment' | 'blank';
 type DiffLine = { text: string; type: DiffLineType };
 type DiffResult = { left: DiffLine[]; right: DiffLine[] };
+type DiffHunk = { id: number; start: number; length: number };
 
 const isComment = (line: string): boolean => line.trimStart().startsWith('#');
 
@@ -139,6 +140,60 @@ function computeDiff(textA: string, textB: string): DiffResult {
   return { left, right };
 }
 
+function isHunkLine(diff: DiffResult, i: number): boolean {
+  const l = diff.left[i];
+  const r = diff.right[i];
+  if (l.type === 'same' && r.type === 'same') return false;
+  if (l.type === 'blank' && r.type === 'blank') return false;
+  if (l.type === 'comment' && r.type === 'comment' && l.text.trim() === r.text.trim()) return false;
+  return l.type !== 'same' || r.type !== 'same';
+}
+
+function identifyHunks(diff: DiffResult): DiffHunk[] {
+  const hunks: DiffHunk[] = [];
+  let id = 0;
+  let i = 0;
+  while (i < diff.left.length) {
+    if (isHunkLine(diff, i)) {
+      const start = i;
+      while (i < diff.left.length && isHunkLine(diff, i)) i++;
+      hunks.push({ id: id++, start, length: i - start });
+    } else {
+      i++;
+    }
+  }
+  return hunks;
+}
+
+function buildEffectiveText(diff: DiffResult, hunks: DiffHunk[], disabledHunkIds: Set<number>): string {
+  const hunkLineMap = new Map<number, DiffHunk>();
+  for (const h of hunks) {
+    for (let i = h.start; i < h.start + h.length; i++) {
+      hunkLineMap.set(i, h);
+    }
+  }
+
+  const lines: string[] = [];
+  for (let i = 0; i < diff.left.length; i++) {
+    const hunk = hunkLineMap.get(i);
+    if (hunk && disabledHunkIds.has(hunk.id)) {
+      // Disabled hunk: take left-side text (original), skip blank fillers
+      if (diff.left[i].type !== 'blank' && diff.left[i].text !== '') {
+        lines.push(diff.left[i].text);
+      }
+    } else {
+      // Enabled hunk or non-hunk: take right-side text, skip blank fillers
+      if (diff.right[i].type !== 'blank' && diff.right[i].text !== '') {
+        lines.push(diff.right[i].text);
+      } else if (diff.right[i].type === 'same' || (!hunk && diff.left[i].type === 'same')) {
+        // Same lines: take the text
+        lines.push(diff.right[i].text);
+      }
+    }
+  }
+  return lines.join('\n');
+}
+
 // --- Diff display ---
 
 const DIFF_BG: Record<DiffLineType, string> = {
@@ -213,6 +268,120 @@ const DiffPane: React.FC<{
   </div>
 );
 
+const ABDiffPane: React.FC<{
+  lines: DiffLine[];
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  onScroll: () => void;
+  side: 'left' | 'right';
+  hunks: DiffHunk[];
+  disabledHunkIds: Set<number>;
+  onToggleHunk?: (hunkId: number) => void;
+}> = ({ lines, scrollRef, onScroll, side, hunks, disabledHunkIds, onToggleHunk }) => {
+  const lineHunkMap = useMemo(() => {
+    const map = new Map<number, DiffHunk>();
+    for (const h of hunks) {
+      for (let i = h.start; i < h.start + h.length; i++) {
+        map.set(i, h);
+      }
+    }
+    return map;
+  }, [hunks]);
+
+  const hunkFirstLines = useMemo(() => {
+    const set = new Set<number>();
+    for (const h of hunks) set.add(h.start);
+    return set;
+  }, [hunks]);
+
+  return (
+    <div
+      ref={scrollRef}
+      onScroll={onScroll}
+      style={{
+        flex: 1,
+        minWidth: 0,
+        overflowY: 'auto',
+        overflowX: 'auto',
+        height: `${14 * DIFF_LINE_HEIGHT + 16}px`,
+        padding: '8px',
+        borderRadius: '4px',
+        border: '1px solid #4b5563',
+        backgroundColor: '#374151',
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        boxSizing: 'border-box',
+        whiteSpace: 'pre',
+      }}
+    >
+      {lines.map((line, i) => {
+        const hunk = lineHunkMap.get(i);
+        const isDisabled = hunk != null && disabledHunkIds.has(hunk.id);
+        const isFirstOfHunk = hunkFirstLines.has(i);
+
+        let bg = DIFF_BG[line.type];
+        let color = DIFF_TEXT_COLOR[line.type];
+        let borderLeft = DIFF_BORDER_COLOR[line.type]
+          ? `3px solid ${DIFF_BORDER_COLOR[line.type]}`
+          : '3px solid transparent';
+        let textDecoration = 'none';
+        let opacity = 1;
+
+        if (isDisabled) {
+          if (side === 'right') {
+            bg = 'transparent';
+            color = '#6b7280';
+            borderLeft = '3px solid transparent';
+            textDecoration = 'line-through';
+            opacity = 0.5;
+          } else {
+            // Left side disabled hunk: render as "same" (this is the version being kept)
+            bg = 'transparent';
+            color = '#e5e7eb';
+            borderLeft = '3px solid transparent';
+          }
+        }
+
+        return (
+          <div
+            key={i}
+            style={{
+              height: `${DIFF_LINE_HEIGHT}px`,
+              lineHeight: `${DIFF_LINE_HEIGHT}px`,
+              backgroundColor: bg,
+              color,
+              borderLeft,
+              paddingLeft: side === 'right' && hunk != null ? '2px' : '6px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'flex',
+              alignItems: 'center',
+              textDecoration,
+              opacity,
+            }}
+          >
+            {side === 'right' && hunk != null && isFirstOfHunk && onToggleHunk && (
+              <input
+                type="checkbox"
+                checked={!isDisabled}
+                onChange={() => onToggleHunk(hunk.id)}
+                style={{
+                  accentColor: '#3b82f6',
+                  marginRight: '4px',
+                  flexShrink: 0,
+                  cursor: 'pointer',
+                }}
+              />
+            )}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {line.text || '\u00A0'}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const StrategyComparison: React.FC = () => {
   const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'round-robin' | 'ab-test'>('by-team');
   const [team0Selection, setTeam0Selection] = useState('0');
@@ -264,6 +433,30 @@ const StrategyComparison: React.FC = () => {
     isSyncingScroll.current = false;
   };
 
+  // A/B Diff view state
+  const [abDiffEnabled, setAbDiffEnabled] = useState(false);
+  const [disabledHunkIds, setDisabledHunkIds] = useState<Set<number>>(new Set());
+  const abDiffLeftRef = useRef<HTMLDivElement | null>(null);
+  const abDiffRightRef = useRef<HTMLDivElement | null>(null);
+  const isAbSyncingScroll = useRef(false);
+
+  const handleAbLeftScroll = () => {
+    if (isAbSyncingScroll.current) return;
+    isAbSyncingScroll.current = true;
+    if (abDiffLeftRef.current && abDiffRightRef.current) {
+      abDiffRightRef.current.scrollTop = abDiffLeftRef.current.scrollTop;
+    }
+    isAbSyncingScroll.current = false;
+  };
+  const handleAbRightScroll = () => {
+    if (isAbSyncingScroll.current) return;
+    isAbSyncingScroll.current = true;
+    if (abDiffLeftRef.current && abDiffRightRef.current) {
+      abDiffLeftRef.current.scrollTop = abDiffRightRef.current.scrollTop;
+    }
+    isAbSyncingScroll.current = false;
+  };
+
   const isCustom0 = team0Selection === CUSTOM_VALUE;
   const isCustom1 = team1Selection === CUSTOM_VALUE;
 
@@ -305,12 +498,40 @@ const StrategyComparison: React.FC = () => {
   const abSections = splitStrategySections(abBaseText);
   const abOriginalSectionText = abSections[abSection];
 
+  const abDiffResult = useMemo<DiffResult | null>(() => {
+    if (!abDiffEnabled || assignmentMode !== 'ab-test') return null;
+    return computeDiff(abOriginalSectionText, abSectionText);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abDiffEnabled, assignmentMode, abOriginalSectionText, abSectionText]);
+
+  const abHunks = useMemo<DiffHunk[]>(() => {
+    if (!abDiffResult) return [];
+    return identifyHunks(abDiffResult);
+  }, [abDiffResult]);
+
+  const handleAbDiffToggle = () => {
+    setAbDiffEnabled(d => {
+      if (!d) setDisabledHunkIds(new Set());
+      return !d;
+    });
+  };
+
+  const toggleHunk = (hunkId: number) => {
+    setDisabledHunkIds(prev => {
+      const next = new Set(prev);
+      if (next.has(hunkId)) next.delete(hunkId);
+      else next.add(hunkId);
+      return next;
+    });
+  };
+
   const handleAbBaseChange = (value: string) => {
     setAbBaseSelection(value);
     // Reset override source to base strategy and load its section
     setAbOverrideSource(value);
     const sections = splitStrategySections(bidWhistStrategies[Number(value)].text);
     setAbSectionText(sections[abSection]);
+    setDisabledHunkIds(new Set());
   };
 
   const handleAbSectionChange = (section: 'play' | 'bid' | 'trump' | 'discard') => {
@@ -319,6 +540,7 @@ const StrategyComparison: React.FC = () => {
     const sourceIdx = abOverrideSource === 'manual' ? Number(abBaseSelection) : Number(abOverrideSource);
     const sections = splitStrategySections(bidWhistStrategies[sourceIdx].text);
     setAbSectionText(sections[section]);
+    setDisabledHunkIds(new Set());
   };
 
   const handleAbOverrideSourceChange = (value: string) => {
@@ -327,6 +549,7 @@ const StrategyComparison: React.FC = () => {
       const sections = splitStrategySections(bidWhistStrategies[Number(value)].text);
       setAbSectionText(sections[abSection]);
     }
+    setDisabledHunkIds(new Set());
   };
 
   const handleRun = async () => {
@@ -338,7 +561,15 @@ const StrategyComparison: React.FC = () => {
 
     if (assignmentMode === 'ab-test') {
       const baseEntry = bidWhistStrategies[Number(abBaseSelection)];
-      const modifiedText = replaceStrategySection(baseEntry.text, abSection, abSectionText);
+      // When diff is on with some hunks disabled, build effective text
+      let effectiveSectionText = abSectionText;
+      let hunkAnnotation = '';
+      if (abDiffEnabled && disabledHunkIds.size > 0 && abDiffResult) {
+        effectiveSectionText = buildEffectiveText(abDiffResult, abHunks, disabledHunkIds);
+        const enabledCount = abHunks.length - disabledHunkIds.size;
+        hunkAnnotation = ` [${enabledCount}/${abHunks.length} hunks]`;
+      }
+      const modifiedText = replaceStrategySection(baseEntry.text, abSection, effectiveSectionText);
       const sourceEntry = abOverrideSource !== 'manual' ? bidWhistStrategies[Number(abOverrideSource)] : null;
       const modLabel = sourceEntry && sourceEntry.name !== baseEntry.name
         ? `${sourceEntry.name} ${abSection}`
@@ -346,7 +577,7 @@ const StrategyComparison: React.FC = () => {
       config = {
         strategies: [
           { name: baseEntry.name, strategyText: baseEntry.text },
-          { name: `${baseEntry.name} (${modLabel})`, strategyText: modifiedText },
+          { name: `${baseEntry.name} (${modLabel}${hunkAnnotation})`, strategyText: modifiedText },
         ],
         assignmentMode: 'by-team',
         numGames: effectiveNumGames,
@@ -737,28 +968,76 @@ const StrategyComparison: React.FC = () => {
               </div>
             </div>
 
-            {/* Side-by-side textareas */}
+            {/* Diff checkbox */}
+            <label style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginBottom: '8px',
+              fontSize: '13px',
+              cursor: 'pointer',
+              color: '#9ca3af',
+            }}>
+              <input
+                type="checkbox"
+                checked={abDiffEnabled}
+                onChange={handleAbDiffToggle}
+                style={{ accentColor: '#3b82f6' }}
+              />
+              Diff
+              {abDiffEnabled && abHunks.length > 0 && (
+                <span style={{ color: '#6b7280', fontSize: '12px' }}>
+                  ({abHunks.length} hunk{abHunks.length !== 1 ? 's' : ''}{disabledHunkIds.size > 0 ? `, ${disabledHunkIds.size} disabled` : ''})
+                </span>
+              )}
+            </label>
+
+            {/* Content panes */}
             <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <textarea
-                  value={abOriginalSectionText}
-                  readOnly
-                  rows={14}
-                  style={{
-                    ...textareaBase,
-                    opacity: 0.7,
-                    cursor: 'default',
-                  }}
-                />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <textarea
-                  value={abSectionText}
-                  onChange={(e) => { setAbSectionText(e.target.value); setAbOverrideSource('manual'); }}
-                  rows={14}
-                  style={textareaBase}
-                />
-              </div>
+              {abDiffEnabled && abDiffResult ? (
+                <>
+                  <ABDiffPane
+                    lines={abDiffResult.left}
+                    scrollRef={abDiffLeftRef}
+                    onScroll={handleAbLeftScroll}
+                    side="left"
+                    hunks={abHunks}
+                    disabledHunkIds={disabledHunkIds}
+                  />
+                  <ABDiffPane
+                    lines={abDiffResult.right}
+                    scrollRef={abDiffRightRef}
+                    onScroll={handleAbRightScroll}
+                    side="right"
+                    hunks={abHunks}
+                    disabledHunkIds={disabledHunkIds}
+                    onToggleHunk={toggleHunk}
+                  />
+                </>
+              ) : (
+                <>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <textarea
+                      value={abOriginalSectionText}
+                      readOnly
+                      rows={14}
+                      style={{
+                        ...textareaBase,
+                        opacity: 0.7,
+                        cursor: 'default',
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <textarea
+                      value={abSectionText}
+                      onChange={(e) => { setAbSectionText(e.target.value); setAbOverrideSource('manual'); }}
+                      rows={14}
+                      style={textareaBase}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
