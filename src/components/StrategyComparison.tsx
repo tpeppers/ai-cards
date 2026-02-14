@@ -28,7 +28,7 @@ const textareaBase: React.CSSProperties = {
 type DiffLineType = 'same' | 'added' | 'removed' | 'changed' | 'comment' | 'blank';
 type DiffLine = { text: string; type: DiffLineType };
 type DiffResult = { left: DiffLine[]; right: DiffLine[] };
-type DiffHunk = { id: number; start: number; length: number };
+type DiffHunk = { id: number; start: number; length: number; checkboxSide: 'left' | 'right' };
 
 const isComment = (line: string): boolean => line.trimStart().startsWith('#');
 
@@ -157,7 +157,24 @@ function identifyHunks(diff: DiffResult): DiffHunk[] {
     if (isHunkLine(diff, i)) {
       const start = i;
       while (i < diff.left.length && isHunkLine(diff, i)) i++;
-      hunks.push({ id: id++, start, length: i - start });
+      const length = i - start;
+      // Check if this hunk has any real (non-comment, non-blank) changes
+      let hasRealChange = false;
+      let rightAllBlank = true;
+      for (let j = start; j < start + length; j++) {
+        const l = diff.left[j];
+        const r = diff.right[j];
+        // Real change = at least one side is not comment/blank
+        if (!((l.type === 'comment' || l.type === 'blank') && (r.type === 'comment' || r.type === 'blank'))) {
+          hasRealChange = true;
+        }
+        if (r.type !== 'blank') {
+          rightAllBlank = false;
+        }
+      }
+      if (hasRealChange) {
+        hunks.push({ id: id++, start, length, checkboxSide: rightAllBlank ? 'left' : 'right' });
+      }
     } else {
       i++;
     }
@@ -288,9 +305,9 @@ const ABDiffPane: React.FC<{
   }, [hunks]);
 
   const hunkFirstLines = useMemo(() => {
-    const set = new Set<number>();
-    for (const h of hunks) set.add(h.start);
-    return set;
+    const map = new Map<number, DiffHunk>();
+    for (const h of hunks) map.set(h.start, h);
+    return map;
   }, [hunks]);
 
   return (
@@ -316,7 +333,8 @@ const ABDiffPane: React.FC<{
       {lines.map((line, i) => {
         const hunk = lineHunkMap.get(i);
         const isDisabled = hunk != null && disabledHunkIds.has(hunk.id);
-        const isFirstOfHunk = hunkFirstLines.has(i);
+        const firstLineHunk = hunkFirstLines.get(i);
+        const showCheckbox = firstLineHunk != null && side === firstLineHunk.checkboxSide && onToggleHunk;
 
         let bg = DIFF_BG[line.type];
         let color = DIFF_TEXT_COLOR[line.type];
@@ -327,19 +345,22 @@ const ABDiffPane: React.FC<{
         let opacity = 1;
 
         if (isDisabled) {
-          if (side === 'right') {
+          // The side with the checkbox shows dimmed/strikethrough (the version being excluded)
+          // The other side renders as "same" (the version being kept)
+          if (hunk && side === hunk.checkboxSide) {
             bg = 'transparent';
             color = '#6b7280';
             borderLeft = '3px solid transparent';
             textDecoration = 'line-through';
             opacity = 0.5;
           } else {
-            // Left side disabled hunk: render as "same" (this is the version being kept)
             bg = 'transparent';
             color = '#e5e7eb';
             borderLeft = '3px solid transparent';
           }
         }
+
+        const hasCheckboxInHunk = hunk != null && side === hunk.checkboxSide;
 
         return (
           <div
@@ -350,7 +371,7 @@ const ABDiffPane: React.FC<{
               backgroundColor: bg,
               color,
               borderLeft,
-              paddingLeft: side === 'right' && hunk != null ? '2px' : '6px',
+              paddingLeft: hasCheckboxInHunk ? '2px' : '6px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               display: 'flex',
@@ -359,11 +380,11 @@ const ABDiffPane: React.FC<{
               opacity,
             }}
           >
-            {side === 'right' && hunk != null && isFirstOfHunk && onToggleHunk && (
+            {showCheckbox && (
               <input
                 type="checkbox"
                 checked={!isDisabled}
-                onChange={() => onToggleHunk(hunk.id)}
+                onChange={() => onToggleHunk(firstLineHunk.id)}
                 style={{
                   accentColor: '#3b82f6',
                   marginRight: '4px',
@@ -1003,6 +1024,7 @@ const StrategyComparison: React.FC = () => {
                     side="left"
                     hunks={abHunks}
                     disabledHunkIds={disabledHunkIds}
+                    onToggleHunk={toggleHunk}
                   />
                   <ABDiffPane
                     lines={abDiffResult.right}
