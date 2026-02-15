@@ -10,7 +10,13 @@ import TurnIndicator from './TurnIndicator.tsx';
 import LastBook from './LastBook.tsx';
 import { useDraggable } from '../hooks/useDraggable.ts';
 
-type ReplayPhase = 'loading' | 'bidding' | 'trumpSelection' | 'discarding' | 'play' | 'done';
+type ReplayPhase = 'loading' | 'bidding' | 'trumpSelection' | 'discarding' | 'play' | 'whistingAnim' | 'done';
+
+const WHISTING_ANIMATIONS = [
+  '/animations/win_cascade.webp',
+  '/animations/win_explosion.webp',
+  '/animations/win_tornado.webp',
+];
 
 interface ReplayConfig {
   deckUrl: string;
@@ -61,6 +67,7 @@ const ReplayPage: React.FC = () => {
   const [moveString, setMoveString] = useState('');
   const [nextCardPreview, setNextCardPreview] = useState<string | null>(null);
   const [showCards, setShowCards] = useState(true);
+  const [whistingAnimation, setWhistingAnimation] = useState<string | null>(null);
   const dealerRef = useRef<number>(0);
 
   // Draggable overlays
@@ -247,7 +254,7 @@ const ReplayPage: React.FC = () => {
   // Execute one step
   const executeStep = useCallback(() => {
     const game = gameRef.current;
-    if (!game || replayPhase === 'loading' || replayPhase === 'done') return;
+    if (!game || replayPhase === 'loading' || replayPhase === 'done' || replayPhase === 'whistingAnim') return;
     if (trickPause) {
       setTrickPause(false);
       return;
@@ -350,8 +357,21 @@ const ReplayPage: React.FC = () => {
 
       // Check if hand/game is done
       if (newGs.gameStage === 'scoring') {
-        setReplayPhase('done');
-        setNextCardPreview(null);
+        if (game.getWhistingWinner() >= 0) {
+          // Whisting: show animation before done
+          const anim = WHISTING_ANIMATIONS[Math.floor(Math.random() * WHISTING_ANIMATIONS.length)];
+          setWhistingAnimation(anim);
+          setReplayPhase('whistingAnim');
+          setIsPlaying(false);
+          setNextCardPreview(null);
+          setTimeout(() => {
+            setWhistingAnimation(null);
+            setReplayPhase('done');
+          }, 5000);
+        } else {
+          setReplayPhase('done');
+          setNextCardPreview(null);
+        }
         return;
       }
 
@@ -369,7 +389,7 @@ const ReplayPage: React.FC = () => {
 
   // Auto-play timer
   useEffect(() => {
-    if (!isPlaying || replayPhase === 'done' || replayPhase === 'loading') return;
+    if (!isPlaying || replayPhase === 'done' || replayPhase === 'loading' || replayPhase === 'whistingAnim') return;
 
     const delay = trickPause ? speed * 1.5 : speed;
     const timer = setTimeout(() => {
@@ -599,6 +619,26 @@ const ReplayPage: React.FC = () => {
           <div className="text-xs flex justify-between">
             <span>E/W:</span>
             <span className="ml-4 font-bold">{booksWon[1]}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Whisting animation overlay */}
+      {whistingAnimation && (
+        <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100]">
+          <div className="text-center">
+            <img
+              src={whistingAnimation}
+              alt="Whisting celebration"
+              style={{ maxWidth: '80vw', maxHeight: '70vh', borderRadius: '12px' }}
+            />
+            <div style={{
+              fontSize: '48px', fontWeight: 'bold', color: '#fbbf24',
+              textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
+              marginTop: '16px',
+            }}>
+              WHISTED!
+            </div>
           </div>
         </div>
       )}

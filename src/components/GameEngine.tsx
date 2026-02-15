@@ -38,6 +38,7 @@ interface GameEngineProps {
   extraControls?: React.ReactNode;
   showAllCards?: boolean;
   onToggleShowAllCards?: () => void;
+  hideGameOver?: boolean;
 }
 
 // Global settings
@@ -61,7 +62,8 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   playerDisplayNames,
   extraControls,
   showAllCards: showAllCardsProp,
-  onToggleShowAllCards
+  onToggleShowAllCards,
+  hideGameOver = false,
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
   const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
@@ -433,7 +435,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       {!hideMoveHistory && <MoveHistory moves={moveHistory} />}
       
       {/* Game over dialog */}
-      {gameState.gameOver && gameState.winner && (
+      {gameState.gameOver && gameState.winner && !hideGameOver && (
         <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg max-w-md text-center border-4 border-blue-800">
             <h2 className="text-2xl font-bold mb-4">Game Over!</h2>
