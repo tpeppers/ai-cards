@@ -61,6 +61,13 @@ const Card: React.FC<CardProps> = ({
   };
 
   const getColor = (suit: string) => {
+    const stored = localStorage.getItem('suitColors');
+    if (stored) {
+      try {
+        const colors = JSON.parse(stored);
+        if (colors[suit]) return colors[suit];
+      } catch {}
+    }
     if (suit === 'joker') return isBigJoker ? 'red' : 'black';
     return suit === 'hearts' || suit === 'diamonds' ? 'red' : 'black';
   };

@@ -1,16 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 interface HomePageProps {}
-
-const cardBackings = [
-  { id: 'classic', name: 'Classic Green', pattern: 'repeating-linear-gradient(45deg, #006400, #006400 5px, #005300 5px, #005300 10px)' },
-  { id: 'blue', name: 'Royal Blue', pattern: 'repeating-linear-gradient(45deg, #1a237e, #1a237e 5px, #0d1442 5px, #0d1442 10px)' },
-  { id: 'red', name: 'Casino Red', pattern: 'repeating-linear-gradient(45deg, #8b0000, #8b0000 5px, #5c0000 5px, #5c0000 10px)' },
-  { id: 'purple', name: 'Royal Purple', pattern: 'repeating-linear-gradient(45deg, #4a148c, #4a148c 5px, #2a0a52 5px, #2a0a52 10px)' },
-  { id: 'gold', name: 'Gold Pattern', pattern: 'repeating-linear-gradient(45deg, #b8860b, #b8860b 5px, #8b6508 5px, #8b6508 10px)' },
-  { id: 'teal', name: 'Ocean Teal', pattern: 'repeating-linear-gradient(45deg, #00695c, #00695c 5px, #004d40 5px, #004d40 10px)' },
-];
 
 const games = [
   { id: 'hearts', name: 'Hearts', description: 'Classic trick-avoiding game. Try to have the lowest score!' },
@@ -20,20 +11,11 @@ const games = [
 const HomePage: React.FC<HomePageProps> = () => {
   const navigate = useNavigate();
   const [selectedGame, setSelectedGame] = useState('hearts');
-  const [selectedBacking, setSelectedBacking] = useState(() => {
-    return localStorage.getItem('cardBacking') || 'classic';
-  });
-
-  const handleBackingChange = (backingId: string) => {
-    setSelectedBacking(backingId);
-    localStorage.setItem('cardBacking', backingId);
-  };
 
   const handlePlayGame = () => {
     navigate(`/${selectedGame}`);
   };
 
-  const selectedBackingData = cardBackings.find(b => b.id === selectedBacking);
   const selectedGameData = games.find(g => g.id === selectedGame);
 
   return (
@@ -67,41 +49,14 @@ const HomePage: React.FC<HomePageProps> = () => {
           )}
         </div>
 
-        {/* Card Backing Selection */}
-        <div className="mb-8">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Card Backing
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            {cardBackings.map(backing => (
-              <button
-                key={backing.id}
-                onClick={() => handleBackingChange(backing.id)}
-                className={`relative p-1 rounded-lg transition-all ${
-                  selectedBacking === backing.id
-                    ? 'ring-2 ring-blue-500 ring-offset-2'
-                    : 'hover:ring-2 hover:ring-gray-300'
-                }`}
-              >
-                <div
-                  className="w-full h-16 rounded border border-gray-400"
-                  style={{ background: backing.pattern }}
-                />
-                <span className="block text-xs mt-1 text-gray-600 truncate">{backing.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Preview Card */}
-        <div className="mb-8 flex justify-center">
-          <div className="text-center">
-            <span className="text-sm text-gray-500 block mb-2">Preview</span>
-            <div
-              className="w-20 h-28 rounded border-2 border-gray-400 shadow-lg mx-auto"
-              style={{ background: selectedBackingData?.pattern }}
-            />
-          </div>
+        {/* Settings Link */}
+        <div className="mb-8 text-center">
+          <Link
+            to="/settings"
+            className="text-sm text-blue-600 hover:text-blue-800 underline"
+          >
+            Customize card backing, suit colors &amp; animations in Settings
+          </Link>
         </div>
 
         {/* Play Button */}
@@ -117,4 +72,3 @@ const HomePage: React.FC<HomePageProps> = () => {
 };
 
 export default HomePage;
-export { cardBackings };

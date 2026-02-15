@@ -10,6 +10,7 @@ import { GameState } from './types/CardGame.ts';
 import { STRATEGY_REGISTRY } from './strategies/index.ts';
 import { getGameStateFromUrl } from './urlGameState.js';
 import { useDraggable } from './hooks/useDraggable.ts';
+import { playWhistingFanfare, stopWhistingFanfare } from './utils/whistingSound.ts';
 
 const SUIT_SYMBOLS: { [key: string]: string } = {
   spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣'
@@ -39,6 +40,15 @@ const WHISTING_ANIMATIONS = [
   '/animations/win_science_cascade.webp',
   '/animations/win_science_explosion.webp',
   '/animations/win_science_tornado.webp',
+  '/animations/win_egyptian_cascade.webp',
+  '/animations/win_egyptian_explosion.webp',
+  '/animations/win_egyptian_tornado.webp',
+  '/animations/win_steampunk_cascade.webp',
+  '/animations/win_steampunk_explosion.webp',
+  '/animations/win_steampunk_tornado.webp',
+  '/animations/win_underwater_cascade.webp',
+  '/animations/win_underwater_explosion.webp',
+  '/animations/win_underwater_tornado.webp',
 ];
 
 const BidWhistGameComponent: React.FunctionComponent = () => {
@@ -298,11 +308,17 @@ Card Rankings:
     const newBiddingState = game.getBiddingState();
 
     // Detect whisting game-over: show animation before game-over dialog
-    if (newState.gameOver && game.getWhistingWinner() >= 0 && !whistingAnimation) {
+    const animSetting = localStorage.getItem('whistingAnimation') || 'enabled';
+    if (newState.gameOver && game.getWhistingWinner() >= 0 && !whistingAnimation && animSetting !== 'disabled') {
       const anim = WHISTING_ANIMATIONS[Math.floor(Math.random() * WHISTING_ANIMATIONS.length)];
       setWhistingAnimation(anim);
+      const soundEnabled = (localStorage.getItem('whistingSound') || 'enabled') !== 'disabled';
+      if (soundEnabled) playWhistingFanfare();
       // Hold animation, then dismiss to show game-over dialog
-      setTimeout(() => setWhistingAnimation(null), 5000);
+      setTimeout(() => {
+        setWhistingAnimation(null);
+        if (soundEnabled) stopWhistingFanfare();
+      }, 5000);
     }
 
     setGameState(newState);
@@ -532,24 +548,32 @@ Card Rankings:
       )}
 
       {/* Whisting animation overlay */}
-      {whistingAnimation && (
-        <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100]">
-          <div className="text-center">
-            <img
-              src={whistingAnimation}
-              alt="Whisting celebration"
-              style={{ maxWidth: '80vw', maxHeight: '70vh', borderRadius: '12px' }}
-            />
-            <div style={{
-              fontSize: '48px', fontWeight: 'bold', color: '#fbbf24',
-              textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
-              marginTop: '16px',
-            }}>
-              WHISTED!
+      {whistingAnimation && (() => {
+        const isFullscreen = (localStorage.getItem('whistingAnimation') || 'enabled') === 'fullscreen';
+        return (
+          <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100]">
+            <div className="text-center" style={isFullscreen ? { width: '100vw', height: '100vh', position: 'relative' } : undefined}>
+              <img
+                src={whistingAnimation}
+                alt="Whisting celebration"
+                style={isFullscreen
+                  ? { width: '100vw', height: '100vh', objectFit: 'cover', borderRadius: 0 }
+                  : { maxWidth: '80vw', maxHeight: '70vh', borderRadius: '12px' }
+                }
+              />
+              <div style={{
+                fontSize: '48px', fontWeight: 'bold', color: '#fbbf24',
+                textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
+                ...(isFullscreen
+                  ? { position: 'absolute', bottom: '40px', left: 0, right: 0 }
+                  : { marginTop: '16px' }),
+              }}>
+                WHISTED!
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

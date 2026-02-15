@@ -9,6 +9,7 @@ import GameTable from './GameTable.tsx';
 import TurnIndicator from './TurnIndicator.tsx';
 import LastBook from './LastBook.tsx';
 import { useDraggable } from '../hooks/useDraggable.ts';
+import { playWhistingFanfare, stopWhistingFanfare } from '../utils/whistingSound.ts';
 
 type ReplayPhase = 'loading' | 'bidding' | 'trumpSelection' | 'discarding' | 'play' | 'whistingAnim' | 'done';
 
@@ -28,6 +29,15 @@ const WHISTING_ANIMATIONS = [
   '/animations/win_science_cascade.webp',
   '/animations/win_science_explosion.webp',
   '/animations/win_science_tornado.webp',
+  '/animations/win_egyptian_cascade.webp',
+  '/animations/win_egyptian_explosion.webp',
+  '/animations/win_egyptian_tornado.webp',
+  '/animations/win_steampunk_cascade.webp',
+  '/animations/win_steampunk_explosion.webp',
+  '/animations/win_steampunk_tornado.webp',
+  '/animations/win_underwater_cascade.webp',
+  '/animations/win_underwater_explosion.webp',
+  '/animations/win_underwater_tornado.webp',
 ];
 
 interface ReplayConfig {
@@ -369,15 +379,19 @@ const ReplayPage: React.FC = () => {
 
       // Check if hand/game is done
       if (newGs.gameStage === 'scoring') {
-        if (game.getWhistingWinner() >= 0) {
+        const animSetting = localStorage.getItem('whistingAnimation') || 'enabled';
+        if (game.getWhistingWinner() >= 0 && animSetting !== 'disabled') {
           // Whisting: show animation before done
           const anim = WHISTING_ANIMATIONS[Math.floor(Math.random() * WHISTING_ANIMATIONS.length)];
           setWhistingAnimation(anim);
+          const soundEnabled = (localStorage.getItem('whistingSound') || 'enabled') !== 'disabled';
+          if (soundEnabled) playWhistingFanfare();
           setReplayPhase('whistingAnim');
           setIsPlaying(false);
           setNextCardPreview(null);
           setTimeout(() => {
             setWhistingAnimation(null);
+            if (soundEnabled) stopWhistingFanfare();
             setReplayPhase('done');
           }, 5000);
         } else {
@@ -636,24 +650,32 @@ const ReplayPage: React.FC = () => {
       )}
 
       {/* Whisting animation overlay */}
-      {whistingAnimation && (
-        <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100]">
-          <div className="text-center">
-            <img
-              src={whistingAnimation}
-              alt="Whisting celebration"
-              style={{ maxWidth: '80vw', maxHeight: '70vh', borderRadius: '12px' }}
-            />
-            <div style={{
-              fontSize: '48px', fontWeight: 'bold', color: '#fbbf24',
-              textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
-              marginTop: '16px',
-            }}>
-              WHISTED!
+      {whistingAnimation && (() => {
+        const isFullscreen = (localStorage.getItem('whistingAnimation') || 'enabled') === 'fullscreen';
+        return (
+          <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100]">
+            <div className="text-center" style={isFullscreen ? { width: '100vw', height: '100vh', position: 'relative' } : undefined}>
+              <img
+                src={whistingAnimation}
+                alt="Whisting celebration"
+                style={isFullscreen
+                  ? { width: '100vw', height: '100vh', objectFit: 'cover', borderRadius: 0 }
+                  : { maxWidth: '80vw', maxHeight: '70vh', borderRadius: '12px' }
+                }
+              />
+              <div style={{
+                fontSize: '48px', fontWeight: 'bold', color: '#fbbf24',
+                textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
+                ...(isFullscreen
+                  ? { position: 'absolute', bottom: '40px', left: 0, right: 0 }
+                  : { marginTop: '16px' }),
+              }}>
+                WHISTED!
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Done overlay */}
       {replayPhase === 'done' && gameState.gameStage === 'scoring' && (

@@ -7,6 +7,7 @@ import HandCreator from './components/HandCreator.tsx';
 import Upload from './components/Upload.tsx';
 import StrategyComparison from './components/StrategyComparison.tsx';
 import ReplayPage from './components/ReplayPage.tsx';
+import SettingsPage from './components/SettingsPage.tsx';
 
 function App() {
   return (
@@ -57,6 +58,12 @@ function App() {
             >
               Replay
             </Link>
+            <Link
+              to="/settings"
+              className="hover:text-blue-300 transition-colors"
+            >
+              Settings
+            </Link>
           </div>
         </nav>
 
@@ -68,6 +75,7 @@ function App() {
           <Route path="/upload" element={<Upload />} />
           <Route path="/compare" element={<StrategyComparison />} />
           <Route path="/replay" element={<ReplayPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </Router>
     </>
