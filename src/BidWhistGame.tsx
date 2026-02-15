@@ -27,6 +27,18 @@ const WHISTING_ANIMATIONS = [
   '/animations/win_cascade.webp',
   '/animations/win_explosion.webp',
   '/animations/win_tornado.webp',
+  '/animations/win_holy_cascade.webp',
+  '/animations/win_holy_explosion.webp',
+  '/animations/win_holy_tornado.webp',
+  '/animations/win_ice_cascade.webp',
+  '/animations/win_ice_explosion.webp',
+  '/animations/win_ice_tornado.webp',
+  '/animations/win_nature_cascade.webp',
+  '/animations/win_nature_explosion.webp',
+  '/animations/win_nature_tornado.webp',
+  '/animations/win_science_cascade.webp',
+  '/animations/win_science_explosion.webp',
+  '/animations/win_science_tornado.webp',
 ];
 
 const BidWhistGameComponent: React.FunctionComponent = () => {
