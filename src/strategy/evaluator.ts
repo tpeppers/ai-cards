@@ -26,6 +26,25 @@ function debugGroupEnd(): void {
   if (strategyDebugEnabled) console.groupEnd();
 }
 
+// ── Rule Tracing ────────────────────────────────────────────────────
+
+export type RuleTraceEntry = {
+  phase: 'bid' | 'trump' | 'discard' | 'play';
+  subSection?: 'leading' | 'following' | 'void';
+  playerId: number;
+  ruleIndex: number;       // 0+ for matched rule, -1 for default, -2 for no match
+  conditionText?: string;  // human-readable condition (from formatExpr)
+};
+
+let traceCollector: RuleTraceEntry[] | null = null;
+
+export function enableTracing(): void { traceCollector = []; }
+export function disableTracing(): RuleTraceEntry[] {
+  const entries = traceCollector || [];
+  traceCollector = null;
+  return entries;
+}
+
 // ── CardSet helpers ─────────────────────────────────────────────────
 
 function makeCardSet(cards: Card[]): CardSet {
@@ -336,6 +355,7 @@ function resolveVariable(name: string, ctx: StrategyContext): any {
     case 'enemy_signal_1': return ctx.enemySignal1;
     case 'enemy_signal_2': return ctx.enemySignal2;
     case 'enemy_has_trump': return ctx.enemyHasTrump;
+    case 'partner_has_trump': return ctx.partnerHasTrump;
     case 'partner_shortsuit': {
       const shortCards = ctx.hand.filter(c => ctx.partnerVoidSuits.includes(c.suit));
       return makeCardSet(shortCards);
@@ -589,7 +609,7 @@ export type PlayResult = Card | null;
 export type BidResult = number | null; // number = bid amount, -1 = take, 0 = pass
 export type TrumpResult = { suit: string; direction: string } | null;
 
-function formatExpr(expr: Expression): string {
+export function formatExpr(expr: Expression): string {
   switch (expr.type) {
     case 'literal': return JSON.stringify(expr.value);
     case 'variable': return expr.name;
@@ -601,7 +621,7 @@ function formatExpr(expr: Expression): string {
   }
 }
 
-function evalRuleBlock(block: RuleBlock, ctx: StrategyContext): Action | null {
+function evalRuleBlock(block: RuleBlock, ctx: StrategyContext): { action: Action | null; ruleIndex: number } {
   for (let i = 0; i < block.rules.length; i++) {
     const rule = block.rules[i];
     const condResult = evalExpr(rule.condition, ctx);
@@ -610,15 +630,15 @@ function evalRuleBlock(block: RuleBlock, ctx: StrategyContext): Action | null {
     }
     if (condResult) {
       debugLog(`  ✓ matched rule ${i}, action: ${rule.action.type}`);
-      return rule.action;
+      return { action: rule.action, ruleIndex: i };
     }
   }
   if (block.defaultAction) {
     debugLog(`  → default action: ${block.defaultAction.type}`);
-    return block.defaultAction;
+    return { action: block.defaultAction, ruleIndex: -1 };
   }
   debugLog(`  → no match, no default`);
-  return null;
+  return { action: null, ruleIndex: -2 };
 }
 
 export function evaluatePlay(ast: StrategyAST, ctx: StrategyContext): PlayResult {
@@ -645,7 +665,16 @@ export function evaluatePlay(ast: StrategyAST, ctx: StrategyContext): PlayResult
 
   if (!block) { debugLog('no block'); debugGroupEnd(); return null; }
 
-  const action = evalRuleBlock(block, ctx);
+  const { action, ruleIndex } = evalRuleBlock(block, ctx);
+
+  if (traceCollector) {
+    traceCollector.push({
+      phase: 'play', subSection: section as 'leading' | 'following' | 'void',
+      playerId: ctx.playerId, ruleIndex,
+      conditionText: ruleIndex >= 0 ? formatExpr(block.rules[ruleIndex].condition) : undefined,
+    });
+  }
+
   if (!action) { debugGroupEnd(); return null; }
 
   if (action.type === 'play') {
@@ -677,7 +706,15 @@ export function evaluateBid(ast: StrategyAST, ctx: StrategyContext): BidResult {
 
   debugGroup(`evaluateBid P${ctx.playerId} bidCount=${ctx.bidCount} currentHigh=${ctx.currentHighBid} isDealer=${ctx.isDealer}`);
 
-  const action = evalRuleBlock(ast.bid, ctx);
+  const { action, ruleIndex } = evalRuleBlock(ast.bid, ctx);
+
+  if (traceCollector) {
+    traceCollector.push({
+      phase: 'bid', playerId: ctx.playerId, ruleIndex,
+      conditionText: ruleIndex >= 0 ? formatExpr(ast.bid!.rules[ruleIndex].condition) : undefined,
+    });
+  }
+
   if (!action) { debugGroupEnd(); return null; }
 
   if (action.type === 'bid') {
@@ -702,7 +739,15 @@ export function evaluateTrump(ast: StrategyAST, ctx: StrategyContext): TrumpResu
 
   debugGroup(`evaluateTrump P${ctx.playerId} partnerBid=${ctx.partnerBid} enemyBid=${ctx.enemyBid}`);
 
-  const action = evalRuleBlock(ast.trump, ctx);
+  const { action, ruleIndex } = evalRuleBlock(ast.trump, ctx);
+
+  if (traceCollector) {
+    traceCollector.push({
+      phase: 'trump', playerId: ctx.playerId, ruleIndex,
+      conditionText: ruleIndex >= 0 ? formatExpr(ast.trump!.rules[ruleIndex].condition) : undefined,
+    });
+  }
+
   if (!action) { debugGroupEnd(); return null; }
 
   if (action.type === 'choose') {
@@ -745,13 +790,20 @@ export function evaluateDiscard(ast: StrategyAST, ctx: StrategyContext): string[
   }
 
   // Evaluate ALL rules (collect-all-matches, not first-match)
-  for (const rule of block.rules) {
+  for (let i = 0; i < block.rules.length; i++) {
+    const rule = block.rules[i];
     const condResult = evalExpr(rule.condition, ctx);
     if (strategyDebugEnabled) {
       debugLog(`  discard rule: ${formatExpr(rule.condition)} → ${condResult}`);
     }
     if (condResult) {
       collectDiscardAction(rule.action, ctx, keepIds, dropIds);
+      if (traceCollector) {
+        traceCollector.push({
+          phase: 'discard', playerId: ctx.playerId, ruleIndex: i,
+          conditionText: formatExpr(rule.condition),
+        });
+      }
     }
   }
 

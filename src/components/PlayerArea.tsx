@@ -10,10 +10,11 @@ interface PlayerAreaProps {
   showAllCards: boolean;
   previewCardId?: string | null;
   displayName?: string;
+  subtitle?: string;
 }
 
 // Player area component
-const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard, showAllCards, previewCardId = null, displayName }) => {
+const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard, showAllCards, previewCardId = null, displayName, subtitle }) => {
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -86,7 +87,10 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
         player.id === 2 ? 'top-44 left-1/2 transform -translate-x-1/2' :
         'left-24 top-1/2 transform -translate-y-1/2'
       } text-white font-bold bg-black bg-opacity-70 py-1 px-3 rounded z-10`}>
-        {displayName || player.name} {isCurrentPlayer && '(Turn)'} - Score: {player.totalScore}
+        <div>{displayName || player.name} {isCurrentPlayer && '(Turn)'} - Score: {player.totalScore}</div>
+        {subtitle && (
+          <div style={{ fontSize: '10px', fontWeight: 'normal', opacity: 0.8, textAlign: 'center' }}>{subtitle}</div>
+        )}
       </div>
 
       {/* Cards */}

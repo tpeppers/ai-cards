@@ -55,7 +55,7 @@ describe('BidWhistSimulator', () => {
       const simulator = new BidWhistSimulator();
       const deckUrl = generateRandomDeckUrl();
       const handUrls = [deckUrl];
-      for (let i = 1; i < 20; i++) {
+      for (let i = 1; i < 50; i++) {
         handUrls.push(generateRandomDeckUrl());
       }
 
@@ -68,7 +68,9 @@ describe('BidWhistSimulator', () => {
       expect(result.winningTeam).toBeLessThanOrEqual(1);
       expect(result.teamScores[0]).toBeGreaterThanOrEqual(0);
       expect(result.teamScores[1]).toBeGreaterThanOrEqual(0);
-      expect(result.teamScores[0] >= 7 || result.teamScores[1] >= 7).toBe(true);
+      // Game ends at 21 or mercy (11-0)
+      const maxScore = Math.max(result.teamScores[0], result.teamScores[1]);
+      expect(maxScore).toBeGreaterThanOrEqual(11);
       expect(result.handsPlayed).toBeGreaterThan(0);
     });
 
@@ -76,7 +78,7 @@ describe('BidWhistSimulator', () => {
       const simulator = new BidWhistSimulator();
       const deckUrl = generateRandomDeckUrl();
       const handUrls = [deckUrl];
-      for (let i = 1; i < 20; i++) {
+      for (let i = 1; i < 50; i++) {
         handUrls.push(generateRandomDeckUrl());
       }
 
@@ -93,7 +95,7 @@ describe('BidWhistSimulator', () => {
   });
 
   describe('BatchRunner', () => {
-    it('completes for 10 games and produces a valid report', async () => {
+    it('completes for 10 hands and produces a valid report', async () => {
       const runner = new BatchRunner();
       const result = await runner.runComparison({
         strategies: [
@@ -101,20 +103,24 @@ describe('BidWhistSimulator', () => {
           { name: 'Claude', strategyText: BIDWHIST_CLAUDE },
         ],
         assignmentMode: 'by-team',
-        numGames: 10,
+        numHands: 10,
       });
 
-      // 10 games * 4 rotations = 40 simulations
-      expect(result.results.length).toBe(40);
-      expect(result.summary.totalGames).toBe(40);
-      expect(result.summary.winsPerConfig[0] + result.summary.winsPerConfig[1]).toBe(40);
+      // With hand-pool approach, games run until target hands reached
+      // Each game produces 4 rotations * 2 configs = 8 GameResults, but only configA stored in allResults
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.summary.totalGames).toBe(result.results.length);
+      expect(result.summary.totalHands).toBeGreaterThan(0);
+      expect(result.summary.winsPerConfig[0] + result.summary.winsPerConfig[1]).toBe(result.results.length);
       expect(result.summary.winRate[0]).toBeGreaterThanOrEqual(0);
       expect(result.summary.winRate[0]).toBeLessThanOrEqual(1);
       expect(result.summary.winRate[1]).toBeGreaterThanOrEqual(0);
       expect(result.summary.winRate[1]).toBeLessThanOrEqual(1);
       expect(result.interestingGames).toBeDefined();
       expect(Array.isArray(result.interestingGames)).toBe(true);
-    }, 30000);
+      expect(result.interestingHands).toBeDefined();
+      expect(Array.isArray(result.interestingHands)).toBe(true);
+    }, 60000);
 
     it('abort stops processing', async () => {
       const runner = new BatchRunner();
@@ -126,7 +132,7 @@ describe('BidWhistSimulator', () => {
           { name: 'Conservative', strategyText: BIDWHIST_CONSERVATIVE },
         ],
         assignmentMode: 'by-team',
-        numGames: 1000,
+        numHands: 1000,
       }, (completed) => {
         lastCompleted = completed;
         if (completed >= 10) {

@@ -52,6 +52,7 @@ const ReplayPage: React.FC = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [biddingState, setBiddingState] = useState<BidWhistState | null>(null);
   const [lastBook, setLastBook] = useState<{ playerId: number; card: any }[]>([]);
+  const [booksWon, setBooksWon] = useState<[number, number]>([0, 0]);
   const [config, setConfig] = useState<ReplayConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [bidLog, setBidLog] = useState<{ player: string; action: string }[]>([]);
@@ -137,6 +138,7 @@ const ReplayPage: React.FC = () => {
     setGameState(game.getGameState());
     setBiddingState(game.getBiddingState());
     setLastBook(game.getLastCompletedTrick());
+    setBooksWon(game.getBooksWon());
   }, []);
 
   // Compute preview of the next card to be played (without mutating game state)
@@ -479,6 +481,7 @@ const ReplayPage: React.FC = () => {
           playCard={() => {}}
           showAllCards={showCards}
           previewCardId={nextCardPreview}
+          subtitle={player.id % 2 === 0 ? t0Name : t1Name}
         />
       ))}
 
@@ -591,11 +594,11 @@ const ReplayPage: React.FC = () => {
           </div>
           <div className="text-xs flex justify-between">
             <span>S/N:</span>
-            <span className="ml-4 font-bold">{gameState.players[0]?.score ?? 0}</span>
+            <span className="ml-4 font-bold">{booksWon[0]}</span>
           </div>
           <div className="text-xs flex justify-between">
             <span>E/W:</span>
-            <span className="ml-4 font-bold">{gameState.players[1]?.score ?? 0}</span>
+            <span className="ml-4 font-bold">{booksWon[1]}</span>
           </div>
         </div>
       )}

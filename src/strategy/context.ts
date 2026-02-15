@@ -94,6 +94,8 @@ export function buildBidWhistContext(game: BidWhistGameLike, playerId: number): 
   const enemy1VoidInTrump = trumpSuit ? voidSuits[enemy1Id].has(trumpSuit) : false;
   const enemy2VoidInTrump = trumpSuit ? voidSuits[enemy2Id].has(trumpSuit) : false;
   const enemyHasTrump = !(enemy1VoidInTrump && enemy2VoidInTrump);
+  const partnerVoidInTrump = trumpSuit ? voidSuits[partnerId].has(trumpSuit) : false;
+  const partnerHasTrump = !partnerVoidInTrump;
   const partnerVoidSuits = Array.from(voidSuits[partnerId]);
 
   return {
@@ -122,6 +124,7 @@ export function buildBidWhistContext(game: BidWhistGameLike, playerId: number): 
     enemySignal1: discardSuits[enemy1Id] ?? '',
     enemySignal2: discardSuits[enemy2Id] ?? '',
     enemyHasTrump,
+    partnerHasTrump,
     partnerVoidSuits,
     getCardValue: (card: Card) => game.getCardValue(card),
     compareCards: (a: Card, b: Card) => game.compareCards(a, b),
@@ -212,6 +215,7 @@ export function buildHeartsContext(game: HeartsGameLike, playerId: number): Stra
     enemySignal1: '',
     enemySignal2: '',
     enemyHasTrump: false,
+    partnerHasTrump: false,
     partnerVoidSuits: [],
     getCardValue,
     compareCards,

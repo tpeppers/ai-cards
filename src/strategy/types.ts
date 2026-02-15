@@ -164,6 +164,7 @@ export interface StrategyContext {
 
   // Void tracking
   enemyHasTrump: boolean;      // true until both enemies shown void in trump
+  partnerHasTrump: boolean;    // true until partner shown void in trump
   partnerVoidSuits: string[];   // suits partner is observed void in
 
   // Card evaluation helpers (injected by game)

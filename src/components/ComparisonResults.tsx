@@ -3,6 +3,8 @@ import { StrategyComparisonResult, GameResult, HandResult } from '../simulation/
 import { BidWhistSimulator } from '../simulation/BidWhistSimulator.ts';
 import { computeAllHandStrengths } from '../simulation/handStrength.ts';
 import WeaknessesTab from './WeaknessesTab.tsx';
+import WhistingsTab from './WhistingsTab.tsx';
+import TracingTab from './TracingTab.tsx';
 
 interface ComparisonResultsProps {
   result: StrategyComparisonResult;
@@ -657,6 +659,22 @@ const boxStyle: React.CSSProperties = {
   marginBottom: '16px',
 };
 
+// Interesting Games: compact game-level rows
+const igThStyle: React.CSSProperties = {
+  padding: '5px 8px', textAlign: 'left', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap',
+};
+const igTdStyle: React.CSSProperties = {
+  padding: '4px 8px', fontSize: '12px',
+};
+
+// Interesting Hands: tight rows
+const ihThStyle: React.CSSProperties = {
+  padding: '3px 6px', textAlign: 'left', fontSize: '11px', fontWeight: 'bold', whiteSpace: 'nowrap',
+};
+const ihTdStyle: React.CSSProperties = {
+  padding: '2px 6px', fontSize: '12px', lineHeight: '18px',
+};
+
 // ── Hand Filter ──────────────────────────────────────────────────────
 
 interface HandFilter {
@@ -671,7 +689,7 @@ interface HandFilter {
 
 // ── Tab types ────────────────────────────────────────────────────────
 
-type TabId = 'results' | 'interesting' | 'stats' | 'bidAnalysis' | 'handStrength' | 'weaknesses' | 'filtered';
+type TabId = 'results' | 'interesting' | 'interestingHands' | 'whistings' | 'stats' | 'bidAnalysis' | 'handStrength' | 'weaknesses' | 'tracing' | 'filtered';
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -679,7 +697,7 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
   const [activeTab, setActiveTab] = useState<TabId>('results');
   const [expandedGames, setExpandedGames] = useState<Set<number>>(() => new Set());
 
-  const { config, summary, interestingGames } = result;
+  const { config, summary, interestingGames, interestingHands, whistings, interestingWhistings } = result;
   const isRR = config.assignmentMode === 'round-robin';
   const strategyNames = config.strategies.map(s => s.name);
   const nameA = strategyNames[0] || 'Strategy A';
@@ -774,18 +792,24 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
     ...(isRR
       ? [
           { id: 'results' as TabId, label: 'Results' },
-          { id: 'interesting' as TabId, label: `Interesting Games (${interestingGames.length})` },
+          { id: 'interesting' as TabId, label: `Interesting\nGames (${interestingGames.length})` },
+          { id: 'whistings' as TabId, label: `Whistings\n(${whistings?.length ?? 0})` },
           { id: 'stats' as TabId, label: 'Stats Overview' },
           { id: 'bidAnalysis' as TabId, label: 'Bid Analysis' },
           { id: 'weaknesses' as TabId, label: 'Weaknesses' },
         ]
       : [
           { id: 'results' as TabId, label: 'Results' },
-          { id: 'interesting' as TabId, label: `Interesting Games (${interestingGames.length})` },
+          { id: 'interesting' as TabId, label: `Interesting\nGames (${interestingGames.length})` },
+          { id: 'interestingHands' as TabId, label: `Interesting\nHands (${interestingHands?.length ?? 0})` },
+          { id: 'whistings' as TabId, label: `Whistings\n(${whistings?.length ?? 0})` },
           { id: 'stats' as TabId, label: 'Stats Overview' },
           { id: 'bidAnalysis' as TabId, label: 'Bid Analysis' },
           { id: 'handStrength' as TabId, label: 'Hand Strength' },
           { id: 'weaknesses' as TabId, label: 'Weaknesses' },
+          ...(config.abTestMeta
+            ? [{ id: 'tracing' as TabId, label: 'Tracing' }]
+            : []),
         ]),
     ...(handFilter
       ? [{ id: 'filtered' as TabId, label: `Filtered: ${handFilter.label}` }]
@@ -824,8 +848,10 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
-              padding: '8px 16px',
-              fontSize: '14px',
+              padding: '8px 12px',
+              fontSize: '13px',
+              lineHeight: '1.2',
+              whiteSpace: 'pre-line',
               fontWeight: activeTab === tab.id ? 'bold' : 'normal',
               color: activeTab === tab.id ? '#fff' : '#9ca3af',
               background: 'none',
@@ -876,17 +902,19 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
           {/* Breakdown */}
           <div style={boxStyle}>
             <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
-              Strategy vs Card Advantage Breakdown
+              Game & Hand Breakdown
             </h3>
             <p style={{ margin: '4px 0' }}>
-              Total simulations: {summary.totalGames}
+              Total games: {summary.totalGames} ({summary.totalHands} hands total)
             </p>
             <p style={{ margin: '4px 0' }}>
-              Strategy mattered (winner changed on swap): {summary.strategyMattersCount}{' '}
-              ({summary.totalGames > 0 ? ((summary.strategyMattersCount / (summary.totalGames / 2)) * 100).toFixed(1) : 0}% of deck/rotation pairs)
+              Avg game length: {summary.totalGames > 0 ? (summary.totalHands / summary.totalGames).toFixed(1) : 0} hands/game
             </p>
             <p style={{ margin: '4px 0' }}>
-              Card advantage dominated (same winner both ways): {summary.cardAdvantageDominatedCount}
+              Strategy mattered in {summary.interestingGameCount} games ({summary.totalGames > 0 ? ((summary.interestingGameCount / (summary.totalGames / 2)) * 100).toFixed(1) : 0}% of game pairs)
+            </p>
+            <p style={{ margin: '4px 0' }}>
+              Strategy diverged in {summary.interestingHandCount} hands
             </p>
           </div>
         </div>
@@ -1001,13 +1029,13 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
               Strategy vs Card Advantage
             </h3>
             <p style={{ margin: '4px 0' }}>
-              Total simulations: {summary.totalGames}
+              Total games: {summary.totalGames} ({summary.totalHands} hands total)
+            </p>
+            <p style={{ margin: '4px 0' }}>
+              Avg game length: {summary.totalGames > 0 ? (summary.totalHands / summary.totalGames).toFixed(1) : 0} hands/game
             </p>
             <p style={{ margin: '4px 0' }}>
               Deck/rotations where strategy mattered: {summary.strategyMattersCount}
-            </p>
-            <p style={{ margin: '4px 0' }}>
-              Deck/rotations dominated by cards: {summary.cardAdvantageDominatedCount}
             </p>
           </div>
         </div>
@@ -1023,70 +1051,123 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #374151', position: 'sticky', top: 0, backgroundColor: '#0f1f15' }}>
-                    <th style={thStyle}>#</th>
-                    <th style={thStyle}>Rot</th>
-                    <th style={{ ...thStyle, borderLeft: '1px solid #374151' }}>A Bidder</th>
-                    <th style={thStyle}>A Call</th>
-                    <th style={thStyle}>A Books</th>
-                    <th style={{ ...thStyle, textAlign: 'center' }}>A Made?</th>
-                    <th style={{ ...thStyle, textAlign: 'center' }}>Play</th>
-                    <th style={{ ...thStyle, borderLeft: '1px solid #374151' }}>B Bidder</th>
-                    <th style={thStyle}>B Call</th>
-                    <th style={thStyle}>B Books</th>
-                    <th style={{ ...thStyle, textAlign: 'center' }}>B Made?</th>
+                    <th style={igThStyle}>#</th>
+                    <th style={igThStyle}>Rot</th>
+                    <th style={igThStyle}>Hands</th>
+                    <th style={{ ...igThStyle, borderLeft: '1px solid #374151' }}>{nameA} Score</th>
+                    <th style={igThStyle}>{nameA} Winner</th>
+                    <th style={{ ...igThStyle, borderLeft: '1px solid #374151' }}>{nameB} Score</th>
+                    <th style={igThStyle}>{nameB} Winner</th>
                   </tr>
                 </thead>
                 <tbody>
                   {interestingGames.map((game, idx) => {
-                    const rotatedUrl = BidWhistSimulator.rotateDeck(game.deckUrl, game.rotation);
-                    const playUrl = `/bidwhist#${rotatedUrl}`;
-                    const handA = game.configAResult.hands[0];
-                    const handB = game.configBResult.hands[0];
-
+                    const rA = game.configAResult;
+                    const rB = game.configBResult;
+                    const aWinner = rA.winningTeam === 0 ? nameA : nameB;
+                    const bWinner = rB.winningTeam === 0 ? nameB : nameA;
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #374151' }}>
-                        <td style={tdStyle}>{idx + 1}</td>
-                        <td style={tdStyle}>{game.rotation}</td>
-                        <td style={{ ...tdStyle, borderLeft: '1px solid #374151' }}>
-                          {handA ? formatBidder(handA) : '\u2014'}
+                        <td style={igTdStyle}>{idx + 1}</td>
+                        <td style={igTdStyle}>{game.rotation}</td>
+                        <td style={igTdStyle}>{Math.max(rA.handsPlayed, rB.handsPlayed)}</td>
+                        <td style={{ ...igTdStyle, borderLeft: '1px solid #374151' }}>
+                          {rA.teamScores[0]}-{rA.teamScores[1]}
                         </td>
-                        <td style={tdStyle}>
-                          {handA ? formatCall(handA) : '\u2014'}
+                        <td style={{ ...igTdStyle, color: '#68d391', fontWeight: 'bold' }}>
+                          {aWinner}
                         </td>
-                        <td style={tdStyle}>
-                          {handA ? `${handA.booksWon[0]}-${handA.booksWon[1]}` : '\u2014'}
+                        <td style={{ ...igTdStyle, borderLeft: '1px solid #374151' }}>
+                          {rB.teamScores[0]}-{rB.teamScores[1]}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          {formatMadeIt(handA)}
+                        <td style={{ ...igTdStyle, color: '#68d391', fontWeight: 'bold' }}>
+                          {bWinner}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Interesting Hands tab (by-team) ──────────────────────── */}
+      {activeTab === 'interestingHands' && !isRR && (
+        <div>
+          {(!interestingHands || interestingHands.length === 0) ? (
+            <p style={{ color: '#9ca3af' }}>No interesting hands found — strategy produced identical outcomes on every hand.</p>
+          ) : (
+            <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #374151', position: 'sticky', top: 0, backgroundColor: '#0f1f15' }}>
+                    <th style={ihThStyle}>#</th>
+                    <th style={ihThStyle}>Gm</th>
+                    <th style={{ ...ihThStyle, borderLeft: '1px solid #374151' }}>A Bid</th>
+                    <th style={ihThStyle}>A Books</th>
+                    <th style={ihThStyle}>A?</th>
+                    <th style={{ ...ihThStyle, textAlign: 'center' }}></th>
+                    <th style={{ ...ihThStyle, borderLeft: '1px solid #374151' }}>B Bid</th>
+                    <th style={ihThStyle}>B Books</th>
+                    <th style={ihThStyle}>B?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {interestingHands.map((ih, idx) => {
+                    const hA = ih.configAHand;
+                    const hB = ih.configBHand;
+                    const rotatedUrl = BidWhistSimulator.rotateDeck(ih.deckUrl, ih.rotation);
+                    const playUrl = `/bidwhist#${rotatedUrl}`;
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid #2d3748' }}>
+                        <td style={ihTdStyle}>{idx + 1}</td>
+                        <td style={{ ...ihTdStyle, color: '#6b7280' }}>{ih.gameIndex + 1}.{ih.handIndex + 1}</td>
+                        <td style={{ ...ihTdStyle, borderLeft: '1px solid #374151' }}>
+                          <span style={{ color: '#6b7280', fontSize: '10px' }}>{formatBidder(hA)} </span>{formatCall(hA)}
+                        </td>
+                        <td style={{
+                          ...ihTdStyle,
+                          fontWeight: hA.booksWon[0] !== hB.booksWon[1] ? 'bold' : 'normal',
+                          color: hA.booksWon[0] !== hB.booksWon[1] ? '#fbbf24' : '#e5e7eb',
+                        }}>
+                          {hA.booksWon[0]}-{hA.booksWon[1]}
+                        </td>
+                        <td style={{ ...ihTdStyle, textAlign: 'center' }}>
+                          {formatMadeIt(hA)}
+                        </td>
+                        <td style={{ ...ihTdStyle, textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <HandTip label="S" deckUrl={rotatedUrl} player={0}>
                             <a
                               href={playUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ color: '#60a5fa', textDecoration: 'underline' }}
+                              style={{ color: '#60a5fa', textDecoration: 'underline', fontSize: '11px' }}
                             >
                               Play
                             </a>
                           </HandTip>
                           {' '}
-                          <a href="#" onClick={(e) => { e.preventDefault(); openReplay(rotatedUrl, 0, 1, game.rotation); }}
-                            style={{ color: '#a78bfa', textDecoration: 'underline', marginLeft: '6px' }}>
+                          <button
+                            onClick={() => openReplay(rotatedUrl, 0, 1, ih.rotation)}
+                            style={{ color: '#a78bfa', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', padding: 0 }}
+                          >
                             Replay
-                          </a>
+                          </button>
                         </td>
-                        <td style={{ ...tdStyle, borderLeft: '1px solid #374151' }}>
-                          {handB ? formatBidder(handB) : '\u2014'}
+                        <td style={{ ...ihTdStyle, borderLeft: '1px solid #374151' }}>
+                          <span style={{ color: '#6b7280', fontSize: '10px' }}>{formatBidder(hB)} </span>{formatCall(hB)}
                         </td>
-                        <td style={tdStyle}>
-                          {handB ? formatCall(handB) : '\u2014'}
+                        <td style={{
+                          ...ihTdStyle,
+                          fontWeight: hA.booksWon[0] !== hB.booksWon[1] ? 'bold' : 'normal',
+                          color: hA.booksWon[0] !== hB.booksWon[1] ? '#fbbf24' : '#e5e7eb',
+                        }}>
+                          {hB.booksWon[0]}-{hB.booksWon[1]}
                         </td>
-                        <td style={tdStyle}>
-                          {handB ? `${handB.booksWon[0]}-${handB.booksWon[1]}` : '\u2014'}
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          {formatMadeIt(handB)}
+                        <td style={{ ...ihTdStyle, textAlign: 'center' }}>
+                          {formatMadeIt(hB)}
                         </td>
                       </tr>
                     );
@@ -2334,6 +2415,16 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ result }) => {
       {/* ── Weaknesses tab ──────────────────────────────────────── */}
       {activeTab === 'weaknesses' && (
         <WeaknessesTab result={result} />
+      )}
+
+      {/* ── Whistings tab ─────────────────────────────────────── */}
+      {activeTab === 'whistings' && (
+        <WhistingsTab result={result} />
+      )}
+
+      {/* ── Tracing tab ────────────────────────────────────────── */}
+      {activeTab === 'tracing' && config.abTestMeta && (
+        <TracingTab result={result} />
       )}
     </div>
   );

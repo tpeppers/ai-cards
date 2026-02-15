@@ -37,6 +37,7 @@ export class BidWhistGame extends CardGame {
   private lastDealtDeckUrl: string = ''; // URL-encoded deck string from most recent deal
   private firstDiscardSuit: (string | null)[] = [null, null, null, null]; // Void signal tracking
   private playerVoidSuits: Set<string>[] = [new Set(), new Set(), new Set(), new Set()]; // Track all voids
+  private whistingWinner: number = -1; // Team that achieved a whisting (-1 = none)
 
   constructor() {
     super(['You', 'East', 'North', 'West']);
@@ -762,20 +763,34 @@ export class BidWhistGame extends CardGame {
       const declarerBooks = declarerTeam === 0 ? team0Books : team1Books;
 
       if (declarerBooks >= contractBooks) {
-        const points = declarerBooks - 6;
-        if (declarerTeam === 0) {
-          this.teamScores[0] += points;
+        const isWhisting = declarerBooks === 13;
+        if (isWhisting) {
+          // Whisting: instant win, no points scored
+          this.whistingWinner = declarerTeam;
+          this.message = `WHISTED! Declarer's team took all 13 books!`;
         } else {
-          this.teamScores[1] += points;
+          // Made: bid points + 1 bonus per 2 overtricks
+          const overtricks = declarerBooks - contractBooks;
+          const bonus = Math.floor(overtricks / 2);
+          const points = this.currentHighBid + bonus;
+          if (declarerTeam === 0) {
+            this.teamScores[0] += points;
+          } else {
+            this.teamScores[1] += points;
+          }
+          const bonusMsg = bonus > 0 ? ` (+${bonus} bonus for ${overtricks} overtricks)` : '';
+          this.message = `Contract made! ${points} points${bonusMsg}`;
         }
-        this.message = `Contract made! ${declarerBooks - 6} books over.`;
       } else {
-        // Opponents get the bid points when declarer fails
-        const points = this.currentHighBid;
+        // Failed: bid points + 1 bonus per 2 undertricks to opponents
+        const undertricks = contractBooks - declarerBooks;
+        const bonus = Math.floor(undertricks / 2);
+        const points = this.currentHighBid + bonus;
         const opponentTeam = declarerTeam === 0 ? 1 : 0;
         this.teamScores[opponentTeam] += points;
         const opponentNames = opponentTeam === 0 ? 'You & North' : 'East & West';
-        this.message = `Contract failed! ${opponentNames} earn ${points} points.`;
+        const bonusMsg = bonus > 0 ? ` (+${bonus} bonus for ${undertricks} undertricks)` : '';
+        this.message = `Contract failed! ${opponentNames} earn ${points} points${bonusMsg}`;
       }
     }
 
@@ -791,24 +806,33 @@ export class BidWhistGame extends CardGame {
   }
 
   isGameOver(): boolean {
-    // First team to 7 points wins
-    return this.teamScores[0] >= 7 || this.teamScores[1] >= 7;
+    // Whisting: instant win
+    if (this.whistingWinner >= 0) return true;
+    // Mercy/shutout: 11+ points if opponent has 0
+    if (this.teamScores[0] >= 11 && this.teamScores[1] === 0) return true;
+    if (this.teamScores[1] >= 11 && this.teamScores[0] === 0) return true;
+    // First team to 21 points wins
+    return this.teamScores[0] >= 21 || this.teamScores[1] >= 21;
   }
 
   getGameSpecificMessage(): string {
     if (this.gameOver && this.winner) {
       const winningTeam = this.winner.id % 2;
-      return `Game over! Team ${winningTeam === 0 ? 'You & North' : 'East & West'} wins!`;
+      const isWhist = this.whistingWinner >= 0;
+      const isMercy = !isWhist && (this.teamScores[winningTeam] >= 11 && this.teamScores[1 - winningTeam] === 0);
+      const endLabel = isWhist ? ' (WHISTED!)' : isMercy ? ' (Shutout!)' : '';
+      return `Game over! Team ${winningTeam === 0 ? 'You & North' : 'East & West'} wins${endLabel}! Final: ${this.teamScores[0]}-${this.teamScores[1]}`;
     }
     if (this.gameStage === 'scoring') {
-      return `Hand complete! Team scores: You/North: ${this.teamScores[0]}, East/West: ${this.teamScores[1]}`;
+      return `Hand complete! Team scores: You/North: ${this.teamScores[0]}, East/West: ${this.teamScores[1]} (first to 21)`;
     }
     return this.message;
   }
 
   protected findWinner(): void {
-    // Team with 7+ points wins
-    if (this.teamScores[0] >= 7) {
+    if (this.whistingWinner >= 0) {
+      this.winner = this.players[this.whistingWinner]; // Whisting team wins instantly
+    } else if (this.teamScores[0] > this.teamScores[1]) {
       this.winner = this.players[0]; // You & North win
     } else {
       this.winner = this.players[1]; // East & West win
@@ -829,6 +853,7 @@ export class BidWhistGame extends CardGame {
     this.teamScores = [0, 0];
     this.booksWon = [0, 0];
     this.lastCompletedTrick = [];
+    this.whistingWinner = -1;
     this.firstDiscardSuit = [null, null, null, null];
     this.playerVoidSuits = [new Set(), new Set(), new Set(), new Set()];
     // Randomly pick new dealer for new game
@@ -889,6 +914,10 @@ export class BidWhistGame extends CardGame {
 
   getTeamScores(): [number, number] {
     return this.teamScores;
+  }
+
+  getWhistingWinner(): number {
+    return this.whistingWinner;
   }
 
   isBiddingPhase(): boolean {

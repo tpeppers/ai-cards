@@ -208,9 +208,9 @@ play:
     # Partner signaled a suit - lead it to pass control
     when partner_signal != "" and hand.suit(partner_signal).count > 0:
       play hand.suit(partner_signal).weakest
-    # Cash boss cards (guaranteed winners, safe vs enemy strength)
-    when hand.boss.count > 0:
-      play hand.boss.weakest
+    # Cash non-trump boss cards (preserve boss trump for control)
+    when hand.boss.nontrump.count > 0:
+      play hand.boss.nontrump.weakest
     # On declarer's team, lead trump to pull opponents' trump
     when on_declarer_team and has_trump:
       play hand.trump.strongest
@@ -282,9 +282,9 @@ play:
     # Partner signaled - cautiously lead their suit
     when partner_signal != "" and hand.suit(partner_signal).count > 0:
       play hand.suit(partner_signal).weakest
-    # Cash boss cards only (guaranteed safe leads)
-    when hand.boss.count > 0:
-      play hand.boss.weakest
+    # Cash non-trump boss cards only (preserve boss trump)
+    when hand.boss.nontrump.count > 0:
+      play hand.boss.nontrump.weakest
     default:
       play hand.weakest
 
@@ -392,14 +392,14 @@ play:
     # Last run: only 1 non-trump left — run out all trump then play it
     when on_declarer_team and has_trump and hand.nontrump.count == 1:
       play hand.trump.strongest
-    # Cash boss cards (guaranteed winners, safe anytime)
+    # Cash non-trump boss cards (preserve boss trump for control)
     # Pull trump: both void-based AND count-based signals say enemies have trump
     when on_declarer_team and has_trump and enemy_has_trump and outstanding_trump() > 0:
       play hand.trump.strongest
-    when hand.boss.count > 0:
-      play hand.boss.weakest
-    # Lead partner's shortsuit (they can trump it)
-    when partner_shortsuit.count > 0:
+    when hand.boss.nontrump.count > 0:
+      play hand.boss.nontrump.weakest
+    # Lead partner's shortsuit so they can trump it (only if we called trump and partner still has trump)
+    when on_declarer_team and partner_has_trump and partner_shortsuit.count > 0:
       play partner_shortsuit.weakest
     # Lead partner's signal suit
     when partner_signal != "" and hand.suit(partner_signal).count > 0:
@@ -558,11 +558,11 @@ play:
     # Also pull trump if NOT on declarer team but we have boss trump
     when not on_declarer_team and hand.trump.boss.count > 0 and outstanding_trump() > 0:
       play hand.trump.boss.weakest
-    # Cash boss cards (guaranteed winners)
-    when hand.boss.count > 0:
-      play hand.boss.weakest
-    # Lead partner's shortsuit (they can trump)
-    when partner_shortsuit.count > 0:
+    # Cash non-trump boss cards (preserve boss trump for control)
+    when hand.boss.nontrump.count > 0:
+      play hand.boss.nontrump.weakest
+    # Lead partner's shortsuit so they can trump it (only if we called trump and partner still has trump)
+    when on_declarer_team and partner_has_trump and partner_shortsuit.count > 0:
       play partner_shortsuit.weakest
     # Lead partner's signal suit
     when partner_signal != "" and hand.suit(partner_signal).count > 0:
@@ -648,6 +648,8 @@ discard:
   when enemy_bid == 1 and bid_direction != "uptown" and partner_bid != 3:
     drop void_candidates()
   when enemy_bid == 2 and bid_direction == "uptown" and partner_bid != 3:
+    drop void_candidates()
+  when min_suit_count() <= 2 and min_suit_count() > 0:
     drop void_candidates()`;
 
 // ── Strategy builder ────────────────────────────────────────────────

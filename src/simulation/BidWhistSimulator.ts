@@ -8,9 +8,10 @@ import {
   computePostTrumpStrength,
   extractPlayerHand,
 } from './handStrength.ts';
+import { enableTracing, disableTracing, RuleTraceEntry } from '../strategy/evaluator.ts';
 
 const MAX_REDEALS = 10;
-const MAX_HANDS = 30;
+const MAX_HANDS = 100;
 
 // ── Detailed hand types (for Weaknesses tab) ─────────────────────
 
@@ -69,7 +70,7 @@ export class BidWhistSimulator {
   }
 
   /**
-   * Simulate a full game (to 7 points) with the given strategies assigned to players.
+   * Simulate a full game (to 21 points, mercy at 11-0) with the given strategies assigned to players.
    * @param deckUrl - 52-char URL for the first hand
    * @param playerStrategies - parsed strategy ASTs for each of 4 players (null = use default AI)
    * @param handDeckUrls - pre-generated deck URLs for subsequent hands
@@ -122,7 +123,15 @@ export class BidWhistSimulator {
     }
 
     const teamScores = game.getTeamScores();
-    const winningTeam = teamScores[0] >= 7 ? 0 : (teamScores[1] >= 7 ? 1 : (teamScores[0] >= teamScores[1] ? 0 : 1));
+    const whistWinner = game.getWhistingWinner();
+    const winningTeam = (() => {
+      if (whistWinner >= 0) return whistWinner; // Whisting: instant win
+      if (teamScores[0] >= 11 && teamScores[1] === 0) return 0;
+      if (teamScores[1] >= 11 && teamScores[0] === 0) return 1;
+      if (teamScores[0] >= 21) return 0;
+      if (teamScores[1] >= 21) return 1;
+      return teamScores[0] >= teamScores[1] ? 0 : 1; // fallback if MAX_HANDS hit
+    })();
 
     return {
       deckUrl,
@@ -245,6 +254,22 @@ export class BidWhistSimulator {
         game.playCard(currentPlayer, bestMove);
       }
     }
+  }
+
+  /**
+   * Simulate a game with rule tracing enabled, capturing every rule evaluation.
+   */
+  simulateGameWithTracing(
+    deckUrl: string,
+    playerStrategies: (StrategyAST | null)[],
+    handDeckUrls: string[],
+    configIndex: number,
+    dealer: number = 0
+  ): { result: GameResult; traces: RuleTraceEntry[] } {
+    enableTracing();
+    const result = this.simulateGame(deckUrl, playerStrategies, handDeckUrls, configIndex, dealer);
+    const traces = disableTracing();
+    return { result, traces };
   }
 
   /**

@@ -69,9 +69,10 @@ Gameplay:
 • Bid winner leads first trick
 
 Scoring:
-• Make contract: +1 point per book over 6
-• Fail contract: Opponents get bid points
-• First team to 7 points wins
+• Make contract: bid points + 1 per 2 overtricks
+• Fail contract: opponents get bid + 1 per 2 undertricks
+• All 13 books = Whisting!
+• First team to 21 wins (11 = shutout if opponent has 0)
 
 Card Rankings:
 • Uptown: A K Q J 10 9 8 7 6 5 4 3 2
