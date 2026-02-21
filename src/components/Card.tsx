@@ -1,19 +1,6 @@
 import React, { useRef } from 'react';
 import { Card as CardType } from '../types/CardGame';
-
-const cardBackings: { [key: string]: string } = {
-  'classic': 'repeating-linear-gradient(45deg, #006400, #006400 5px, #005300 5px, #005300 10px)',
-  'blue': 'repeating-linear-gradient(45deg, #1a237e, #1a237e 5px, #0d1442 5px, #0d1442 10px)',
-  'red': 'repeating-linear-gradient(45deg, #8b0000, #8b0000 5px, #5c0000 5px, #5c0000 10px)',
-  'purple': 'repeating-linear-gradient(45deg, #4a148c, #4a148c 5px, #2a0a52 5px, #2a0a52 10px)',
-  'gold': 'repeating-linear-gradient(45deg, #b8860b, #b8860b 5px, #8b6508 5px, #8b6508 10px)',
-  'teal': 'repeating-linear-gradient(45deg, #00695c, #00695c 5px, #004d40 5px, #004d40 10px)',
-};
-
-const getCardBacking = (): string => {
-  const backingId = localStorage.getItem('cardBacking') || 'classic';
-  return cardBackings[backingId] || cardBackings['classic'];
-};
+import { getCardBacking } from '../utils/cardBackings.ts';
 
 interface CardProps {
   card: CardType;
