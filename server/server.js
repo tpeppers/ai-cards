@@ -7,7 +7,9 @@ const fs = require('fs');
 const FormData = require('form-data');
 const { spawn } = require('child_process');
 const sharp = require('sharp');
+const http = require('http');
 const labelStudio = require('./labelStudio');
+const { initMultiplayer } = require('./multiplayer');
 
 // ML service configuration
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:3002';
@@ -542,9 +544,13 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: error.message || 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+initMultiplayer(server);
+
+server.listen(PORT, () => {
   console.log(`Hearts Card Capture API server running on port ${PORT}`);
   console.log(`Upload endpoint: http://localhost:${PORT}/api/upload`);
   console.log(`iOS app download: http://localhost:${PORT}/ios/download`);
   console.log(`Health check: http://localhost:${PORT}/health`);
+  console.log(`Multiplayer: socket.io enabled`);
 });

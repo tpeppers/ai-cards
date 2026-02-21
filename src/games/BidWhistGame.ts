@@ -880,6 +880,66 @@ export class BidWhistGame extends CardGame {
     super.startNewHand(url);
   }
 
+  // Multiplayer: set trump without auto-discarding for any player
+  setTrumpSuitForPlayer(suit: string, direction: BidDirection, isHumanDeclarer: boolean): boolean {
+    if (this.gameStage !== 'trumpSelection') return false;
+    if (this.declarer === null) return false;
+
+    const validSuits = ['spades', 'hearts', 'diamonds', 'clubs'];
+    if (!validSuits.includes(suit)) return false;
+
+    this.trumpSuit = suit;
+    this.bidDirection = direction;
+
+    this.players.forEach(player => {
+      this.sortHand(player.hand);
+    });
+
+    const suitDisplay = suit.charAt(0).toUpperCase() + suit.slice(1);
+    const directionDisplayMap: { [key: string]: string } = {
+      'uptown': 'Uptown',
+      'downtown': 'Downtown',
+      'downtown-noaces': 'Downtown (Aces No Good)'
+    };
+    const directionDisplay = directionDisplayMap[direction] || direction;
+
+    if (isHumanDeclarer) {
+      this.gameStage = 'discarding';
+      this.message = `${this.players[this.declarer].name} called ${directionDisplay} ${suitDisplay}. Select 4 cards to discard.`;
+    } else {
+      this.autoDiscard(this.declarer);
+      this.findStartingPlayer();
+      this.gameStage = 'play';
+      this.message = `${this.players[this.declarer].name} called ${directionDisplay} ${suitDisplay}. Play begins!`;
+    }
+
+    return true;
+  }
+
+  // Multiplayer: discard cards for any player (not just player 0)
+  discardCardsForPlayer(playerId: number, cardIds: string[]): boolean {
+    if (this.gameStage !== 'discarding') return false;
+    if (this.declarer !== playerId) return false;
+    if (cardIds.length !== 4) return false;
+
+    const player = this.players[playerId];
+    const discards = player.hand.filter(c => cardIds.includes(c.id));
+    if (discards.length !== 4) return false;
+
+    player.hand = player.hand.filter(c => !cardIds.includes(c.id));
+    player.tricks.push(...discards);
+    this.sortHand(player.hand);
+
+    this.findStartingPlayer();
+    this.gameStage = 'play';
+    const suitDisplay = this.trumpSuit ? this.trumpSuit.charAt(0).toUpperCase() + this.trumpSuit.slice(1) : '';
+    const dirMap: { [key: string]: string } = { 'uptown': 'Uptown', 'downtown': 'Downtown', 'downtown-noaces': 'Downtown (Aces No Good)' };
+    const dirDisplay = dirMap[this.bidDirection] || this.bidDirection;
+    this.message = `${player.name} called ${dirDisplay} ${suitDisplay}. Play begins!`;
+
+    return true;
+  }
+
   // Simulation helpers
   simulateAutoDiscard(playerId: number): void {
     this.autoDiscard(playerId);
