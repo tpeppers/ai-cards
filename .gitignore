@@ -22,3 +22,18 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 __pycache__/
+
+# ML datasets and training
+/Playing-Cards-Object-Detection/
+/runs/
+/labeling/
+
+# Binary assets
+/animations/
+/pix/
+
+# Claude Code local settings
+.claude/
+
+# Windows artifacts
+nul
