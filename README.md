@@ -1,55 +1,120 @@
-## Development Setup
+# Hearts & Bid Whist Card Game
 
-### Prerequisites
+A full-featured trick-taking card game platform with AI opponents, multiplayer support, game analysis tools, and ML-powered card recognition from photos.
+
+## Tech Stack
+
+- **Frontend**: React 19, TypeScript, Tailwind CSS, Lucide React icons
+- **Backend**: Express.js, Socket.io (multiplayer), Multer (file uploads), Sharp (image processing)
+- **ML Pipeline**: Python, YOLOv8 (Ultralytics), FastAPI, OpenCV, PyTorch
+- **iOS App**: Swift / Xcode (camera capture for physical card hands)
+- **Testing**: Jest, React Testing Library, Selenium (E2E)
+- **Tooling**: Create React App, Concurrently, PostCSS, ESLint
+
+## Prerequisites
+
 - Node.js and npm
-- Xcode (for iOS development)
-- Python 3 (for testing)
+- Python 3 (for ML card recognition and E2E tests)
+- Xcode (only for iOS development)
 
-### Installation
+## Installation
 
-1. Install dependencies:
 ```bash
 npm install
 ```
 
-2. Install Python testing dependencies:
+For the ML card recognition pipeline:
+
+```bash
+npm run ml:install
+```
+
+For Selenium E2E tests:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### Running the Applications
+## Running the App
 
-#### Start both web app and API server:
 ```bash
+# Web app + API server together (recommended)
 npm run dev
-```
 
-#### Start individually:
-```bash
-# Web application only (port 3000)
+# Web app only (port 3000)
 npm start
 
-# API server only (port 3001)  
+# API server only (port 3001)
 npm run server
+
+# Full stack including ML inference server and Label Studio
+npm run dev:full
 ```
-### API Endpoints
 
-- `POST /api/upload` - Upload card hand images
-- `GET /api/upload/:uuid` - Get upload details by UUID
-- `GET /api/uploads` - List all uploads
-- `GET /ios/download` - Download compiled iOS app
-- `GET /health` - Server health check
+## Games
 
-## ALTERNATIVE ENCODINGS:
-TODO: Integrate PHH file format: https://arxiv.org/html/2312.11753v5 
+### Hearts
+- Classic trick-avoiding card game for 4 players
+- Queen of Spades = 13 points, each Heart = 1 point
+- Shoot the moon to give all opponents 26 points
+- Configurable AI strategies
 
-Here are the SHIFT+CTRL-U+1F0[A-D]X codes:	
-Unicode 	|  1    2   3   4   5  6   7  8   9  A   B   C   D
-U+1F0Ax	    |  🂡	🂢	🂣	🂤	🂥	🂦	🂧	🂨	🂩	🂪	🂫	🂭	🂮
-U+1F0Bx	    |  🂱	🂲	🂳	🂴	🂵	🂶	🂷	🂸	🂹	🂺	🂻	🂽	🂾
-U+1F0Cx	    |  🃁	🃂	🃃	🃄	🃅	🃆	🃇	🃈	🃉	🃊	🃋	🃍	🃎
-U+1F0Dx	    |  🃑	🃒	🃓	🃔	🃕	🃖	🃗	🃘	🃙	🃚	🃛	🃝	🃞
+### Bid Whist
+- Partnership trick-taking game (2v2)
+- Bidding phase with trump selection (uptown/downtown)
+- Custom strategy language (`.cstrat` files) for AI behavior
+- Whisting bonus bids with themed animations
 
-Note the as-of-yet unused KNIGHTS ("cavalier") available in unicode: 🂬🂼🃌🃜 which might be interesting for testing.
+## Features
 
-Curious if an ad-hoc token-schema performs better or worse than unicode encoding, i.e., asking a model what card to play, after prompting with an entire set of rules, would cause it to pick well?
+- **Multiplayer** — Socket.io-based lobbies with passphrase protection, seat swapping, and AI fill-in on disconnect
+- **Strategy Comparison** — Run thousands of simulated games to compare AI strategies
+- **Replay Analyzer** — Step through past games with move-by-move review
+- **Table Analysis** — Evaluate hand strength with percentile rankings
+- **Hand Creator** — Manually construct hands for testing scenarios
+- **Settings** — Card back designs (7 SVG themes), suit colors, animation modes, sound effects
+- **URL Seeding** — Share specific deals via URL hash (`#[52-letter-code]`)
+
+## ML Card Recognition
+
+Recognizes playing cards from photos using a YOLOv8 object detection model.
+
+```bash
+npm run ml:prepare       # Split labeled images into train/val sets
+npm run ml:train         # Train YOLOv8 model
+npm run ml:server        # Start inference server (port 3002)
+npm run label-studio     # Start Label Studio annotation UI (port 8080)
+```
+
+The web app proxies upload requests from the Express server (3001) to the ML inference server (3002).
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/upload` | Upload card hand image for recognition |
+| GET | `/api/upload/:uuid` | Get upload details by UUID |
+| GET | `/api/uploads` | List all uploads |
+| GET | `/health` | Server health check |
+
+## iOS App
+
+A companion camera app (Swift) for capturing photos of physical card hands and sending them to the server for recognition.
+
+```bash
+npm run build:ios
+```
+
+## Testing
+
+```bash
+npm test                        # Run tests in watch mode
+npm test -- --watchAll=false    # Run all tests once
+npm test -- -t "component"     # Run tests matching a name
+```
+
+## Build
+
+```bash
+npm run build
+```
