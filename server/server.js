@@ -64,6 +64,10 @@ const upload = multer({
 
 const uploadDatabase = new Map();
 
+// When true (default), all detected images are automatically saved to labeling/images/ for retraining.
+// When false, images are deleted after 10 minutes unless manually reported as incorrect.
+let autoSaveForRetraining = true;
+
 app.post('/api/upload', upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
@@ -124,6 +128,20 @@ app.get('/api/uploads', (req, res) => {
   }));
 
   res.json({ uploads });
+});
+
+// Auto-save for retraining setting
+app.get('/api/settings/auto-save', (req, res) => {
+  res.json({ autoSaveForRetraining });
+});
+
+app.post('/api/settings/auto-save', (req, res) => {
+  const { enabled } = req.body;
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled must be a boolean' });
+  }
+  autoSaveForRetraining = enabled;
+  res.json({ autoSaveForRetraining });
 });
 
 app.get('/ios/download', (req, res) => {
@@ -360,31 +378,60 @@ print(json.dumps({
       try {
         const result = JSON.parse(output.trim());
 
-        // Store detection info for potential reporting (keep image for 10 minutes)
         const detectionId = req.file.filename;
-        recentDetections.set(detectionId, {
-          imagePath,
-          imageWidth,
-          imageHeight,
-          detections: result.detections,
-          timestamp: Date.now()
-        });
 
-        // Clean up old detections after 10 minutes
-        setTimeout(() => {
-          const detection = recentDetections.get(detectionId);
-          if (detection) {
-            recentDetections.delete(detectionId);
-            fs.unlink(detection.imagePath, () => {});
+        if (autoSaveForRetraining) {
+          // Auto-save: copy to labeling directory for retraining
+          const labelingFilename = `${Date.now()}_${path.basename(imagePath)}`;
+          const labelingPath = path.join(labelingDir, labelingFilename);
+          try {
+            fs.copyFileSync(imagePath, labelingPath);
+            const metaPath = labelingPath.replace(/\.[^.]+$/, '_meta.json');
+            fs.writeFileSync(metaPath, JSON.stringify({
+              originalDetections: result.detections,
+              imageWidth,
+              imageHeight,
+              timestamp: new Date().toISOString(),
+              autoSaved: true
+            }, null, 2));
+          } catch (err) {
+            console.error('Failed to auto-save for retraining:', err);
           }
-        }, 10 * 60 * 1000);
+          fs.unlink(imagePath, () => {});
 
-        res.json({
-          ...result,
-          detectionId,
-          imageWidth,
-          imageHeight
-        });
+          res.json({
+            ...result,
+            detectionId,
+            imageWidth,
+            imageHeight,
+            autoSaved: true
+          });
+        } else {
+          // Manual mode: keep image for 10 minutes for potential reporting
+          recentDetections.set(detectionId, {
+            imagePath,
+            imageWidth,
+            imageHeight,
+            detections: result.detections,
+            timestamp: Date.now()
+          });
+
+          setTimeout(() => {
+            const detection = recentDetections.get(detectionId);
+            if (detection) {
+              recentDetections.delete(detectionId);
+              fs.unlink(detection.imagePath, () => {});
+            }
+          }, 10 * 60 * 1000);
+
+          res.json({
+            ...result,
+            detectionId,
+            imageWidth,
+            imageHeight,
+            autoSaved: false
+          });
+        }
       } catch (parseError) {
         fs.unlink(imagePath, () => {});
         console.error('Parse error:', output);

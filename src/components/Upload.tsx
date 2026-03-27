@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 
 interface DetectionResult {
   cards: string[];
@@ -7,6 +7,7 @@ interface DetectionResult {
   detectionId?: string;
   imageWidth?: number;
   imageHeight?: number;
+  autoSaved?: boolean;
 }
 
 const suitInfo: Record<string, { symbol: string; color: string }> = {
@@ -43,6 +44,28 @@ const Upload: React.FC = () => {
   const [reportError, setReportError] = useState<string | null>(null);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [autoSave, setAutoSave] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/settings/auto-save')
+      .then(res => res.json())
+      .then(data => setAutoSave(data.autoSaveForRetraining))
+      .catch(() => {});
+  }, []);
+
+  const toggleAutoSave = async () => {
+    const newValue = !autoSave;
+    setAutoSave(newValue);
+    try {
+      await fetch('/api/settings/auto-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newValue }),
+      });
+    } catch {
+      setAutoSave(!newValue);
+    }
+  };
 
   const processFile = useCallback((file: File) => {
     setSelectedFile(file);
@@ -157,6 +180,24 @@ const Upload: React.FC = () => {
     <div className="max-w-5xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">Card Detection</h1>
 
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={toggleAutoSave}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            autoSave ? 'bg-blue-600' : 'bg-gray-300'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              autoSave ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+        <span className="text-sm text-gray-600">
+          Auto-save images for retraining
+        </span>
+      </div>
+
       <div className="flex gap-6 items-start">
         {/* Left column - Image */}
         <div className="flex-1 min-w-0">
@@ -265,40 +306,48 @@ const Upload: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-4 bg-gray-50 rounded border">
-                    <h3 className="font-semibold mb-2">Results not correct?</h3>
-                    {labelStudioUrl ? (
-                      <div className="bg-blue-50 p-3 rounded">
-                        <p className="text-sm mb-2">Task created! Click to correct labels in Label Studio:</p>
-                        <a
-                          href={labelStudioUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline break-all"
-                        >
-                          {labelStudioUrl}
-                        </a>
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          onClick={handleReportIncorrect}
-                          disabled={isReporting || !result.detectionId}
-                          className="bg-orange-500 text-white py-2 px-4 rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {isReporting ? 'Creating task...' : 'Report Incorrect'}
-                        </button>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Opens Label Studio to correct the card labels for model improvement
-                        </p>
-                      </>
-                    )}
-                    {reportError && (
-                      <div className="mt-2 p-2 bg-red-100 text-red-700 rounded text-sm">
-                        {reportError}
-                      </div>
-                    )}
-                  </div>
+                  {result.autoSaved ? (
+                    <div className="p-4 bg-blue-50 rounded border border-blue-200">
+                      <p className="text-sm text-blue-700">
+                        Image and detections auto-saved to retraining dataset
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-gray-50 rounded border">
+                      <h3 className="font-semibold mb-2">Results not correct?</h3>
+                      {labelStudioUrl ? (
+                        <div className="bg-blue-50 p-3 rounded">
+                          <p className="text-sm mb-2">Task created! Click to correct labels in Label Studio:</p>
+                          <a
+                            href={labelStudioUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline break-all"
+                          >
+                            {labelStudioUrl}
+                          </a>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={handleReportIncorrect}
+                            disabled={isReporting || !result.detectionId}
+                            className="bg-orange-500 text-white py-2 px-4 rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {isReporting ? 'Creating task...' : 'Report Incorrect'}
+                          </button>
+                          <p className="text-sm text-gray-500 mt-2">
+                            Opens Label Studio to correct the card labels for model improvement
+                          </p>
+                        </>
+                      )}
+                      {reportError && (
+                        <div className="mt-2 p-2 bg-red-100 text-red-700 rounded text-sm">
+                          {reportError}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </>

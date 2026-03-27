@@ -40,7 +40,9 @@
     "ml:train": "cd ml/scripts && python train.py",
     "ml:prepare": "cd ml/scripts && python prepare_dataset.py",
     "ml:verify-labels": "cd ml/scripts && python verify_labels.py",
-    "label-studio": "python -c \"import sys; sys.argv = ['label-studio', 'start', '--port', '8080', '--no-browser']; from label_studio.server import main; main()\""
+    "label-studio": "python -c \"import sys; sys.argv = ['label-studio', 'start', '--port', '8080', '--no-browser']; from label_studio.server import main; main()\"",
+    "build:standalone": "node scripts/build-standalone.js",
+    "deploy": "npm run build:standalone && gh-pages -d standalone/bidwhist"
   },
   "eslintConfig": {
     "extends": [
@@ -65,6 +67,8 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.24",
+    "esbuild": "^0.24.2",
+    "gh-pages": "^6.3.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19"
   }
