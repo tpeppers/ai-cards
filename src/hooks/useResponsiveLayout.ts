@@ -6,7 +6,10 @@ export const BASE_CARD_HEIGHT = 96;
 const REFERENCE_WIDTH = 900;
 const REFERENCE_HEIGHT = 700;
 const MIN_SCALE = 0.5;
-const COMPACT_BREAKPOINT = 700;
+const COMPACT_WIDTH_BREAKPOINT = 700;
+// Any viewport shorter than this triggers compact mode too, so landscape
+// phones (wide but short) get the corner-anchored chrome.
+const COMPACT_HEIGHT_BREAKPOINT = 500;
 
 export interface ResponsiveLayout {
   width: number;
@@ -15,6 +18,7 @@ export interface ResponsiveLayout {
   cardWidth: number;
   cardHeight: number;
   isCompact: boolean;
+  isLandscape: boolean;
 }
 
 const computeLayout = (width: number, height: number): ResponsiveLayout => {
@@ -23,13 +27,19 @@ const computeLayout = (width: number, height: number): ResponsiveLayout => {
   const scaleX = effectiveWidth / REFERENCE_WIDTH;
   const scaleY = effectiveHeight / REFERENCE_HEIGHT;
   const scale = Math.max(MIN_SCALE, Math.min(1, Math.min(scaleX, scaleY)));
+  const isCompact =
+    effectiveWidth < COMPACT_WIDTH_BREAKPOINT ||
+    effectiveHeight < COMPACT_HEIGHT_BREAKPOINT;
+  const isLandscape =
+    effectiveWidth > effectiveHeight && effectiveHeight < COMPACT_HEIGHT_BREAKPOINT;
   return {
     width: effectiveWidth,
     height: effectiveHeight,
     scale,
     cardWidth: BASE_CARD_WIDTH * scale,
     cardHeight: BASE_CARD_HEIGHT * scale,
-    isCompact: effectiveWidth < COMPACT_BREAKPOINT,
+    isCompact,
+    isLandscape,
   };
 };
 

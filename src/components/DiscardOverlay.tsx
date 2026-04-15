@@ -52,8 +52,8 @@ const DiscardOverlay: React.FC<DiscardOverlayProps> = ({
   };
 
   return (
-    <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-      <div className={`bg-white rounded-lg shadow-2xl w-full max-w-2xl ${isCompact ? 'p-2 mx-1' : 'p-5 mx-4'}`}>
+    <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2">
+      <div className={`bg-white rounded-lg shadow-2xl w-full max-w-2xl overflow-y-auto ${isCompact ? 'p-2 max-h-[95vh]' : 'p-5'}`}>
         <h2 className={`font-bold text-center text-gray-800 ${isCompact ? 'text-base mb-1' : 'text-xl mb-1'}`}>Discard 4 Cards</h2>
         <p className={`text-center text-gray-600 ${isCompact ? 'text-[11px] mb-2' : 'text-sm mb-3'}`}>
           Select 4 cards to discard. Trump ({getSuitInfo(trumpSuit || '').symbol}) highlighted.
