@@ -1,5 +1,7 @@
 # Hearts & Bid Whist Card Game
 
+**[DEMO: PLAY BID-WHIST](https://tpeppers.github.io/ai-cards/)**
+
 A full-featured trick-taking card game platform with AI opponents, multiplayer support, game analysis tools, and ML-powered card recognition from photos.
 
 ## Tech Stack
