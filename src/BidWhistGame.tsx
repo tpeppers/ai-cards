@@ -10,7 +10,7 @@ import { GameState } from './types/CardGame.ts';
 import { STRATEGY_REGISTRY } from './strategies/index.ts';
 import { getGameStateFromUrl } from './urlGameState.js';
 import { useDraggable } from './hooks/useDraggable.ts';
-import { useResponsiveLayout } from './hooks/useResponsiveLayout.ts';
+import { useResponsiveLayout, PlayAreaLayoutProvider } from './hooks/useResponsiveLayout.ts';
 import { playWhistingFanfare, stopWhistingFanfare } from './utils/whistingSound.ts';
 
 const SUIT_SYMBOLS: { [key: string]: string } = {
@@ -71,6 +71,9 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const [showStrategyModal, setShowStrategyModal] = useState(false);
 
   const game = gameRef.current;
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Top-level only needs isCompact for chrome sizing; it falls back to the
+  // window viewport (fine — isCompact is width-based and the root fills it).
   const { isCompact } = useResponsiveLayout();
 
   // Draggable overlays
@@ -362,7 +365,8 @@ Card Rankings:
   const lastBook = game.getLastCompletedTrick();
 
   return (
-    <div className="relative w-full h-full">
+    <div ref={rootRef} className="relative w-full h-full">
+      <PlayAreaLayoutProvider elementRef={rootRef}>
       <GameEngine
         game={game}
         gameName={displayGameName}
@@ -586,6 +590,7 @@ Card Rankings:
           </div>
         );
       })()}
+      </PlayAreaLayoutProvider>
     </div>
   );
 };

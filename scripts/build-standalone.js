@@ -58,6 +58,10 @@ async function build() {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bid Whist</title>
   <script src="https://cdn.tailwindcss.com"><\/script>
+  <style>
+    html, body, #root { height: 100%; margin: 0; }
+    body { overflow: hidden; }
+  </style>
 </head>
 <body class="bg-gray-900">
   <div id="root"></div>

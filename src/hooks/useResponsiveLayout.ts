@@ -1,11 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, createContext, useContext } from 'react';
 
 export const BASE_CARD_WIDTH = 71;
 export const BASE_CARD_HEIGHT = 96;
-
-// Height of the app-level router navbar (bg-gray-800 p-4 in App.js).
-// Play areas live below this, so we subtract it from innerHeight.
-export const APP_NAV_HEIGHT = 68;
 
 const REFERENCE_WIDTH = 900;
 const REFERENCE_HEIGHT = 700;
@@ -21,29 +17,92 @@ export interface ResponsiveLayout {
   isCompact: boolean;
 }
 
-const readViewport = () => ({
-  width: typeof window !== 'undefined' ? window.innerWidth : REFERENCE_WIDTH,
-  height: typeof window !== 'undefined' ? window.innerHeight : REFERENCE_HEIGHT,
-});
+const computeLayout = (width: number, height: number): ResponsiveLayout => {
+  const effectiveHeight = Math.max(200, height);
+  const effectiveWidth = Math.max(200, width);
+  const scaleX = effectiveWidth / REFERENCE_WIDTH;
+  const scaleY = effectiveHeight / REFERENCE_HEIGHT;
+  const scale = Math.max(MIN_SCALE, Math.min(1, Math.min(scaleX, scaleY)));
+  return {
+    width: effectiveWidth,
+    height: effectiveHeight,
+    scale,
+    cardWidth: BASE_CARD_WIDTH * scale,
+    cardHeight: BASE_CARD_HEIGHT * scale,
+    isCompact: effectiveWidth < COMPACT_BREAKPOINT,
+  };
+};
 
+const readViewportLayout = (): ResponsiveLayout => {
+  if (typeof window === 'undefined') {
+    return computeLayout(REFERENCE_WIDTH, REFERENCE_HEIGHT);
+  }
+  return computeLayout(window.innerWidth, window.innerHeight);
+};
+
+const PlayAreaLayoutContext = createContext<ResponsiveLayout | null>(null);
+
+/**
+ * Provider that measures its wrapping element and exposes the resulting
+ * layout to descendants via context. Children that call useResponsiveLayout
+ * get the actual play-area dimensions instead of window.innerWidth/Height.
+ * Falls back to the window viewport if no element has been attached yet.
+ */
+export const PlayAreaLayoutProvider: React.FC<{
+  elementRef: React.RefObject<HTMLElement | null>;
+  children: React.ReactNode;
+}> = ({ elementRef, children }) => {
+  const [layout, setLayout] = useState<ResponsiveLayout>(readViewportLayout);
+
+  useLayoutEffect(() => {
+    const el = elementRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      // If the element has not been laid out yet (w/h still 0), fall back to window.
+      if (rect.width > 0 && rect.height > 0) {
+        setLayout(computeLayout(rect.width, rect.height));
+      } else {
+        setLayout(readViewportLayout());
+      }
+    };
+
+    measure();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => measure());
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+
+    const onResize = () => measure();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [elementRef]);
+
+  return React.createElement(
+    PlayAreaLayoutContext.Provider,
+    { value: layout },
+    children
+  );
+};
+
+/**
+ * Read the current play-area layout. Inside a PlayAreaLayoutProvider this
+ * returns the measured container dimensions; outside a provider it falls
+ * back to the window viewport (so standalone entry points still work).
+ */
 export function useResponsiveLayout(): ResponsiveLayout {
-  const [size, setSize] = useState(readViewport);
+  const ctx = useContext(PlayAreaLayoutContext);
+  const [fallback, setFallback] = useState<ResponsiveLayout>(readViewportLayout);
 
   useEffect(() => {
-    const handleResize = () => setSize(readViewport());
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    if (ctx) return; // context-provided layout, no window listener needed
+    const onResize = () => setFallback(readViewportLayout());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [ctx]);
 
-  const { width } = size;
-  // Subtract the app-level router navbar so card positions live in the real play area.
-  const height = Math.max(200, size.height - APP_NAV_HEIGHT);
-  const scaleX = width / REFERENCE_WIDTH;
-  const scaleY = height / REFERENCE_HEIGHT;
-  const scale = Math.max(MIN_SCALE, Math.min(1, Math.min(scaleX, scaleY)));
-  const cardWidth = BASE_CARD_WIDTH * scale;
-  const cardHeight = BASE_CARD_HEIGHT * scale;
-  const isCompact = width < COMPACT_BREAKPOINT;
-
-  return { width, height, scale, cardWidth, cardHeight, isCompact };
+  return ctx || fallback;
 }
