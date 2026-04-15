@@ -35,6 +35,10 @@ __pycache__/
 # Standalone builds
 /standalone/
 
+# Strategy optimizer bundle + results
+/build-scripts/
+/optimized-strategy.json
+
 # Claude Code local settings
 .claude/
 

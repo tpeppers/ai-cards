@@ -1,9 +1,10 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import { STRATEGY_REGISTRY, splitStrategySections, replaceStrategySection } from '../strategies/index.ts';
 import { BatchRunner } from '../simulation/BatchRunner.ts';
 import { ComparisonConfig, StrategyComparisonResult } from '../simulation/types.ts';
 import { RED_TEAM_DECKS } from '../simulation/redTeamDecks.ts';
 import ComparisonResults from './ComparisonResults.tsx';
+import SignalLabPanel, { SignalLabStrategy } from './SignalLabPanel.tsx';
 import {
   DiffLineType, DiffLine, DiffResult, DiffHunk,
   computeDiff, identifyHunks, buildEffectiveText,
@@ -220,7 +221,7 @@ const ABDiffPane: React.FC<{
 };
 
 const StrategyComparison: React.FC = () => {
-  const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'round-robin' | 'ab-test'>('by-team');
+  const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'round-robin' | 'ab-test' | 'signal-lab'>('by-team');
   const [team0Selection, setTeam0Selection] = useState('0');
   const [team1Selection, setTeam1Selection] = useState('1');
   const [custom0Text, setCustom0Text] = useState('');
@@ -240,6 +241,12 @@ const StrategyComparison: React.FC = () => {
     const sections = splitStrategySections(bidWhistStrategies[0].text);
     return sections.trump;
   });
+
+  // Signal Lab state
+  const [slStrategies, setSlStrategies] = useState<SignalLabStrategy[]>([]);
+  const handleSlStrategiesChange = useCallback((strategies: SignalLabStrategy[]) => {
+    setSlStrategies(strategies);
+  }, []);
 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
@@ -437,6 +444,14 @@ const StrategyComparison: React.FC = () => {
         numHands: effectiveNumHands,
         predefinedDeckUrls,
       };
+    } else if (assignmentMode === 'signal-lab') {
+      // Signal Lab: generated strategies run in round-robin
+      config = {
+        strategies: slStrategies.map(s => ({ name: s.name, strategyText: s.strategyText })),
+        assignmentMode: 'round-robin',
+        numHands: effectiveNumHands,
+        predefinedDeckUrls,
+      };
     } else {
       // Round-robin: build strategies from checked items
       const strategies = Array.from(rrSelected)
@@ -448,7 +463,7 @@ const StrategyComparison: React.FC = () => {
       if (rrCustomChecked && rrCustomText.trim()) {
         strategies.push({ name: 'Custom', strategyText: rrCustomText });
       }
-      config = { strategies, assignmentMode, numHands: effectiveNumHands, predefinedDeckUrls };
+      config = { strategies, assignmentMode: 'round-robin', numHands: effectiveNumHands, predefinedDeckUrls };
     }
 
     const runner = new BatchRunner();
@@ -478,7 +493,7 @@ const StrategyComparison: React.FC = () => {
 
   const progressPct = progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
 
-  const canRun = assignmentMode === 'by-team' || assignmentMode === 'ab-test' || rrStrategyCount >= 2;
+  const canRun = assignmentMode === 'by-team' || assignmentMode === 'ab-test' || rrStrategyCount >= 2 || (assignmentMode === 'signal-lab' && slStrategies.length >= 2);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0f1f15', padding: '24px', color: '#e5e7eb' }}>
@@ -538,6 +553,20 @@ const StrategyComparison: React.FC = () => {
               }}
             >
               A/B Test
+            </button>
+            <button
+              onClick={() => setAssignmentMode('signal-lab')}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: assignmentMode === 'signal-lab' ? '#10b981' : '#374151',
+                color: '#e5e7eb',
+                cursor: 'pointer',
+                fontWeight: assignmentMode === 'signal-lab' ? 'bold' : 'normal',
+              }}
+            >
+              Signal Lab
             </button>
           </div>
         </div>
@@ -883,6 +912,11 @@ const StrategyComparison: React.FC = () => {
               )}
             </div>
           </div>
+        )}
+
+        {/* Signal Lab */}
+        {assignmentMode === 'signal-lab' && (
+          <SignalLabPanel onStrategiesChange={handleSlStrategiesChange} />
         )}
 
         {/* Game count */}
