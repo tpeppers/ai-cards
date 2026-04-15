@@ -10,6 +10,7 @@ import { GameState } from './types/CardGame.ts';
 import { STRATEGY_REGISTRY } from './strategies/index.ts';
 import { getGameStateFromUrl } from './urlGameState.js';
 import { useDraggable } from './hooks/useDraggable.ts';
+import { useResponsiveLayout } from './hooks/useResponsiveLayout.ts';
 import { playWhistingFanfare, stopWhistingFanfare } from './utils/whistingSound.ts';
 
 const SUIT_SYMBOLS: { [key: string]: string } = {
@@ -70,6 +71,7 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const [showStrategyModal, setShowStrategyModal] = useState(false);
 
   const game = gameRef.current;
+  const { isCompact } = useResponsiveLayout();
 
   // Draggable overlays
   const lastBookDrag = useDraggable();
@@ -360,7 +362,7 @@ Card Rankings:
   const lastBook = game.getLastCompletedTrick();
 
   return (
-    <div className="relative w-full h-screen">
+    <div className="relative w-full h-full">
       <GameEngine
         game={game}
         gameName={displayGameName}
@@ -436,24 +438,26 @@ Card Rankings:
         const books = game.getBooksWon();
         return (
           <div
-            className="absolute top-8 right-4 bg-white bg-opacity-90 p-2 rounded border border-gray-400 shadow-md z-10"
+            className={`absolute bg-white bg-opacity-90 rounded border border-gray-400 shadow-md z-10 ${
+              isCompact ? 'bottom-1 left-1 p-1 text-[10px]' : 'top-8 right-4 p-2'
+            }`}
             style={{ transform: `translate(${booksDrag.position.x}px, ${booksDrag.position.y}px)` }}
           >
             <div
-              className="text-sm font-bold border-b border-gray-400 mb-1 pb-1"
+              className={`font-bold border-b border-gray-400 mb-1 pb-1 ${isCompact ? 'text-[10px]' : 'text-sm'}`}
               style={{ cursor: 'grab' }}
               onMouseDown={booksDrag.handleMouseDown}
               onTouchStart={booksDrag.handleTouchStart}
             >
               Books
             </div>
-            <div className="text-xs flex justify-between">
+            <div className={`flex justify-between ${isCompact ? 'text-[10px]' : 'text-xs'}`}>
               <span>S/N:</span>
-              <span className="ml-4 font-bold">{books[0]}</span>
+              <span className="ml-3 font-bold">{books[0]}</span>
             </div>
-            <div className="text-xs flex justify-between">
+            <div className={`flex justify-between ${isCompact ? 'text-[10px]' : 'text-xs'}`}>
               <span>E/W:</span>
-              <span className="ml-4 font-bold">{books[1]}</span>
+              <span className="ml-3 font-bold">{books[1]}</span>
             </div>
           </div>
         );
@@ -487,19 +491,27 @@ Card Rankings:
 
       {/* Kitty display when Show All Cards is enabled during bidding/trump phases */}
       {showAllCards && (biddingState.biddingPhase || game.isTrumpSelectionPhase()) && game.getKitty().length > 0 && (
-        <div className="absolute top-1/2 -translate-y-1/2 z-[51] pointer-events-none"
-          style={{ left: 'calc(50% + 230px)' }}>
-          <div className="bg-white bg-opacity-95 rounded-lg shadow-lg p-3 pointer-events-auto">
-            <div className="text-xs font-semibold text-gray-500 mb-2 text-center">Kitty</div>
+        <div
+          className="absolute z-[51] pointer-events-none"
+          style={
+            isCompact
+              ? { top: '4px', right: '4px' }
+              : { top: '50%', left: 'calc(50% + 230px)', transform: 'translateY(-50%)' }
+          }
+        >
+          <div className={`bg-white bg-opacity-95 rounded-lg shadow-lg pointer-events-auto ${isCompact ? 'p-1' : 'p-3'}`}>
+            <div className={`font-semibold text-gray-500 text-center ${isCompact ? 'text-[9px] mb-1' : 'text-xs mb-2'}`}>Kitty</div>
             <div className="grid grid-cols-2 gap-1">
               {game.getKitty().map(card => (
                 <div
                   key={card.id}
-                  className="w-10 h-14 bg-white border border-gray-300 rounded flex flex-col items-center justify-center text-xs font-bold shadow-sm"
+                  className={`bg-white border border-gray-300 rounded flex flex-col items-center justify-center font-bold shadow-sm ${
+                    isCompact ? 'w-6 h-8 text-[9px]' : 'w-10 h-14 text-xs'
+                  }`}
                   style={{ color: SUIT_COLORS[card.suit] || 'black' }}
                 >
                   <span>{RANK_DISPLAY[card.rank] || card.rank}</span>
-                  <span className="text-base leading-none">{SUIT_SYMBOLS[card.suit]}</span>
+                  <span className={`leading-none ${isCompact ? 'text-xs' : 'text-base'}`}>{SUIT_SYMBOLS[card.suit]}</span>
                 </div>
               ))}
             </div>
@@ -518,16 +530,16 @@ Card Rankings:
 
       {/* Auto Play button (z-60 to float above overlays) */}
       {showAutoPlay && (
-        <div className="absolute top-10 right-4 z-[60]">
+        <div className={`absolute z-[60] ${isCompact ? 'bottom-1 right-1' : 'top-10 right-4'}`}>
           <button
-            className="bg-green-600 text-white px-3 py-1 text-sm rounded hover:bg-green-700"
+            className={`bg-green-600 text-white rounded hover:bg-green-700 ${isCompact ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'}`}
             onClick={handleAutoPlay}
             onMouseEnter={handleAutoPlayHover}
             onMouseLeave={handleAutoPlayLeave}
           >
             Auto Play
           </button>
-          <div className="text-gray-300 text-xs mt-1 max-w-[140px] truncate">
+          <div className={`text-gray-300 mt-0.5 truncate ${isCompact ? 'text-[9px] max-w-[100px]' : 'text-xs max-w-[140px]'}`}>
             {player0StrategyName}
           </div>
         </div>

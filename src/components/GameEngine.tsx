@@ -5,6 +5,7 @@ import PlayerArea from './PlayerArea.tsx';
 import GameTable from './GameTable.tsx';
 import MoveHistory from './MoveHistory.tsx';
 import TurnIndicator from './TurnIndicator.tsx';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout.ts';
 import { 
   decodeUrlToDeck, 
   getGameStateFromUrl, 
@@ -69,6 +70,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
   const [showAllCardsLocal, setShowAllCardsLocal] = useState<boolean>(false);
   const showAllCards = showAllCardsProp !== undefined ? showAllCardsProp : showAllCardsLocal;
+  const { isCompact } = useResponsiveLayout();
   
   // Window resize handling
   useEffect(() => {
@@ -307,7 +309,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   }, [gameState.currentPlayer, gameState.gameStage, gameState.currentTrick]);
 
   return (
-    <div className="w-full h-screen overflow-hidden relative"
+    <div className="w-full h-full overflow-hidden relative"
       style={{ backgroundColor: '#008000', backgroundImage: 'radial-gradient(circle, #009900 0%, #006600 100%)' }}>
       
       {/* Menu Bar */}
@@ -350,81 +352,89 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
       />
       
       {/* Game controls */}
-      <div className="absolute top-28 right-[140px] flex flex-col gap-2 z-[60]">
+      <div
+        className={`absolute flex gap-2 z-[60] ${
+          isCompact ? 'top-9 right-1 flex-col items-end' : 'top-28 right-[140px] flex-col'
+        }`}
+      >
         {extraControls}
         {!hideDeal && gameState.gameStage === 'deal' && (
           <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            className={`bg-blue-600 text-white rounded hover:bg-blue-700 ${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
             onClick={dealCards}
             id="dealButton"
           >
             Deal
           </button>
         )}
-        
+
         {gameState.gameStage === 'scoring' && !gameState.gameOver && (
-          <button 
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          <button
+            className={`bg-blue-600 text-white rounded hover:bg-blue-700 ${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
             onClick={startNewHand}
           >
             Next Hand
           </button>
         )}
-        
+
         {gameState.gameOver && (
           <button
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center gap-1"
+            className={`bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-1 ${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
             onClick={() => resetGame(true)}
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={isCompact ? 12 : 16} />
             New Game
           </button>
         )}
-        
+
         {!hideAutoPlay && gameState.gameStage === 'play' && gameState.currentPlayer === 0 && (
           <button
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            className={`bg-green-600 text-white rounded hover:bg-green-700 ${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
             onClick={handleAutoPlay}
           >
             Auto Play
           </button>
         )}
-        
+
         {(
           <button
-            className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+            className={`bg-yellow-600 text-white rounded hover:bg-yellow-700 ${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
             onClick={handleRandomUrl}
           >
-            Random URL
+            {isCompact ? 'URL' : 'Random URL'}
           </button>
         )}
-        
+
         <button
-          className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700"
+          className={`bg-orange-600 text-white rounded hover:bg-orange-700 ${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-2'}`}
           onClick={toggleCardVisibility}
         >
-          {showAllCards ? 'Hide Cards' : 'Show All Cards'}
+          {isCompact ? (showAllCards ? 'Hide' : 'Show') : (showAllCards ? 'Hide Cards' : 'Show All Cards')}
         </button>
       </div>
-      
+
       {/* Score display */}
-      <div className="absolute top-28 left-[140px] bg-white bg-opacity-90 p-2 rounded border border-gray-400 shadow-md">
-        <div className="text-sm font-bold border-b border-gray-400 mb-1 pb-1">
+      <div
+        className={`absolute bg-white bg-opacity-90 rounded border border-gray-400 shadow-md ${
+          isCompact ? 'top-8 left-1 p-1 text-xs' : 'top-28 left-[140px] p-2'
+        }`}
+      >
+        <div className={`font-bold border-b border-gray-400 mb-1 pb-1 ${isCompact ? 'text-xs' : 'text-sm'}`}>
           Score
         </div>
         {gameState.players.map(player => (
-          <div key={player.id} className="flex justify-between text-sm">
+          <div key={player.id} className={`flex justify-between ${isCompact ? 'text-[10px]' : 'text-sm'}`}>
             <span>{playerDisplayNames?.[player.id] || player.name}:</span>
-            <span className="ml-4">{player.totalScore}</span>
+            <span className="ml-3">{player.totalScore}</span>
           </div>
         ))}
         {gameState.gameStage === 'scoring' && (
           <div className="mt-2 pt-1 border-t border-gray-400">
-            <div className="text-sm font-bold mb-1">Last Hand</div>
+            <div className={`font-bold mb-1 ${isCompact ? 'text-xs' : 'text-sm'}`}>Last Hand</div>
             {gameState.players.map(player => (
-              <div key={`last_${player.id}`} className="flex justify-between text-sm">
+              <div key={`last_${player.id}`} className={`flex justify-between ${isCompact ? 'text-[10px]' : 'text-sm'}`}>
                 <span>{playerDisplayNames?.[player.id] || player.name}:</span>
-                <span className="ml-4">{player.score}</span>
+                <span className="ml-3">{player.score}</span>
               </div>
             ))}
           </div>

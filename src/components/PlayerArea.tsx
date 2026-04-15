@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Player } from '../types/CardGame';
 import Card from './Card.tsx';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout.ts';
 
 interface PlayerAreaProps {
   player: Player;
@@ -15,24 +16,18 @@ interface PlayerAreaProps {
 
 // Player area component
 const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard, showAllCards, previewCardId = null, displayName, subtitle }) => {
-  const [windowSize, setWindowSize] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight
-  });
+  const { width, height, scale, cardWidth, cardHeight, isCompact } = useResponsiveLayout();
 
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
+  // Scaled layout constants
+  const humanFanSpacing = 30 * scale;
+  const sideStackSpacing = 25 * scale;
+  const topFanSpacing = 30 * scale;
+  const westEdgeX = 30 * scale;
+  const eastEdgeX = width - 100 * scale;
+  const sideTopY = 120 * scale;
+  const topY = 70 * scale;
+  const bottomY = height - 140 * scale;
+  const humanHandMargin = 80 * scale;
 
   // Create the fan-shaped layout for cards similar to classic Microsoft Hearts
   const getPositionStyle = (index: number, cardId?: string) => {
@@ -40,58 +35,91 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
 
     if (isHuman) {
       // Bottom player (human) - fan out cards, pull UP toward center
-      const totalWidth = Math.min(windowSize.width - 100, player.hand.length * 30);
+      const totalWidth = Math.min(width - humanHandMargin, player.hand.length * humanFanSpacing);
       const spacing = totalWidth / Math.max(player.hand.length - 1, 1);
-      const startX = (windowSize.width - totalWidth) / 2;
+      const startX = (width - totalWidth) / 2;
 
       return {
         x: startX + index * spacing,
-        y: windowSize.height - 140,  // Position cards higher to stay within viewport
+        y: bottomY,
         raised: isPreview,
         // default raiseTransform = translateY(-20px), no override needed
       };
     } else if (player.id === 1) {
       // Right player (East) - cards stacked sideways, pull LEFT toward center
       return {
-        x: windowSize.width - 100,
-        y: 120 + index * 25,
+        x: eastEdgeX,
+        y: sideTopY + index * sideStackSpacing,
         raised: isPreview,
         raiseTransform: 'translateX(-20px)',
       };
     } else if (player.id === 2) {
       // Top player (North) - cards stacked horizontally, pull DOWN toward center
       return {
-        x: (windowSize.width / 2) - (player.hand.length * 30 / 2) + index * 30,
-        y: 70,
+        x: (width / 2) - (player.hand.length * topFanSpacing / 2) + index * topFanSpacing,
+        y: topY,
         raised: isPreview,
         raiseTransform: 'translateY(20px)',
       };
     } else {
       // Left player (West) - cards stacked sideways, pull RIGHT toward center
       return {
-        x: 30,
-        y: 120 + index * 25,
+        x: westEdgeX,
+        y: sideTopY + index * sideStackSpacing,
         raised: isPreview,
         raiseTransform: 'translateX(20px)',
       };
     }
   };
 
+  // Player name badge position — corner-anchored on compact to avoid colliding with scaled cards
+  const badgeStyle: React.CSSProperties = (() => {
+    if (isHuman) {
+      // Just above the human card fan
+      return {
+        bottom: `${Math.max(4, height - bottomY + 4)}px`,
+        left: '50%',
+        transform: 'translateX(-50%)',
+      };
+    }
+    if (player.id === 2) {
+      // Just below the north cards
+      return {
+        top: `${topY + cardHeight + 4}px`,
+        left: '50%',
+        transform: 'translateX(-50%)',
+      };
+    }
+    // East/West: pinned just above the top of the side card stack, at the corresponding edge
+    const sideBadgeTop = Math.max(36, sideTopY - 24);
+    if (player.id === 1) {
+      return { top: `${sideBadgeTop}px`, right: '4px' };
+    }
+    return { top: `${sideBadgeTop}px`, left: '4px' };
+  })();
+
+  const badgeFontSize = 12;
+
   // Player name indicator and score display
   return (
     <>
-      {/* Player name & score display */}
-      <div className={`absolute ${
-        isHuman ? 'bottom-36 left-1/2 transform -translate-x-1/2' :
-        player.id === 1 ? 'right-24 top-1/2 transform -translate-y-1/2' :
-        player.id === 2 ? 'top-44 left-1/2 transform -translate-x-1/2' :
-        'left-24 top-1/2 transform -translate-y-1/2'
-      } text-white font-bold bg-black bg-opacity-70 py-1 px-3 rounded z-10`}>
-        <div>{displayName || player.name} {isCurrentPlayer && '(Turn)'} - Score: {player.totalScore}</div>
-        {subtitle && (
-          <div style={{ fontSize: '10px', fontWeight: 'normal', opacity: 0.8, textAlign: 'center' }}>{subtitle}</div>
-        )}
-      </div>
+      {/* Player name & score display — hidden on compact to avoid crowding the chrome */}
+      {!isCompact && (
+        <div
+          className="absolute text-white font-bold bg-black bg-opacity-70 rounded z-10"
+          style={{
+            ...badgeStyle,
+            fontSize: `${badgeFontSize}px`,
+            padding: '4px 10px',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <div>{displayName || player.name} {isCurrentPlayer && '(Turn)'} - Score: {player.totalScore}</div>
+          {subtitle && (
+            <div style={{ fontSize: `${badgeFontSize - 2}px`, fontWeight: 'normal', opacity: 0.8, textAlign: 'center' }}>{subtitle}</div>
+          )}
+        </div>
+      )}
 
       {/* Cards */}
       {player.hand.map((card, index) => (
@@ -103,6 +131,8 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
           draggable={isHuman && isCurrentPlayer}
           onClick={isHuman && isCurrentPlayer ? () => playCard(card) : undefined}
           faceDown={!isHuman && !showAllCards}
+          width={cardWidth}
+          height={cardHeight}
         />
       ))}
     </>

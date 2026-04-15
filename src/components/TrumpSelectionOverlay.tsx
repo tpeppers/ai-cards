@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card } from '../types/CardGame.ts';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout.ts';
 
 type BidDirection = 'uptown' | 'downtown' | 'downtown-noaces';
 
@@ -36,6 +37,7 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
   const [selectedSuit, setSelectedSuit] = useState<string>('spades');
   const [isUptown, setIsUptown] = useState<boolean>(true);
   const [acesGood, setAcesGood] = useState<boolean>(false); // false = aces no good (default for downtown)
+  const { isCompact } = useResponsiveLayout();
 
   const handleSubmit = () => {
     let direction: BidDirection;
@@ -87,18 +89,20 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
 
   return (
     <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl p-5 max-w-lg w-full mx-4">
-        <h2 className="text-xl font-bold text-center mb-1 text-gray-800">Choose Trump</h2>
-        <p className="text-center text-gray-600 text-sm mb-3">
+      <div className={`bg-white rounded-lg shadow-2xl w-full max-w-lg ${isCompact ? 'p-2 mx-1' : 'p-5 mx-4'}`}>
+        <h2 className={`font-bold text-center text-gray-800 ${isCompact ? 'text-base mb-1' : 'text-xl mb-1'}`}>Choose Trump</h2>
+        <p className={`text-center text-gray-600 ${isCompact ? 'text-[11px] mb-2' : 'text-sm mb-3'}`}>
           You won with {winningBid}! Click a card or use controls below.
         </p>
 
         {isYourTurn ? (
           <>
             {/* Clickable hand for quick-select */}
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Click a card to quick-select:</label>
-              <div className="flex flex-wrap gap-1 justify-center bg-gray-100 rounded-lg p-2 max-h-32 overflow-y-auto">
+            <div className={isCompact ? 'mb-2' : 'mb-4'}>
+              {!isCompact && (
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Click a card to quick-select:</label>
+              )}
+              <div className={`flex flex-wrap gap-1 justify-center bg-gray-100 rounded-lg overflow-y-auto ${isCompact ? 'p-1 max-h-24' : 'p-2 max-h-32'}`}>
                 {playerHand.map((card) => {
                   const suitInfo = suits.find(s => s.id === card.suit);
                   const isSelected = card.suit === selectedSuit;
@@ -107,7 +111,9 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
                     <button
                       key={card.id}
                       onClick={() => handleCardClick(card)}
-                      className={`w-10 h-14 bg-white rounded border-2 flex flex-col items-center justify-center text-xs font-bold transition-all hover:scale-105 ${
+                      className={`bg-white rounded border-2 flex flex-col items-center justify-center font-bold transition-all hover:scale-105 ${
+                        isCompact ? 'w-7 h-10' : 'w-10 h-14'
+                      } ${
                         isPreview
                           ? 'border-green-400 ring-2 ring-green-300 bg-green-50 animate-pulse'
                           : isSelected
@@ -116,8 +122,8 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
                       }`}
                       style={{ color: suitInfo?.color === 'red' ? '#dc2626' : '#1f2937' }}
                     >
-                      <span className="text-sm">{getRankDisplay(card.rank)}</span>
-                      <span className="text-base leading-none">{suitInfo?.symbol}</span>
+                      <span className={isCompact ? 'text-[10px]' : 'text-sm'}>{getRankDisplay(card.rank)}</span>
+                      <span className={`leading-none ${isCompact ? 'text-xs' : 'text-base'}`}>{suitInfo?.symbol}</span>
                     </button>
                   );
                 })}
@@ -199,21 +205,25 @@ const TrumpSelectionOverlay: React.FC<TrumpSelectionOverlayProps> = ({
             </div>
 
             {/* Direction explanation */}
-            <div className="bg-gray-100 rounded-lg p-2 mb-4 text-center">
-              <div className="text-sm text-gray-600">
-                {isUptown ? (
-                  <span><strong>Uptown:</strong> A K Q J 10 9 8 7 6 5 4 3 2 (high cards win)</span>
-                ) : acesGood ? (
-                  <span><strong>Downtown:</strong> A 2 3 4 5 6 7 8 9 10 J Q K (low cards win, A stays high)</span>
-                ) : (
-                  <span><strong>Downtown, Aces No Good:</strong> 2 3 4 5 6 7 8 9 10 J Q K A (low cards win, A is worst)</span>
-                )}
+            {!isCompact && (
+              <div className="bg-gray-100 rounded-lg p-2 mb-4 text-center">
+                <div className="text-sm text-gray-600">
+                  {isUptown ? (
+                    <span><strong>Uptown:</strong> A K Q J 10 9 8 7 6 5 4 3 2 (high cards win)</span>
+                  ) : acesGood ? (
+                    <span><strong>Downtown:</strong> A 2 3 4 5 6 7 8 9 10 J Q K (low cards win, A stays high)</span>
+                  ) : (
+                    <span><strong>Downtown, Aces No Good:</strong> 2 3 4 5 6 7 8 9 10 J Q K A (low cards win, A is worst)</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <button
               onClick={handleSubmit}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors text-lg"
+              className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors ${
+                isCompact ? 'py-2 px-3 text-sm' : 'py-3 px-6 text-lg'
+              }`}
             >
               {getAcceptLabel()}
             </button>

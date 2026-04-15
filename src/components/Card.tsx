@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Card as CardType } from '../types/CardGame';
 import { getCardBacking } from '../utils/cardBackings.ts';
+import { BASE_CARD_WIDTH, BASE_CARD_HEIGHT } from '../hooks/useResponsiveLayout.ts';
 
 interface CardProps {
   card: CardType;
@@ -16,6 +17,8 @@ interface CardProps {
   onDragEnd?: () => void;
   onClick?: (card: CardType) => void;
   faceDown?: boolean;
+  width?: number;
+  height?: number;
 }
 
 // Card component with classic Microsoft Hearts styling
@@ -27,8 +30,18 @@ const Card: React.FC<CardProps> = ({
   onDragStart,
   onDragEnd,
   onClick,
-  faceDown = false
+  faceDown = false,
+  width,
+  height
 }) => {
+  // Derive dimensions and text scale from props (defaults = classic size)
+  const w = width ?? BASE_CARD_WIDTH;
+  const h = height ?? (w * (BASE_CARD_HEIGHT / BASE_CARD_WIDTH));
+  const scale = w / BASE_CARD_WIDTH;
+  const cornerFontSize = Math.max(7, Math.round(12 * scale));
+  const centerFontSize = Math.max(11, Math.round(24 * scale));
+  const jokerCenterFontSize = Math.max(14, Math.round(30 * scale));
+  const cornerPadding = Math.max(1, Math.round(4 * scale));
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Check if card is a joker
@@ -82,8 +95,8 @@ const Card: React.FC<CardProps> = ({
       className={`absolute select-none ${onClick ? 'cursor-pointer' : ''}`}
       style={{
         position: 'absolute',
-        width: '71px', // Classic card dimensions
-        height: '96px',
+        width: `${w}px`,
+        height: `${h}px`,
         top: position.y,
         left: position.x,
         zIndex: position.raised ? 100 : zIndex,
@@ -125,34 +138,34 @@ const Card: React.FC<CardProps> = ({
             {isJoker ? (
               <>
                 {/* Joker card layout */}
-                <div className="absolute top-1 left-1 leading-none" style={{ color: getColor(card.suit) }}>
-                  <span className="font-bold text-xs">{getJokerLabel()}</span>
+                <div className="absolute leading-none" style={{ top: cornerPadding, left: cornerPadding, color: getColor(card.suit) }}>
+                  <span className="font-bold" style={{ fontSize: cornerFontSize }}>{getJokerLabel()}</span>
                 </div>
                 {/* Center: large star */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ color: getColor(card.suit) }}>
-                  <span className="text-3xl">★</span>
-                  <span className="text-xs font-bold">JOKER</span>
+                  <span style={{ fontSize: jokerCenterFontSize, lineHeight: 1 }}>★</span>
+                  <span className="font-bold" style={{ fontSize: cornerFontSize }}>JOKER</span>
                 </div>
                 {/* Bottom-right corner (rotated) */}
-                <div className="absolute bottom-1 right-1 leading-none rotate-180" style={{ color: getColor(card.suit) }}>
-                  <span className="font-bold text-xs">{getJokerLabel()}</span>
+                <div className="absolute leading-none rotate-180" style={{ bottom: cornerPadding, right: cornerPadding, color: getColor(card.suit) }}>
+                  <span className="font-bold" style={{ fontSize: cornerFontSize }}>{getJokerLabel()}</span>
                 </div>
               </>
             ) : (
               <>
                 {/* Top-left corner: rank + suit side-by-side */}
-                <div className="absolute top-1 left-1 flex items-center leading-none" style={{ color: getColor(card.suit) }}>
-                  <span className="font-bold text-sm">{getRank(card.rank)}</span>
-                  <span className="text-xs">{getSuitSymbol(card.suit)}</span>
+                <div className="absolute flex items-center leading-none" style={{ top: cornerPadding, left: cornerPadding, color: getColor(card.suit) }}>
+                  <span className="font-bold" style={{ fontSize: cornerFontSize + 2 }}>{getRank(card.rank)}</span>
+                  <span style={{ fontSize: cornerFontSize }}>{getSuitSymbol(card.suit)}</span>
                 </div>
                 {/* Center suit symbol */}
                 <div className="absolute inset-0 flex items-center justify-center" style={{ color: getColor(card.suit) }}>
-                  <span className="text-2xl">{getSuitSymbol(card.suit)}</span>
+                  <span style={{ fontSize: centerFontSize, lineHeight: 1 }}>{getSuitSymbol(card.suit)}</span>
                 </div>
                 {/* Bottom-right corner: rank + suit side-by-side (rotated) */}
-                <div className="absolute bottom-1 right-1 flex items-center leading-none rotate-180" style={{ color: getColor(card.suit) }}>
-                  <span className="font-bold text-sm">{getRank(card.rank)}</span>
-                  <span className="text-xs">{getSuitSymbol(card.suit)}</span>
+                <div className="absolute flex items-center leading-none rotate-180" style={{ bottom: cornerPadding, right: cornerPadding, color: getColor(card.suit) }}>
+                  <span className="font-bold" style={{ fontSize: cornerFontSize + 2 }}>{getRank(card.rank)}</span>
+                  <span style={{ fontSize: cornerFontSize }}>{getSuitSymbol(card.suit)}</span>
                 </div>
               </>
             )}

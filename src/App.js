@@ -85,9 +85,9 @@ function NavBar() {
   ];
 
   return (
-    <nav className="bg-gray-800 text-white p-4">
+    <nav className="bg-gray-800 text-white px-2 py-2 sm:p-4 flex-shrink-0">
       <div className="max-w-6xl mx-auto flex items-center">
-        <div className="flex space-x-2">
+        <div className="flex space-x-1 sm:space-x-2 min-w-0">
           <NavDropdown label="Play" items={playItems} openMenu={openMenu} setOpenMenu={setOpenMenu} />
           <NavDropdown label="Analysis" items={analysisItems} openMenu={openMenu} setOpenMenu={setOpenMenu} />
         </div>
@@ -95,7 +95,8 @@ function NavBar() {
           <Link
             to="/settings"
             onClick={() => setOpenMenu(null)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+            aria-label="Settings"
+            className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded transition-colors ${
               location.pathname === '/settings' ? 'text-blue-300' : 'hover:text-blue-300'
             }`}
           >
@@ -103,7 +104,7 @@ function NavBar() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            Settings
+            <span className="hidden sm:inline">Settings</span>
           </Link>
         </div>
       </div>
@@ -116,20 +117,23 @@ function App() {
     <>
       <meta httpEquiv="Content-Security-Policy" content="%%CSP_CONTENT%%"></meta>
       <Router>
-        <NavBar />
-
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/hearts" element={<HeartsGame />} />
-          <Route path="/bidwhist" element={<BidWhistGame />} />
-          <Route path="/hand-creator" element={<HandCreator />} />
-          <Route path="/upload" element={<Upload />} />
-          <Route path="/compare" element={<StrategyComparison />} />
-          <Route path="/replay" element={<ReplayPage />} />
-          <Route path="/multiplayer" element={<MultiplayerPage />} />
-          <Route path="/table-analysis" element={<TableAnalysis />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Routes>
+        <div className="flex flex-col h-screen overflow-hidden">
+          <NavBar />
+          <div className="flex-1 min-h-0 relative overflow-hidden">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/hearts" element={<HeartsGame />} />
+              <Route path="/bidwhist" element={<BidWhistGame />} />
+              <Route path="/hand-creator" element={<HandCreator />} />
+              <Route path="/upload" element={<Upload />} />
+              <Route path="/compare" element={<StrategyComparison />} />
+              <Route path="/replay" element={<ReplayPage />} />
+              <Route path="/multiplayer" element={<MultiplayerPage />} />
+              <Route path="/table-analysis" element={<TableAnalysis />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </div>
+        </div>
       </Router>
     </>
   );
