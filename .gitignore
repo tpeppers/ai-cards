@@ -38,6 +38,7 @@ __pycache__/
 # Strategy optimizer bundle + results
 /build-scripts/
 /optimized-strategy.json
+/whisting-hands.json
 
 # Claude Code local settings
 .claude/
