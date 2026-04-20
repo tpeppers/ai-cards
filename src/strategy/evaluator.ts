@@ -309,6 +309,40 @@ function minSuitCount(ctx: StrategyContext): number {
   return nonZero.length > 0 ? Math.min(...nonZero) : 0;
 }
 
+// ── Power scoring ──────────────────────────────────────────────────
+// Integer point weights indexed by rank (1=A, 13=K). Missing rank → 0.
+// These match the human-readable mental model A=4/K=3/Q=2/J=1 (uptown) and
+// the mirror for downtown. Distinct from the fractional postTrumpCardValue
+// used for best_suit / analysis tooling.
+const POINTS_UPTOWN: Record<number, number> = { 1: 4, 13: 3, 12: 2, 11: 1 };
+const POINTS_DOWNTOWN: Record<number, number> = { 1: 4, 2: 3, 3: 2, 4: 1 };
+const POINTS_DOWNTOWN_NOACES: Record<number, number> = { 2: 4, 3: 3, 4: 2, 5: 1 };
+
+function pointsTable(direction: string): Record<number, number> {
+  if (direction === 'uptown') return POINTS_UPTOWN;
+  if (direction === 'downtown') return POINTS_DOWNTOWN;
+  if (direction === 'downtown-noaces') return POINTS_DOWNTOWN_NOACES;
+  return {};
+}
+
+function handPower(ctx: StrategyContext, direction: string): number {
+  const table = pointsTable(direction);
+  return ctx.hand.reduce((sum, c) => sum + (table[c.rank] ?? 0), 0);
+}
+
+function suitPower(ctx: StrategyContext, suit: string, direction: string): number {
+  const table = pointsTable(direction);
+  return ctx.hand.reduce(
+    (sum, c) => sum + (c.suit === suit ? (table[c.rank] ?? 0) : 0),
+    0,
+  );
+}
+
+function trumpPower(ctx: StrategyContext, direction: string): number {
+  if (!ctx.trumpSuit) return 0;
+  return suitPower(ctx, ctx.trumpSuit, direction);
+}
+
 // ── Expression Evaluator ────────────────────────────────────────────
 
 function evalExpr(expr: Expression, ctx: StrategyContext): any {
@@ -437,6 +471,13 @@ function evalCall(name: string, args: any[], ctx: StrategyContext): any {
       result = countOutstandingTrump(ctx); break;
     case 'outstanding_threats':
       result = countOutstandingThreats(ctx); break;
+    case 'hand_power':
+      result = typeof args[0] === 'string' ? handPower(ctx, args[0]) : 0; break;
+    case 'suit_power':
+      result = (typeof args[0] === 'string' && typeof args[1] === 'string')
+        ? suitPower(ctx, args[0], args[1]) : 0; break;
+    case 'trump_power':
+      result = typeof args[0] === 'string' ? trumpPower(ctx, args[0]) : 0; break;
     default:
       result = undefined;
   }
