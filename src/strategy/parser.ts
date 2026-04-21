@@ -17,7 +17,7 @@ interface Token {
 const KEYWORDS = new Set([
   'strategy', 'game', 'play', 'bid', 'trump', 'discard', 'leading', 'following', 'void',
   'when', 'default', 'pass', 'choose', 'keep', 'drop', 'suit', 'direction',
-  'and', 'or', 'not', 'true', 'false',
+  'and', 'or', 'not', 'true', 'false', 'let',
 ]);
 
 function tokenize(source: string): Token[] {
@@ -115,6 +115,14 @@ function tokenize(source: string): Token[] {
       }
       if (trimmed[pos] === '<') {
         tokens.push({ type: 'op', value: '<', line: lineNum });
+        pos++;
+        continue;
+      }
+      // Bare '=' is only used for `let name = value` bindings. `==` is
+      // already handled above (longer match wins), so reaching here means
+      // the caller wrote a single =. Emit a distinct '=' op token.
+      if (trimmed[pos] === '=') {
+        tokens.push({ type: 'op', value: '=', line: lineNum });
         pos++;
         continue;
       }
@@ -235,12 +243,18 @@ class Parser {
       this.skipNewlines();
     }
 
-    // Parse sections
+    // Parse sections and top-level `let` constant bindings. `let` can
+    // appear before any section or between sections — we don't enforce
+    // ordering so micropatches can land wherever it makes sense.
     while (!this.isAtEnd()) {
       this.skipNewlines();
       if (this.isAtEnd()) break;
 
       const tok = this.peek();
+      if (tok.type === 'keyword' && tok.value === 'let') {
+        this.parseLetBinding(ast);
+        continue;
+      }
       if (tok.type === 'keyword' && tok.value === 'play') {
         this.advance();
         this.expect('colon');
@@ -267,6 +281,26 @@ class Parser {
     }
 
     return ast;
+  }
+
+  // `let <ident> = <number>` — binds a numeric constant on the AST. The
+  // value can be negative (`let offset = -1`) and is parsed as a literal
+  // number expression so we reuse the existing number tokenization rules.
+  private parseLetBinding(ast: StrategyAST): void {
+    this.advance(); // consume 'let'
+    const name = this.expect('ident').value;
+    this.expect('op', '=');
+    const numTok = this.expect('number');
+    const value = parseInt(numTok.value, 10);
+    if (Number.isNaN(value)) {
+      throw new Error(`Parse error at line ${numTok.line + 1}: invalid number "${numTok.value}" in let binding`);
+    }
+    if (!ast.constants) ast.constants = {};
+    if (name in ast.constants) {
+      throw new Error(`Parse error at line ${numTok.line + 1}: duplicate let binding "${name}"`);
+    }
+    ast.constants[name] = value;
+    this.skipNewlines();
   }
 
   private parsePlaySection(): PlaySection {

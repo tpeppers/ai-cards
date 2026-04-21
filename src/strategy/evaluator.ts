@@ -401,6 +401,10 @@ function resolveVariable(name: string, ctx: StrategyContext): any {
     case 'uptown': return 'uptown';
     case 'downtown-noaces': return 'downtown-noaces';
     default:
+      // Fall through to strategy-declared `let` constants. Built-ins above
+      // shadow constants, so a `let is_dealer = 1` in the strategy text
+      // won't override the context value.
+      if (ctx.constants && name in ctx.constants) return ctx.constants[name];
       return undefined;
   }
 }
@@ -682,8 +686,17 @@ function evalRuleBlock(block: RuleBlock, ctx: StrategyContext): { action: Action
   return { action: null, ruleIndex: -2 };
 }
 
-export function evaluatePlay(ast: StrategyAST, ctx: StrategyContext): PlayResult {
+// Thread strategy-level `let` constants into the evaluation context. Done
+// once at each public entry point so internal helpers (resolveVariable) can
+// look them up without plumbing the AST through every call.
+function withConstants(ast: StrategyAST, ctx: StrategyContext): StrategyContext {
+  if (!ast.constants) return ctx;
+  return { ...ctx, constants: ast.constants };
+}
+
+export function evaluatePlay(ast: StrategyAST, ctxIn: StrategyContext): PlayResult {
   if (!ast.play) return null;
+  const ctx = withConstants(ast, ctxIn);
 
   // Determine which sub-section to use
   let block: RuleBlock | undefined;
@@ -742,8 +755,9 @@ export function evaluatePlay(ast: StrategyAST, ctx: StrategyContext): PlayResult
   return null;
 }
 
-export function evaluateBid(ast: StrategyAST, ctx: StrategyContext): BidResult {
+export function evaluateBid(ast: StrategyAST, ctxIn: StrategyContext): BidResult {
   if (!ast.bid) return null;
+  const ctx = withConstants(ast, ctxIn);
 
   debugGroup(`evaluateBid P${ctx.playerId} bidCount=${ctx.bidCount} currentHigh=${ctx.currentHighBid} isDealer=${ctx.isDealer}`);
 
@@ -775,8 +789,9 @@ export function evaluateBid(ast: StrategyAST, ctx: StrategyContext): BidResult {
   return null;
 }
 
-export function evaluateTrump(ast: StrategyAST, ctx: StrategyContext): TrumpResult {
+export function evaluateTrump(ast: StrategyAST, ctxIn: StrategyContext): TrumpResult {
   if (!ast.trump) return null;
+  const ctx = withConstants(ast, ctxIn);
 
   debugGroup(`evaluateTrump P${ctx.playerId} partnerBid=${ctx.partnerBid} enemyBid=${ctx.enemyBid}`);
 
@@ -816,8 +831,9 @@ export function evaluateTrump(ast: StrategyAST, ctx: StrategyContext): TrumpResu
  * Returns the IDs of the 4 lowest-scored cards to discard, or null if
  * no discard section exists.
  */
-export function evaluateDiscard(ast: StrategyAST, ctx: StrategyContext): string[] | null {
+export function evaluateDiscard(ast: StrategyAST, ctxIn: StrategyContext): string[] | null {
   if (!ast.discard) return null;
+  const ctx = withConstants(ast, ctxIn);
 
   debugGroup(`evaluateDiscard P${ctx.playerId} trump=${ctx.trumpSuit || 'none'}`);
 

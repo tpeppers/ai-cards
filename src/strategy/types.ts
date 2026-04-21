@@ -5,6 +5,11 @@ import { Card } from '../types/CardGame.ts';
 export interface StrategyAST {
   name: string;
   game: string;
+  // Numeric named constants declared with `let name = value` at the top of
+  // the strategy. Referenced from within rule bodies like any other
+  // variable; they fall through the resolveVariable chain, so a built-in
+  // context variable of the same name takes precedence.
+  constants?: Record<string, number>;
   play?: PlaySection;
   bid?: RuleBlock;
   trump?: RuleBlock;
@@ -174,4 +179,9 @@ export interface StrategyContext {
 
   // All cards that have been played (for cards_above tracking)
   playedCards: Card[];
+
+  // Strategy-declared numeric constants (`let name = value`). Populated by
+  // the evaluate* entry points from ast.constants; consulted by
+  // resolveVariable when a name doesn't match a built-in.
+  constants?: Record<string, number>;
 }

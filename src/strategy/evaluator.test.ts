@@ -135,3 +135,94 @@ bid:
     expect(bidWith(STRAT, h)).toBe(0);
   });
 });
+
+describe('let bindings', () => {
+  it('threshold constants parse and drive rule selection', () => {
+    // hand_power(uptown) = 4+3+2+1 = 10 (AKQJ of hearts)
+    const h = hand('amlk' + 'bcdefghi');
+
+    const STRAT = (threshold: number) => `strategy "let threshold"
+game: bidwhist
+
+let bid2_threshold = ${threshold}
+
+bid:
+  when hand_power(uptown) >= bid2_threshold:
+    bid 2
+  default:
+    pass
+`;
+    // threshold 10: fires → bid 2. threshold 11: no fire → pass.
+    expect(bidWith(STRAT(10), h)).toBe(2);
+    expect(bidWith(STRAT(11), h)).toBe(0);
+  });
+
+  it('let bindings compose with arithmetic', () => {
+    const h = hand('amlk' + 'bcdefghi'); // uptown power 10
+
+    const STRAT = `strategy "arithmetic"
+game: bidwhist
+
+let base = 8
+let bonus = 2
+
+bid:
+  when hand_power(uptown) >= base + bonus:
+    bid 4
+  default:
+    pass
+`;
+    expect(bidWith(STRAT, h)).toBe(4);
+  });
+
+  it('built-in context variables shadow let bindings of the same name', () => {
+    const h = hand('amlk' + 'bcdefghi');
+
+    // Even though the strategy declares let partner_bid = 99, the
+    // context's partnerBid (0 by default in ctxFromHand) should win.
+    const STRAT = `strategy "shadow"
+game: bidwhist
+
+let partner_bid = 99
+
+bid:
+  when partner_bid >= 50:
+    bid 5
+  default:
+    pass
+`;
+    expect(bidWith(STRAT, h)).toBe(0);
+  });
+
+  it('negative literal values parse', () => {
+    const h = hand('amlk' + 'bcdefghi'); // uptown power 10
+
+    const STRAT = `strategy "negative"
+game: bidwhist
+
+let offset = -5
+
+bid:
+  when hand_power(uptown) + offset >= 5:
+    bid 3
+  default:
+    pass
+`;
+    // 10 + (-5) = 5 >= 5 → bid 3
+    expect(bidWith(STRAT, h)).toBe(3);
+  });
+
+  it('duplicate let bindings throw at parse time', () => {
+    const STRAT = `strategy "dup"
+game: bidwhist
+
+let x = 1
+let x = 2
+
+bid:
+  default:
+    pass
+`;
+    expect(() => parseStrategy(STRAT)).toThrow(/duplicate let binding/);
+  });
+});
