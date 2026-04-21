@@ -24,10 +24,22 @@ export interface FamilyPoweredParams {
   oppPassThreshold: number;
   /** strong-suit length required by dealer to take a 4 */
   dealerLongSuit: number;
+  /**
+   * Minimum king_ace_count required in addition to hand_power to signal.
+   * 0 means "pure hand_power" (Q/J-only hands can signal). 2 is the
+   * compound predicate: hand must have hand_power(dir)>=sig AND at least
+   * 2 stoppers. Families implicitly requires 3.
+   */
+  minStoppers?: number;
 }
 
 export function generateFamilyPoweredTuned(p: FamilyPoweredParams): string {
-  const name = `Family (Powered sig=${p.sigThreshold} trust=${p.trustBonus} opp=${p.oppPassThreshold})`;
+  const minStop = p.minStoppers ?? 0;
+  const name = `Family (Powered sig=${p.sigThreshold} trust=${p.trustBonus} opp=${p.oppPassThreshold} minStop=${minStop})`;
+  // If min_stoppers > 0, every hand_power signal gate also has to clear
+  // king_ace_count >= min_stoppers. 0 disables the extra check (the gate
+  // becomes vacuously true via a `>= 0` conjunct).
+  const stopGuard = minStop > 0 ? ' and king_ace_count() >= min_stoppers' : '';
 
   return `strategy "${name}"
 game: bidwhist
@@ -36,6 +48,7 @@ let sig_threshold = ${p.sigThreshold}
 let trust = ${p.trustBonus}
 let opp_pass = ${p.oppPassThreshold}
 let dealer_bid4_suit_req = ${p.dealerLongSuit}
+let min_stoppers = ${minStop}
 
 play:
   leading:
@@ -77,8 +90,8 @@ play:
       play hand.weakest
 
 bid:
-  # Signal 3: strong both directions (compound power)
-  when bid_count < 2 and hand_power(uptown) >= sig_threshold and hand_power(downtown) >= sig_threshold and bid.current < 3:
+  # Signal 3: strong both directions (compound power, optional stopper guard)
+  when bid_count < 2 and hand_power(uptown) >= sig_threshold and hand_power(downtown) >= sig_threshold${stopGuard} and bid.current < 3:
     bid 3
   # 6+ long suit
   when bid_count < 2 and max_suit_count() >= 6 and bid.current < 4:
@@ -86,11 +99,11 @@ bid:
   # 7+ very long suit
   when bid_count < 2 and max_suit_count() >= 7 and bid.current < 5:
     bid 5
-  # Signal 2: uptown power
-  when bid_count < 2 and hand_power(uptown) >= sig_threshold and bid.current < 2:
+  # Signal 2: uptown power (optional stopper guard)
+  when bid_count < 2 and hand_power(uptown) >= sig_threshold${stopGuard} and bid.current < 2:
     bid 2
-  # Signal 1: downtown power
-  when bid_count < 2 and hand_power(downtown) >= sig_threshold and bid.current < 1:
+  # Signal 1: downtown power (stopper guard uses aces-as-stopper reading)
+  when bid_count < 2 and hand_power(downtown) >= sig_threshold${stopGuard} and bid.current < 1:
     bid 1
 
   # Seat 3 (hot seat):

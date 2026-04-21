@@ -38,6 +38,7 @@ interface Args {
   sigs: number[];
   trusts: number[];
   oppPasses: number[];
+  minStoppers: number[];
 }
 
 function parseArgs(argv: string[]): Args {
@@ -52,6 +53,7 @@ function parseArgs(argv: string[]): Args {
     sigs: [7, 9, 11, 13],
     trusts: [3, 5, 7],
     oppPasses: [99, 9, 11],
+    minStoppers: [0],
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -68,6 +70,7 @@ function parseArgs(argv: string[]): Args {
       case '--sigs':          out.sigs = parseList(next); i++; break;
       case '--trusts':        out.trusts = parseList(next); i++; break;
       case '--opp':           out.oppPasses = parseList(next); i++; break;
+      case '--min-stoppers':  out.minStoppers = parseList(next); i++; break;
     }
   }
   return out;
@@ -116,10 +119,12 @@ function fmt(n: number, d = 3): string { return n.toFixed(d); }
 function formatRow(r: EvalResult): string {
   const p = r.params;
   const flag = r.winRate - r.ci95 > 0.5 ? '  ✓' : r.winRate + r.ci95 < 0.5 ? '  ✗' : '  ~';
+  const stop = p.minStoppers ?? 0;
   return (
     `sig=${String(p.sigThreshold).padStart(2)} ` +
     `trust=${String(p.trustBonus).padStart(2)} ` +
     `opp=${String(p.oppPassThreshold).padStart(3)} ` +
+    `stop=${String(stop).padStart(1)} ` +
     `→ ${r.wins.toString().padStart(4)}W-${r.losses.toString().padStart(4)}L/${r.games.toString().padStart(4)}  ` +
     `winRate=${fmt(r.winRate)} ±${fmt(r.ci95, 3)}${flag}`
   );
@@ -132,19 +137,22 @@ async function main(): Promise<void> {
   for (const sig of args.sigs) {
     for (const trust of args.trusts) {
       for (const opp of args.oppPasses) {
-        configs.push({
-          sigThreshold: sig,
-          trustBonus: trust,
-          oppPassThreshold: opp,
-          dealerLongSuit: 5,
-        });
+        for (const minStop of args.minStoppers) {
+          configs.push({
+            sigThreshold: sig,
+            trustBonus: trust,
+            oppPassThreshold: opp,
+            dealerLongSuit: 5,
+            minStoppers: minStop,
+          });
+        }
       }
     }
   }
 
   realLog('── hand_power sweep ────────────────────────────────────');
   realLog(`configs=${configs.length}  hands/config=${args.hands}  pool=${args.pool}  seed=${args.seed}`);
-  realLog(`grid: sigs=[${args.sigs.join(',')}] trusts=[${args.trusts.join(',')}] opp=[${args.oppPasses.join(',')}]`);
+  realLog(`grid: sigs=[${args.sigs.join(',')}] trusts=[${args.trusts.join(',')}] opp=[${args.oppPasses.join(',')}] stop=[${args.minStoppers.join(',')}]`);
   realLog(`legend: ✓ = CI clear of 0.5 (beats Family), ✗ = worse, ~ = tied/noisy`);
   realLog('');
 
