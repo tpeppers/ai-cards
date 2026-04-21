@@ -680,6 +680,130 @@ export const BIDWHIST_CONSERVATIVE_ALL = buildStrategy(
 
 export const BIDWHIST_FAMILY = buildStrategy('Family', FAMILY_PLAY, FAMILY_BID, FAMILY_TRUMP, FAMILY_DISCARD);
 
+// ── Family (Constants): bit-identical to Family, parameterized via let ───
+// Every magic number that drives a Family bid rule becomes a named let
+// binding. The predicates are otherwise unchanged, so this strategy
+// should produce the same decision as Family on every hand. Used by the
+// parity demo (scripts/parity-check.js) to verify the new let-binding
+// pathway doesn't change semantics.
+
+const FAMILY_CONSTANTS_HEADER = `\
+let long_suit = 6
+let very_long_suit = 7
+let honor_threshold = 3
+let dealer_bid4_suit_req = 5`;
+
+const FAMILY_CONSTANTS_BID = `\
+bid:
+  # ── Seats 1/2 (early bidders): signal bids ──
+  when bid_count < 2 and max_suit_count() >= long_suit and bid.current < 4:
+    bid 4
+  when bid_count < 2 and max_suit_count() >= very_long_suit and bid.current < 5:
+    bid 5
+  when bid_count < 2 and king_ace_count() >= honor_threshold and deuce_trey_count() >= honor_threshold and bid.current < 3:
+    bid 3
+  when bid_count < 2 and king_ace_count() >= honor_threshold and bid.current < 2:
+    bid 2
+  when bid_count < 2 and deuce_trey_count() >= honor_threshold and bid.current < 1:
+    bid 1
+
+  # ── Seat 3 (hot seat): ALWAYS bid at least 4 ──
+  when bid_count == 2 and bid.current < 4:
+    bid 4
+  when bid_count == 2 and bid.current == 4 and partner_bid == 1 and low_count() >= high_count():
+    bid 5
+  when bid_count == 2 and bid.current == 4 and partner_bid == 2 and high_count() > low_count():
+    bid 5
+  when bid_count == 2 and bid.current == 4 and max_suit_count() >= long_suit and king_ace_count() >= honor_threshold:
+    bid 5
+  when bid_count == 2 and bid.current == 4 and max_suit_count() >= long_suit and deuce_trey_count() >= honor_threshold:
+    bid 5
+  when bid_count == 2:
+    pass
+
+  # ── Dealer ──
+  when is_dealer and bid.current == 0:
+    bid 1
+  when is_dealer and partner_bid == bid.current and partner_bid > 0 and max_suit_count() <= 8:
+    pass
+  when is_dealer and bid.current <= 3:
+    bid take
+  when is_dealer and bid.current == 4 and max_suit_count() >= dealer_bid4_suit_req:
+    bid take
+  when is_dealer and bid.current == 4 and king_ace_count() >= honor_threshold:
+    bid take
+  default:
+    pass`;
+
+export const BIDWHIST_FAMILY_CONSTANTS =
+  `strategy "Family (Constants)"\ngame: bidwhist\n\n` +
+  FAMILY_CONSTANTS_HEADER + '\n\n' +
+  FAMILY_PLAY + '\n\n' +
+  FAMILY_CONSTANTS_BID + '\n\n' +
+  FAMILY_TRUMP + '\n\n' +
+  FAMILY_DISCARD + '\n';
+
+// ── Family (Powered): approximate rewrite using hand_power ───────────────
+// Replaces king_ace_count() >= 3 and deuce_trey_count() >= 3 with
+// hand_power() thresholds. NOT bit-identical — a hand with many Q/J but
+// no K/A will trigger hand_power(uptown) >= 9 while failing
+// king_ace_count() >= 3, and vice versa. Used by the parity demo to
+// show statistical equivalence (win rate ≈ 50% head-to-head).
+
+const FAMILY_POWERED_HEADER = `\
+let long_suit = 6
+let very_long_suit = 7
+let uptown_signal_threshold = 9
+let downtown_signal_threshold = 9
+let dealer_bid4_suit_req = 5`;
+
+const FAMILY_POWERED_BID = `\
+bid:
+  when bid_count < 2 and max_suit_count() >= long_suit and bid.current < 4:
+    bid 4
+  when bid_count < 2 and max_suit_count() >= very_long_suit and bid.current < 5:
+    bid 5
+  when bid_count < 2 and hand_power(uptown) >= uptown_signal_threshold and hand_power(downtown) >= downtown_signal_threshold and bid.current < 3:
+    bid 3
+  when bid_count < 2 and hand_power(uptown) >= uptown_signal_threshold and bid.current < 2:
+    bid 2
+  when bid_count < 2 and hand_power(downtown) >= downtown_signal_threshold and bid.current < 1:
+    bid 1
+
+  when bid_count == 2 and bid.current < 4:
+    bid 4
+  when bid_count == 2 and bid.current == 4 and partner_bid == 1 and low_count() >= high_count():
+    bid 5
+  when bid_count == 2 and bid.current == 4 and partner_bid == 2 and high_count() > low_count():
+    bid 5
+  when bid_count == 2 and bid.current == 4 and max_suit_count() >= long_suit and hand_power(uptown) >= uptown_signal_threshold:
+    bid 5
+  when bid_count == 2 and bid.current == 4 and max_suit_count() >= long_suit and hand_power(downtown) >= downtown_signal_threshold:
+    bid 5
+  when bid_count == 2:
+    pass
+
+  when is_dealer and bid.current == 0:
+    bid 1
+  when is_dealer and partner_bid == bid.current and partner_bid > 0 and max_suit_count() <= 8:
+    pass
+  when is_dealer and bid.current <= 3:
+    bid take
+  when is_dealer and bid.current == 4 and max_suit_count() >= dealer_bid4_suit_req:
+    bid take
+  when is_dealer and bid.current == 4 and hand_power(uptown) >= uptown_signal_threshold:
+    bid take
+  default:
+    pass`;
+
+export const BIDWHIST_FAMILY_POWERED =
+  `strategy "Family (Powered)"\ngame: bidwhist\n\n` +
+  FAMILY_POWERED_HEADER + '\n\n' +
+  FAMILY_PLAY + '\n\n' +
+  FAMILY_POWERED_BID + '\n\n' +
+  FAMILY_TRUMP + '\n\n' +
+  FAMILY_DISCARD + '\n';
+
 // ── Claude strategy ──────────────────────────────────────────────────
 
 export const BIDWHIST_CLAUDE = buildStrategy('Claude', CLAUDE_PLAY, CLAUDE_BID, CLAUDE_TRUMP, CLAUDE_DISCARD);
@@ -809,6 +933,8 @@ export const STRATEGY_REGISTRY: StrategyRegistryEntry[] = [
   { name: 'Conservative (Partner Signals)', game: 'bidwhist', text: BIDWHIST_CONSERVATIVE_PARTNER },
   { name: 'Conservative (All Signals)', game: 'bidwhist', text: BIDWHIST_CONSERVATIVE_ALL },
   { name: 'Family', game: 'bidwhist', text: BIDWHIST_FAMILY },
+  { name: 'Family (Constants)', game: 'bidwhist', text: BIDWHIST_FAMILY_CONSTANTS },
+  { name: 'Family (Powered)', game: 'bidwhist', text: BIDWHIST_FAMILY_POWERED },
   { name: 'Claude', game: 'bidwhist', text: BIDWHIST_CLAUDE },
   { name: 'Standard', game: 'hearts', text: HEARTS_STANDARD },
 ];
