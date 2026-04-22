@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Playable Hands — hand_power signaling report</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html" class="active">Playable Hands</a></nav>
+</header>
+<main>
+
+<section>
+  <h2>Divergent hands — click to play locally</h2>
+  <p>
+    Each of these 15 decks was seed-searched to surface <em>divergent outcomes</em>
+    across Family, Powered(sig=9), Powered(sig=14), and Powered(sig=17): the strategies reached
+    different bids, different declarers, or different contract-made outcomes on the same deal.
+    The list is balanced between (a) decks where sig=17 succeeds where Family fails — the hands
+    that prove the thesis — and (b) decks where Family succeeds where sig=17 fails — the hands
+    that show the tradeoff.
+  </p>
+  <p class="muted">
+    Summary across these hand-selected divergent decks (not representative of random play!):
+    sig=17 makes &amp; Family fails on <strong>3</strong>;
+    Family makes &amp; sig=17 fails on <strong>5</strong>;
+    sig=14 beats sig=9 on <strong>0</strong> hands,
+    sig=9 beats sig=14 on <strong>4</strong>. Highlighted rows are sig=17 wins over Family.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>P0 classification</th>
+        <th>KAC</th><th>QJC</th>
+        <th>hp(up)</th><th>maxsuit</th>
+        <th>Family bid</th>
+        <th>sig=9 bid</th>
+        <th>sig=14 bid</th>
+        <th>sig=17 bid</th>
+        <th>Link</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr class="highlight-row">
+<td class="num">1</td>
+<td>KA≥3 (true stopper)</td>
+<td class="num">3</td>
+<td class="num">2</td>
+<td class="num">14</td>
+<td class="num">4</td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td><a href="http://localhost:3000/#ELsDMnXtYBfzhKdiaZyqplwbFTPjNkrIOHVcgQuvxJGRSCUoAWme" target="_blank">play</a></td>
+</tr>
+<tr class="highlight-row">
+<td class="num">2</td>
+<td>mixed</td>
+<td class="num">1</td>
+<td class="num">0</td>
+<td class="num">4</td>
+<td class="num">4</td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td><a href="http://localhost:3000/#AHPnerLORwKBGdTMcXkfuNJtpgIvhmlZsYSjibazDFUCVEQoyxqW" target="_blank">play</a></td>
+</tr>
+<tr class="highlight-row">
+<td class="num">3</td>
+<td>hp(downtown)≥13</td>
+<td class="num">1</td>
+<td class="num">2</td>
+<td class="num">6</td>
+<td class="num">4</td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td><a href="http://localhost:3000/#brgKfsNHDJyYqaSFWLjzTAeRnGIiPptdoUmlBEQcxuMvkVXhZCOw" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">4</td>
+<td>hp(downtown)≥13</td>
+<td class="num">2</td>
+<td class="num">3</td>
+<td class="num">11</td>
+<td class="num">5</td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td><a href="http://localhost:3000/#BsuqGbAhnFDTjyVSrMweOatHLXJgxvlpzRUCWEmQoPYKkIZNifcd" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">5</td>
+<td>KA≥3 (true stopper)</td>
+<td class="num">4</td>
+<td class="num">2</td>
+<td class="num">17</td>
+<td class="num">6</td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td><a href="http://localhost:3000/#AgOWCfeyJHUnFGmEzuVdpsPwoShqxNTRDMckLBtKZXrIaijYQblv" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">6</td>
+<td>mixed</td>
+<td class="num">1</td>
+<td class="num">3</td>
+<td class="num">9</td>
+<td class="num">5</td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td><a href="http://localhost:3000/#RsmQkOTJUPGiIaoDlNxXAcEMqHZSfuKbywzYWCjLenvBdgptrhFV" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">7</td>
+<td>mixed</td>
+<td class="num">2</td>
+<td class="num">2</td>
+<td class="num">11</td>
+<td class="num">5</td>
+<td class="num">5 <span class="tag made">✓</span></td>
+<td class="num">5 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td><a href="http://localhost:3000/#zosgiZwORYknDbSqleaHLNtxdFjEGCJmIruThMvWUKpcAVfByXQP" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">8</td>
+<td>KA≥3 (true stopper)</td>
+<td class="num">4</td>
+<td class="num">0</td>
+<td class="num">14</td>
+<td class="num">4</td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td><a href="http://localhost:3000/#AWgwzZyvSrBJVRIHDexKQiakEbCTNXUsoLPmMFjpcYluqOtdnGfh" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">9</td>
+<td>KA≥3 (true stopper)</td>
+<td class="num">3</td>
+<td class="num">2</td>
+<td class="num">14</td>
+<td class="num">4</td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td><a href="http://localhost:3000/#AjkegxzstRrIOhXpTcSwZCQnyUdbGuovNJPBKlFfEiHYqmVWaLMD" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">10</td>
+<td>mixed</td>
+<td class="num">1</td>
+<td class="num">2</td>
+<td class="num">6</td>
+<td class="num">3</td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td><a href="http://localhost:3000/#qGIjtlbBKvkFRycXhTEeLQHACaOxSoMYZpUzgDJVirnwuWNdmPsf" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">11</td>
+<td>mixed</td>
+<td class="num">2</td>
+<td class="num">3</td>
+<td class="num">11</td>
+<td class="num">4</td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td><a href="http://localhost:3000/#hUfiYKdDVEXTjIaAmkHCxqezLnJZcyuwQpNOMBoWtSgrFsRPbvlG" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">12</td>
+<td>hp(downtown)≥13</td>
+<td class="num">2</td>
+<td class="num">1</td>
+<td class="num">10</td>
+<td class="num">4</td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td><a href="http://localhost:3000/#ORYsPEiqUDXnCTHlIjemapcKrgzuASQbGWFJfZVxtwhLyBNkMvdo" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">13</td>
+<td>hp(downtown)≥13</td>
+<td class="num">1</td>
+<td class="num">1</td>
+<td class="num">5</td>
+<td class="num">3</td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td><a href="http://localhost:3000/#TXkFEnegoCcSbiOdfphamyrlswIABVjUPzWuqQMxYKGZDHtvRLJN" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">14</td>
+<td>Q/J-heavy (sig=9 false positive)</td>
+<td class="num">2</td>
+<td class="num">5</td>
+<td class="num">14</td>
+<td class="num">4</td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag failed">✗</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td><a href="http://localhost:3000/#xgTvDnCNzROmlfLVEcrKphWIkqUaJHbAMSuZyBjsetGQYoPwdiXF" target="_blank">play</a></td>
+</tr>
+<tr>
+<td class="num">15</td>
+<td>long-suit (bid-4 via length)</td>
+<td class="num">2</td>
+<td class="num">3</td>
+<td class="num">11</td>
+<td class="num">7</td>
+<td class="num">5 <span class="tag made">✓</span></td>
+<td class="num">5 <span class="tag made">✓</span></td>
+<td class="num">5 <span class="tag made">✓</span></td>
+<td class="num">4 <span class="tag made">✓</span></td>
+<td><a href="http://localhost:3000/#JHDWQLsnTFVGPAihykcRzKxBXNmpUEfOYqrMZagwvSuCboljIdet" target="_blank">play</a></td>
+</tr>
+    </tbody>
+  </table>
+  <p class="muted">
+    <strong>Bid column reading:</strong> the number is the winning bid (the contract is bid+6). ✓ means
+    the declarer's team made the contract; ✗ means they fell short.
+  </p>
+</section>
+
+<section>
+  <h2>Running this locally</h2>
+  <p>The app must be serving at <code>http://localhost:3000</code> for the links to resolve. Two easy options:</p>
+  <pre># Option A: React dev server
+npm start   # serves at localhost:3000
+
+# Option B: standalone bundle (built once)
+npm run build:standalone
+node scripts/static-serve.js standalone/bidwhist 3000</pre>
+</section>
+  
+</main>
+<footer>
+  Generated from <code>node scripts/generate-report.js</code>. Source:
+  <code>src/simulation/runReportData.ts</code>.
+</footer>
+</body>
+</html>

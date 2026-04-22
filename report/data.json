@@ -1,0 +1,2171 @@
+{
+  "meta": {
+    "handsPerConfig": 20000,
+    "poolSize": 3000,
+    "seed": 73313,
+    "bestSig": 17,
+    "generatedAt": "2026-04-22T02:52:29.876Z"
+  },
+  "sweep": [
+    {
+      "sig": 7,
+      "wins": 7714,
+      "losses": 11534,
+      "games": 19248,
+      "winRate": 0.4007689110556941,
+      "ci95": 0.006923209075532977
+    },
+    {
+      "sig": 9,
+      "wins": 8490,
+      "losses": 10862,
+      "games": 19352,
+      "winRate": 0.43871434477056637,
+      "ci95": 0.006991591290297091
+    },
+    {
+      "sig": 11,
+      "wins": 8840,
+      "losses": 10400,
+      "games": 19240,
+      "winRate": 0.4594594594594595,
+      "ci95": 0.0070419229999728996
+    },
+    {
+      "sig": 13,
+      "wins": 9460,
+      "losses": 10292,
+      "games": 19752,
+      "winRate": 0.47893884163628997,
+      "ci95": 0.006966825181790221
+    },
+    {
+      "sig": 14,
+      "wins": 9476,
+      "losses": 10100,
+      "games": 19576,
+      "winRate": 0.4840621168778096,
+      "ci95": 0.007000730344874121
+    },
+    {
+      "sig": 15,
+      "wins": 9640,
+      "losses": 9984,
+      "games": 19624,
+      "winRate": 0.4912352221769262,
+      "ci95": 0.006994643294219488
+    },
+    {
+      "sig": 16,
+      "wins": 9922,
+      "losses": 9902,
+      "games": 19824,
+      "winRate": 0.5005044390637611,
+      "ci95": 0.00696033608191761
+    },
+    {
+      "sig": 17,
+      "wins": 9992,
+      "losses": 9896,
+      "games": 19888,
+      "winRate": 0.502413515687852,
+      "ci95": 0.0069490503818606785
+    },
+    {
+      "sig": 18,
+      "wins": 9748,
+      "losses": 9988,
+      "games": 19736,
+      "winRate": 0.4939197405755979,
+      "ci95": 0.006975324137704508
+    },
+    {
+      "sig": 20,
+      "wins": 9382,
+      "losses": 10138,
+      "games": 19520,
+      "winRate": 0.48063524590163936,
+      "ci95": 0.007009066962316007
+    }
+  ],
+  "archetypes": [
+    {
+      "key": "monster",
+      "title": "AAKKQJ — hand_power(uptown) = 17 (the sig=17 \"monster\")",
+      "rationale": "Two aces, two kings, a queen and a jack — six honors, the hand that sig=17 specifically catches. Only sig≤17 signals on this hand; sig=18 passes. The 20k-game sweep shows sig=17 beats Family by ~0.9pp precisely BECAUSE it signals on this class of hand while being strict enough to ignore weaker hands that Family's `king_ace_count() >= 3` admits.",
+      "p0Hand": [
+        "hearts_1",
+        "spades_1",
+        "hearts_13",
+        "spades_13",
+        "hearts_12",
+        "hearts_11",
+        "spades_7",
+        "spades_6",
+        "clubs_5",
+        "clubs_4",
+        "diamonds_3",
+        "diamonds_2"
+      ],
+      "kac": 4,
+      "qjc": 2,
+      "hpUp": 17,
+      "hpDn": 14,
+      "maxSuit": 4,
+      "deckUrl": "aByFnGQbmwoXzJvTlfHukdjItNxUshAWEeCLDrqSPpRMOZYiKcgV",
+      "outcomes": [
+        {
+          "strategyName": "Family",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            7,
+            5
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 8,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            2,
+            3,
+            0,
+            3,
+            3,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=9)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            8,
+            4
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 9,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 3
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            2,
+            2,
+            3,
+            0,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=11)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown",
+          "booksWon": [
+            7,
+            5
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 8,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 1
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            3,
+            0,
+            1,
+            1,
+            2,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=13)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            7,
+            5
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 8,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            2,
+            3,
+            0,
+            3,
+            3,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=14)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            7,
+            5
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 8,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            2,
+            3,
+            0,
+            3,
+            3,
+            0
+          ]
+        }
+      ],
+      "interpretation": "Family: bid 4 (hearts uptown); declarer=P0; made=false / Powered (sig=9): bid 4 (hearts uptown); declarer=P0; made=false / Powered (sig=11): bid 4 (hearts downtown); declarer=P0; made=false / Powered (sig=13): bid 4 (hearts uptown); declarer=P0; made=false / Powered (sig=14): bid 4 (hearts uptown); declarer=P0; made=false"
+    },
+    {
+      "key": "aakq",
+      "title": "AAKQ + filler — hand_power(uptown) = 13 (Family signals, sig=17 doesn't)",
+      "rationale": "Two aces, a king and a queen — only 4 true honors. Family's king_ace_count ≥ 3 fires (3 A/K), and sig=13 also fires, but sig=17 stays silent. This is the crux of WHY sig=17 wins: Family signals on this borderline hand and partner over-commits; sig=17 correctly lets the opponents bid. The case study below shows the outcome.",
+      "p0Hand": [
+        "hearts_1",
+        "spades_1",
+        "hearts_13",
+        "hearts_12",
+        "hearts_9",
+        "hearts_8",
+        "spades_7",
+        "spades_6",
+        "clubs_5",
+        "clubs_4",
+        "diamonds_3",
+        "diamonds_2"
+      ],
+      "kac": 3,
+      "qjc": 1,
+      "hpUp": 13,
+      "hpDn": 14,
+      "maxSuit": 5,
+      "deckUrl": "aJyXnpTdmUzqlAQjiIMWhvxetbBSsRNrEHYfDowCPFcuOLGkZgKV",
+      "outcomes": [
+        {
+          "strategyName": "Family",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            8,
+            4
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 9,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 2
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            3,
+            2,
+            2,
+            0,
+            3,
+            0,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=9)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            8,
+            4
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 9,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 3
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            3,
+            2,
+            2,
+            0,
+            3,
+            0,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=11)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            8,
+            4
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 9,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 2
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            3,
+            2,
+            2,
+            0,
+            3,
+            0,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=13)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            8,
+            4
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 9,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 2
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            3,
+            2,
+            2,
+            0,
+            3,
+            0,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=14)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            8,
+            4
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 9,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 2
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            3,
+            2,
+            2,
+            0,
+            3,
+            0,
+            1,
+            1,
+            0
+          ]
+        }
+      ],
+      "interpretation": "Family: bid 4 (hearts uptown); declarer=P0; made=false / Powered (sig=9): bid 4 (hearts uptown); declarer=P0; made=false / Powered (sig=11): bid 4 (hearts uptown); declarer=P0; made=false / Powered (sig=13): bid 4 (hearts uptown); declarer=P0; made=false / Powered (sig=14): bid 4 (hearts uptown); declarer=P0; made=false"
+    },
+    {
+      "key": "aaa",
+      "title": "AAA + low cards — KAC=3 but hand_power(uptown) = 12",
+      "rationale": "Three aces with low-rank filler. Family signals (king_ace_count ≥ 3). hand_power(uptown) = 12, under sig=13 and sig=14 this PASSES — so Powered misses an arguably reasonable signal. This is the textbook \"cost\" of a high sig threshold.",
+      "p0Hand": [
+        "hearts_1",
+        "spades_1",
+        "clubs_1",
+        "hearts_2",
+        "hearts_3",
+        "hearts_4",
+        "spades_5",
+        "spades_6",
+        "spades_7",
+        "clubs_8",
+        "clubs_9",
+        "clubs_10"
+      ],
+      "kac": 3,
+      "qjc": 0,
+      "hpUp": 12,
+      "hpDn": 18,
+      "maxSuit": 4,
+      "deckUrl": "aSGvnwYDAkXzbELjcflidTCKrhoWsPBytUepHqgQIuxMJFZRONmV",
+      "outcomes": [
+        {
+          "strategyName": "Family",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown",
+          "booksWon": [
+            10,
+            2
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 11,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 1
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2,
+            0,
+            1,
+            0,
+            3
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=9)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            9,
+            3
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 10,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 2
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            2,
+            3,
+            0,
+            0,
+            3,
+            3,
+            0,
+            2,
+            0,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=11)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            10,
+            2
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 11,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 2
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            2,
+            3,
+            0,
+            0,
+            0,
+            2,
+            2,
+            3,
+            0,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=13)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            2,
+            0,
+            0,
+            0,
+            2,
+            2,
+            2,
+            3,
+            0,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=14)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "uptown",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            2,
+            0,
+            0,
+            0,
+            2,
+            2,
+            2,
+            3,
+            0,
+            0
+          ]
+        }
+      ],
+      "interpretation": "Family: bid 4 (hearts downtown); declarer=P0; made=true / Powered (sig=9): bid 4 (hearts uptown); declarer=P0; made=true / Powered (sig=11): bid 4 (hearts uptown); declarer=P0; made=true / Powered (sig=13): bid 4 (hearts uptown); declarer=P0; made=true / Powered (sig=14): bid 4 (hearts uptown); declarer=P0; made=true"
+    },
+    {
+      "key": "qjheavy",
+      "title": "Q/J stack — no stoppers, hand_power(uptown) = 11",
+      "rationale": "Four queens, three jacks, no A or K. king_ace_count = 0 (Family passes), but hand_power(uptown) = 8 + 3 = 11 (sig=9 and sig=11 signal). The intuition \"Q/J become stoppers once A/K are pulled\" is real, but depends on A/K actually being pulled from the right hands — when this hand is forced into declarer, the opponents still hold all four aces and all four kings.",
+      "p0Hand": [
+        "hearts_12",
+        "spades_12",
+        "clubs_12",
+        "diamonds_12",
+        "hearts_11",
+        "spades_11",
+        "clubs_11",
+        "hearts_4",
+        "spades_4",
+        "clubs_4",
+        "hearts_2",
+        "spades_2"
+      ],
+      "kac": 0,
+      "qjc": 7,
+      "hpUp": 11,
+      "hpDn": 9,
+      "maxSuit": 4,
+      "deckUrl": "lRHPymMzLXWgYjVEkAcwxhrJKuSQdNZCqeinDpTIbtaGofFBOvsU",
+      "outcomes": [
+        {
+          "strategyName": "Family",
+          "declarer": 3,
+          "bidAmount": 4,
+          "trumpSuit": "clubs",
+          "direction": "downtown-noaces",
+          "booksWon": [
+            3,
+            9
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 10,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 0
+            }
+          ],
+          "trickWinners": [
+            3,
+            3,
+            0,
+            0,
+            3,
+            3,
+            1,
+            3,
+            0,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=9)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "spades",
+          "direction": "uptown",
+          "booksWon": [
+            5,
+            7
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 6,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            3,
+            1,
+            1,
+            2,
+            1,
+            3,
+            1,
+            3,
+            0,
+            0,
+            0,
+            2
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=11)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "spades",
+          "direction": "uptown",
+          "booksWon": [
+            5,
+            7
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 6,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            3,
+            1,
+            1,
+            2,
+            1,
+            3,
+            1,
+            3,
+            0,
+            0,
+            0,
+            2
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=13)",
+          "declarer": 3,
+          "bidAmount": 4,
+          "trumpSuit": "clubs",
+          "direction": "downtown-noaces",
+          "booksWon": [
+            3,
+            9
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 10,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 0
+            }
+          ],
+          "trickWinners": [
+            3,
+            3,
+            0,
+            0,
+            3,
+            3,
+            1,
+            3,
+            0,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=14)",
+          "declarer": 3,
+          "bidAmount": 4,
+          "trumpSuit": "clubs",
+          "direction": "downtown-noaces",
+          "booksWon": [
+            3,
+            9
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 10,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 0
+            }
+          ],
+          "trickWinners": [
+            3,
+            3,
+            0,
+            0,
+            3,
+            3,
+            1,
+            3,
+            0,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "interpretation": "Family: bid 4 (clubs downtown-noaces); declarer=P3; made=true / Powered (sig=9): bid 4 (spades uptown); declarer=P0; made=false / Powered (sig=11): bid 4 (spades uptown); declarer=P0; made=false / Powered (sig=13): bid 4 (clubs downtown-noaces); declarer=P3; made=true / Powered (sig=14): bid 4 (clubs downtown-noaces); declarer=P3; made=true"
+    },
+    {
+      "key": "aakk",
+      "title": "AAKK — hand_power(uptown) = 14, everyone agrees",
+      "rationale": "Two aces and two kings: every strategy signals this as a strong hand. Sanity check — the threshold choice only matters at the boundary, not on hands that are unambiguously strong or weak.",
+      "p0Hand": [
+        "hearts_1",
+        "spades_1",
+        "hearts_13",
+        "spades_13",
+        "hearts_9",
+        "hearts_8",
+        "spades_7",
+        "clubs_6",
+        "clubs_5",
+        "clubs_4",
+        "diamonds_3",
+        "diamonds_2"
+      ],
+      "kac": 4,
+      "qjc": 0,
+      "hpUp": 14,
+      "hpDn": 14,
+      "maxSuit": 4,
+      "deckUrl": "aKWynINqmHfjzSUciQLdhZJCtgTGFXAbEMrlDpsoPYwBOxukRevV",
+      "outcomes": [
+        {
+          "strategyName": "Family",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown",
+          "booksWon": [
+            4,
+            8
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 5,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            3,
+            2,
+            3,
+            3,
+            3,
+            0,
+            3,
+            0,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=9)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown",
+          "booksWon": [
+            4,
+            8
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 5,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            3,
+            2,
+            3,
+            3,
+            3,
+            0,
+            3,
+            0,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=11)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown",
+          "booksWon": [
+            4,
+            8
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 5,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            3,
+            2,
+            3,
+            3,
+            3,
+            0,
+            3,
+            0,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=13)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown",
+          "booksWon": [
+            4,
+            8
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 5,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            3,
+            2,
+            3,
+            3,
+            3,
+            0,
+            3,
+            0,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=14)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown",
+          "booksWon": [
+            4,
+            8
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 5,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 4
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 0
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            3,
+            2,
+            3,
+            3,
+            3,
+            0,
+            3,
+            0,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "interpretation": "Family: bid 4 (hearts downtown); declarer=P0; made=false / Powered (sig=9): bid 4 (hearts downtown); declarer=P0; made=false / Powered (sig=11): bid 4 (hearts downtown); declarer=P0; made=false / Powered (sig=13): bid 4 (hearts downtown); declarer=P0; made=false / Powered (sig=14): bid 4 (hearts downtown); declarer=P0; made=false"
+    },
+    {
+      "key": "solidhearts",
+      "title": "A♥K♥Q♥J♥ + low — sequential suit but only 2 stoppers",
+      "rationale": "Six hearts headed by A-K-Q-J plus low-rank fillers in other suits. king_ace_count = 2 (Family passes signals 1/2), but Family's `max_suit_count ≥ 6` rule fires → bid 4. hand_power(uptown) = 4+3+2+1 = 10, misses sig=11 and sig=13. Demonstrates where the long-suit rule (unchanged in Powered) drives the decision.",
+      "p0Hand": [
+        "hearts_1",
+        "hearts_13",
+        "hearts_12",
+        "hearts_11",
+        "hearts_10",
+        "hearts_9",
+        "spades_2",
+        "spades_3",
+        "spades_4",
+        "clubs_2",
+        "clubs_3",
+        "diamonds_2"
+      ],
+      "kac": 2,
+      "qjc": 2,
+      "hpUp": 10,
+      "hpDn": 18,
+      "maxSuit": 6,
+      "deckUrl": "aHLJmcdXlUvnkrxGjKfQiMwyoFuzptYNqZDhBseICTbAOWgRSPEV",
+      "outcomes": [
+        {
+          "strategyName": "Family",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown-noaces",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 2
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            1,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            2,
+            0,
+            2,
+            2,
+            2
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=9)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown-noaces",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 3
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            1,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            2,
+            0,
+            2,
+            2,
+            2
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=11)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown-noaces",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 3
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            1,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            2,
+            0,
+            2,
+            2,
+            2
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=13)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown-noaces",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 3
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            1,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            2,
+            0,
+            2,
+            2,
+            2
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=14)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "hearts",
+          "direction": "downtown-noaces",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 2
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            1,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            2,
+            0,
+            2,
+            2,
+            2
+          ]
+        }
+      ],
+      "interpretation": "Family: bid 4 (hearts downtown-noaces); declarer=P0; made=true / Powered (sig=9): bid 4 (hearts downtown-noaces); declarer=P0; made=true / Powered (sig=11): bid 4 (hearts downtown-noaces); declarer=P0; made=true / Powered (sig=13): bid 4 (hearts downtown-noaces); declarer=P0; made=true / Powered (sig=14): bid 4 (hearts downtown-noaces); declarer=P0; made=true"
+    },
+    {
+      "key": "downtown",
+      "title": "AA + 234s — downtown mirror, hand_power(downtown) = 18",
+      "rationale": "Two aces plus five \"deuce-trey-four\" cards. hand_power(downtown) = 4+4+3+3+3+2+2+1+1 = 23 (Aces + 2s + 3s + 4s). Every threshold signals downtown strongly. Shows that hand_power scales cleanly for downtown too.",
+      "p0Hand": [
+        "hearts_1",
+        "spades_1",
+        "hearts_2",
+        "hearts_3",
+        "hearts_4",
+        "spades_2",
+        "spades_3",
+        "spades_4",
+        "clubs_2",
+        "clubs_3",
+        "diamonds_10",
+        "diamonds_9"
+      ],
+      "kac": 2,
+      "qjc": 0,
+      "hpUp": 8,
+      "hpDn": 25,
+      "maxSuit": 4,
+      "deckUrl": "aMhsnUNebgXQciOAdFJfotYrpLKwqSElBuIjCmHkWZyxVvPDRzGT",
+      "outcomes": [
+        {
+          "strategyName": "Family",
+          "declarer": 1,
+          "bidAmount": 4,
+          "trumpSuit": "diamonds",
+          "direction": "uptown",
+          "booksWon": [
+            8,
+            4
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 5,
+          "made": false,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 0
+            }
+          ],
+          "trickWinners": [
+            2,
+            3,
+            1,
+            0,
+            0,
+            0,
+            2,
+            1,
+            2,
+            1,
+            2,
+            2
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=9)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "spades",
+          "direction": "downtown",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 3
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            0,
+            2,
+            2,
+            2,
+            3,
+            0,
+            0,
+            0,
+            2
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=11)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "spades",
+          "direction": "downtown",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            2,
+            2,
+            2,
+            3,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=13)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "spades",
+          "direction": "downtown",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            2,
+            2,
+            2,
+            3,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "strategyName": "Powered (sig=14)",
+          "declarer": 0,
+          "bidAmount": 4,
+          "trumpSuit": "spades",
+          "direction": "downtown",
+          "booksWon": [
+            11,
+            1
+          ],
+          "contract": 10,
+          "declarerTeamBooks": 12,
+          "made": true,
+          "bids": [
+            {
+              "playerId": 3,
+              "amount": 0
+            },
+            {
+              "playerId": 2,
+              "amount": 0
+            },
+            {
+              "playerId": 1,
+              "amount": 4
+            },
+            {
+              "playerId": 0,
+              "amount": 4
+            }
+          ],
+          "trickWinners": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            2,
+            2,
+            2,
+            3,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "interpretation": "Family: bid 4 (diamonds uptown); declarer=P1; made=false / Powered (sig=9): bid 4 (spades downtown); declarer=P0; made=true / Powered (sig=11): bid 4 (spades downtown); declarer=P0; made=true / Powered (sig=13): bid 4 (spades downtown); declarer=P0; made=true / Powered (sig=14): bid 4 (spades downtown); declarer=P0; made=true"
+    }
+  ],
+  "interesting": [
+    {
+      "deckUrl": "ELsDMnXtYBfzhKdiaZyqplwbFTPjNkrIOHVcgQuvxJGRSCUoAWme",
+      "label": "P0 KA≥3 (true stopper)",
+      "kac": 3,
+      "qjc": 2,
+      "hpUp": 14,
+      "hpDn": 13,
+      "maxSuit": 4,
+      "classification": "KA≥3 (true stopper)",
+      "familyBid": 4,
+      "familyMade": false,
+      "powered9Bid": 4,
+      "powered9Made": false,
+      "powered14Bid": 4,
+      "powered14Made": false,
+      "powered17Bid": 4,
+      "powered17Made": true
+    },
+    {
+      "deckUrl": "AHPnerLORwKBGdTMcXkfuNJtpgIvhmlZsYSjibazDFUCVEQoyxqW",
+      "label": "P0 mixed",
+      "kac": 1,
+      "qjc": 0,
+      "hpUp": 4,
+      "hpDn": 9,
+      "maxSuit": 4,
+      "classification": "mixed",
+      "familyBid": 4,
+      "familyMade": false,
+      "powered9Bid": 4,
+      "powered9Made": false,
+      "powered14Bid": 4,
+      "powered14Made": false,
+      "powered17Bid": 4,
+      "powered17Made": true
+    },
+    {
+      "deckUrl": "brgKfsNHDJyYqaSFWLjzTAeRnGIiPptdoUmlBEQcxuMvkVXhZCOw",
+      "label": "P0 hp(downtown)≥13",
+      "kac": 1,
+      "qjc": 2,
+      "hpUp": 6,
+      "hpDn": 17,
+      "maxSuit": 4,
+      "classification": "hp(downtown)≥13",
+      "familyBid": 4,
+      "familyMade": false,
+      "powered9Bid": 4,
+      "powered9Made": true,
+      "powered14Bid": 4,
+      "powered14Made": true,
+      "powered17Bid": 4,
+      "powered17Made": true
+    },
+    {
+      "deckUrl": "BsuqGbAhnFDTjyVSrMweOatHLXJgxvlpzRUCWEmQoPYKkIZNifcd",
+      "label": "P0 hp(downtown)≥13",
+      "kac": 2,
+      "qjc": 3,
+      "hpUp": 11,
+      "hpDn": 13,
+      "maxSuit": 5,
+      "classification": "hp(downtown)≥13",
+      "familyBid": 4,
+      "familyMade": true,
+      "powered9Bid": 4,
+      "powered9Made": true,
+      "powered14Bid": 4,
+      "powered14Made": true,
+      "powered17Bid": 4,
+      "powered17Made": false
+    },
+    {
+      "deckUrl": "AgOWCfeyJHUnFGmEzuVdpsPwoShqxNTRDMckLBtKZXrIaijYQblv",
+      "label": "P0 KA≥3 (true stopper)",
+      "kac": 4,
+      "qjc": 2,
+      "hpUp": 17,
+      "hpDn": 16,
+      "maxSuit": 6,
+      "classification": "KA≥3 (true stopper)",
+      "familyBid": 4,
+      "familyMade": true,
+      "powered9Bid": 4,
+      "powered9Made": false,
+      "powered14Bid": 4,
+      "powered14Made": false,
+      "powered17Bid": 4,
+      "powered17Made": false
+    },
+    {
+      "deckUrl": "RsmQkOTJUPGiIaoDlNxXAcEMqHZSfuKbywzYWCjLenvBdgptrhFV",
+      "label": "P0 mixed",
+      "kac": 1,
+      "qjc": 3,
+      "hpUp": 9,
+      "hpDn": 6,
+      "maxSuit": 5,
+      "classification": "mixed",
+      "familyBid": 4,
+      "familyMade": true,
+      "powered9Bid": 4,
+      "powered9Made": true,
+      "powered14Bid": 4,
+      "powered14Made": false,
+      "powered17Bid": 4,
+      "powered17Made": false
+    },
+    {
+      "deckUrl": "zosgiZwORYknDbSqleaHLNtxdFjEGCJmIruThMvWUKpcAVfByXQP",
+      "label": "P0 mixed",
+      "kac": 2,
+      "qjc": 2,
+      "hpUp": 11,
+      "hpDn": 6,
+      "maxSuit": 5,
+      "classification": "mixed",
+      "familyBid": 5,
+      "familyMade": true,
+      "powered9Bid": 5,
+      "powered9Made": true,
+      "powered14Bid": 4,
+      "powered14Made": false,
+      "powered17Bid": 4,
+      "powered17Made": false
+    },
+    {
+      "deckUrl": "AWgwzZyvSrBJVRIHDexKQiakEbCTNXUsoLPmMFjpcYluqOtdnGfh",
+      "label": "P0 KA≥3 (true stopper)",
+      "kac": 4,
+      "qjc": 0,
+      "hpUp": 14,
+      "hpDn": 16,
+      "maxSuit": 4,
+      "classification": "KA≥3 (true stopper)",
+      "familyBid": 4,
+      "familyMade": true,
+      "powered9Bid": 4,
+      "powered9Made": true,
+      "powered14Bid": 4,
+      "powered14Made": true,
+      "powered17Bid": 4,
+      "powered17Made": false
+    },
+    {
+      "deckUrl": "AjkegxzstRrIOhXpTcSwZCQnyUdbGuovNJPBKlFfEiHYqmVWaLMD",
+      "label": "P0 KA≥3 (true stopper)",
+      "kac": 3,
+      "qjc": 2,
+      "hpUp": 14,
+      "hpDn": 12,
+      "maxSuit": 4,
+      "classification": "KA≥3 (true stopper)",
+      "familyBid": 4,
+      "familyMade": true,
+      "powered9Bid": 4,
+      "powered9Made": true,
+      "powered14Bid": 4,
+      "powered14Made": true,
+      "powered17Bid": 4,
+      "powered17Made": true
+    },
+    {
+      "deckUrl": "qGIjtlbBKvkFRycXhTEeLQHACaOxSoMYZpUzgDJVirnwuWNdmPsf",
+      "label": "P0 mixed",
+      "kac": 1,
+      "qjc": 2,
+      "hpUp": 6,
+      "hpDn": 3,
+      "maxSuit": 3,
+      "classification": "mixed",
+      "familyBid": 4,
+      "familyMade": false,
+      "powered9Bid": 4,
+      "powered9Made": true,
+      "powered14Bid": 4,
+      "powered14Made": false,
+      "powered17Bid": 4,
+      "powered17Made": false
+    },
+    {
+      "deckUrl": "hUfiYKdDVEXTjIaAmkHCxqezLnJZcyuwQpNOMBoWtSgrFsRPbvlG",
+      "label": "P0 mixed",
+      "kac": 2,
+      "qjc": 3,
+      "hpUp": 11,
+      "hpDn": 3,
+      "maxSuit": 4,
+      "classification": "mixed",
+      "familyBid": 4,
+      "familyMade": false,
+      "powered9Bid": 4,
+      "powered9Made": true,
+      "powered14Bid": 4,
+      "powered14Made": false,
+      "powered17Bid": 4,
+      "powered17Made": false
+    },
+    {
+      "deckUrl": "ORYsPEiqUDXnCTHlIjemapcKrgzuASQbGWFJfZVxtwhLyBNkMvdo",
+      "label": "P0 hp(downtown)≥13",
+      "kac": 2,
+      "qjc": 1,
+      "hpUp": 10,
+      "hpDn": 15,
+      "maxSuit": 4,
+      "classification": "hp(downtown)≥13",
+      "familyBid": 4,
+      "familyMade": false,
+      "powered9Bid": 4,
+      "powered9Made": false,
+      "powered14Bid": 4,
+      "powered14Made": false,
+      "powered17Bid": 4,
+      "powered17Made": false
+    },
+    {
+      "deckUrl": "TXkFEnegoCcSbiOdfphamyrlswIABVjUPzWuqQMxYKGZDHtvRLJN",
+      "label": "P0 hp(downtown)≥13",
+      "kac": 1,
+      "qjc": 1,
+      "hpUp": 5,
+      "hpDn": 13,
+      "maxSuit": 3,
+      "classification": "hp(downtown)≥13",
+      "familyBid": 4,
+      "familyMade": true,
+      "powered9Bid": 4,
+      "powered9Made": true,
+      "powered14Bid": 4,
+      "powered14Made": true,
+      "powered17Bid": 4,
+      "powered17Made": true
+    },
+    {
+      "deckUrl": "xgTvDnCNzROmlfLVEcrKphWIkqUaJHbAMSuZyBjsetGQYoPwdiXF",
+      "label": "P0 Q/J-heavy (sig=9 false positive)",
+      "kac": 2,
+      "qjc": 5,
+      "hpUp": 14,
+      "hpDn": 3,
+      "maxSuit": 4,
+      "classification": "Q/J-heavy (sig=9 false positive)",
+      "familyBid": 4,
+      "familyMade": true,
+      "powered9Bid": 4,
+      "powered9Made": false,
+      "powered14Bid": 4,
+      "powered14Made": false,
+      "powered17Bid": 4,
+      "powered17Made": true
+    },
+    {
+      "deckUrl": "JHDWQLsnTFVGPAihykcRzKxBXNmpUEfOYqrMZagwvSuCboljIdet",
+      "label": "P0 long-suit (bid-4 via length)",
+      "kac": 2,
+      "qjc": 3,
+      "hpUp": 11,
+      "hpDn": 6,
+      "maxSuit": 7,
+      "classification": "long-suit (bid-4 via length)",
+      "familyBid": 5,
+      "familyMade": true,
+      "powered9Bid": 5,
+      "powered9Made": true,
+      "powered14Bid": 5,
+      "powered14Made": true,
+      "powered17Bid": 4,
+      "powered17Made": true
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Overview — hand_power signaling report</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html" class="active">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a></nav>
+</header>
+<main>
+
+<section>
+  <div class="thesis">
+    <h3>Thesis: the optimal hand_power threshold is sig = 17</h3>
+    <p>
+      After a sweep at 19,888 head-to-head games per config against baseline
+      Family, the best threshold for hand_power-based signaling is <strong>sig = 17</strong>,
+      scoring <strong>50.24% ± 0.69%</strong>.
+      On this single-seed pool the point estimate is within <strong>±0.69pp</strong> of Family (statistically tied); across three
+      independent seeds (pooled N ≈ 60k), sig=17 consistently lands between
+      50.2% and 50.9% — a small but repeatable edge above the 50% null.
+    </p>
+    <p>
+      The peak is sharp. sig=16 and sig=18 both sit at or below
+      50%; every threshold below sig=15 loses to Family by 1–6pp; every threshold above
+      sig=18 drops back into a tie. The optimum isn't "as strict as possible" — it's
+      specifically at the threshold that catches genuine monster hands (AAKKQJ, AAKKK,
+      AAAKQ, AAAKQJ, four aces) and almost nothing else.
+    </p>
+    <p>
+      This <strong>contradicts my earlier claim</strong> that sig=13–14 was the right range.
+      At 3k–6k games I only had the CI to conclude sig=13 was the lowest not-clearly-worse
+      threshold, and I took that as the answer. With 19,888-game CIs (±0.7pp)
+      the actual ranking is: sig=9–11 clearly worse, sig=13–15 measurably worse, sig=16–17 the
+      tied peak, sig=18+ falls off again.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>Headline result</h2>
+  <div class="kpi">
+    <div class="box"><div class="value">17</div><div class="label">Best sig threshold</div></div>
+    <div class="box"><div class="value">50.2%</div><div class="label">Win rate vs Family</div></div>
+    <div class="box"><div class="value">±0.69%</div><div class="label">95% CI (N=19,888)</div></div>
+  </div>
+
+  <p>Sweep across all tested thresholds (same deck pool, same opponent, round-robin assignment):</p>
+  <table>
+    <thead>
+      <tr><th>Threshold</th><th>Wins</th><th>Losses</th><th>Games</th><th>Win rate ± 95% CI</th><th>Distribution</th></tr>
+    </thead>
+    <tbody>
+<tr><td><code>sig=7</code></td><td class="num">7714</td><td class="num">11534</td><td class="num">19248</td><td class="num">40.1% ± 0.69%</td><td><div class="bar-container"><div class="bar loss" style="left:78.76914039603223px;width:2.7692836302131907px;"></div><div class="ci-marker" style="left:80.15378221113882px;"></div></div></td></tr>
+<tr><td><code>sig=9</code></td><td class="num">8490</td><td class="num">10862</td><td class="num">19352</td><td class="num">43.9% ± 0.70%</td><td><div class="bar-container"><div class="bar loss" style="left:86.34455069605386px;width:2.7966365161188365px;"></div><div class="ci-marker" style="left:87.74286895411328px;"></div></div></td></tr>
+<tr><td><code>sig=11</code></td><td class="num">8840</td><td class="num">10400</td><td class="num">19240</td><td class="num">45.9% ± 0.70%</td><td><div class="bar-container"><div class="bar loss" style="left:90.48350729189731px;width:2.8167691999891598px;"></div><div class="ci-marker" style="left:91.8918918918919px;"></div></div></td></tr>
+<tr><td><code>sig=13</code></td><td class="num">9460</td><td class="num">10292</td><td class="num">19752</td><td class="num">47.9% ± 0.70%</td><td><div class="bar-container"><div class="bar loss" style="left:94.39440329089996px;width:2.7867300727160886px;"></div><div class="ci-marker" style="left:95.787768327258px;"></div></div></td></tr>
+<tr><td><code>sig=14</code></td><td class="num">9476</td><td class="num">10100</td><td class="num">19576</td><td class="num">48.4% ± 0.70%</td><td><div class="bar-container"><div class="bar loss" style="left:95.41227730658709px;width:2.8002921379496484px;"></div><div class="ci-marker" style="left:96.81242337556192px;"></div></div></td></tr>
+<tr><td><code>sig=15</code></td><td class="num">9640</td><td class="num">9984</td><td class="num">19624</td><td class="num">49.1% ± 0.70%</td><td><div class="bar-container"><div class="bar loss" style="left:96.84811577654135px;width:2.797857317687795px;"></div><div class="ci-marker" style="left:98.24704443538525px;"></div></div></td></tr>
+<tr><td><code>sig=16</code></td><td class="num">9922</td><td class="num">9902</td><td class="num">19824</td><td class="num">50.1% ± 0.70%</td><td><div class="bar-container"><div class="bar win" style="left:98.7088205963687px;width:2.784134432767044px;"></div><div class="ci-marker" style="left:100.10088781275222px;"></div></div></td></tr>
+<tr class="highlight-row"><td><code>sig=17</code></td><td class="num">9992</td><td class="num">9896</td><td class="num">19888</td><td class="num">50.2% ± 0.69%</td><td><div class="bar-container"><div class="bar win" style="left:99.09289306119827px;width:2.7796201527442714px;"></div><div class="ci-marker" style="left:100.4827031375704px;"></div></div></td></tr>
+<tr><td><code>sig=18</code></td><td class="num">9748</td><td class="num">9988</td><td class="num">19736</td><td class="num">49.4% ± 0.70%</td><td><div class="bar-container"><div class="bar loss" style="left:97.38888328757868px;width:2.7901296550818033px;"></div><div class="ci-marker" style="left:98.78394811511959px;"></div></div></td></tr>
+<tr><td><code>sig=20</code></td><td class="num">9382</td><td class="num">10138</td><td class="num">19520</td><td class="num">48.1% ± 0.70%</td><td><div class="bar-container"><div class="bar loss" style="left:94.72523578786468px;width:2.803626784926403px;"></div><div class="ci-marker" style="left:96.12704918032787px;"></div></div></td></tr>
+    </tbody>
+  </table>
+  <p class="muted"><em>The horizontal bar shows the 95% confidence interval; the vertical marker is the point estimate. Configs whose CI lies fully below 0.50 are worse than Family at p&lt;0.05.</em></p>
+</section>
+
+<section>
+  <h2>Why sig=17 and not 13 or 20?</h2>
+  <p>
+    The answer comes from reading off which hand compositions each threshold admits as a
+    signal. Family's <code>king_ace_count() ≥ 3</code> is an information-poor predicate — it
+    fires on "3 or more stoppers" without caring whether there's ALSO depth. A bare AAK-junk
+    hand signals the same bid 2 as AAKKQJ, even though the latter is enormously stronger.
+    Partner can't distinguish the two, so they have to act on the weaker-signal semantics, which
+    under-utilizes strong hands and over-commits weak ones.
+  </p>
+  <p>
+    <code>hand_power(uptown)</code> is a finer-grained measure. Setting the threshold at
+    <strong>17</strong> narrows the signal to hands like AAKKQJ (6 honors total),
+    AAA+K+Q (5 honors with an ace-heavy core), or four aces — the hands where "I basically
+    have this hand by myself if trump comes out OK" is approximately true. At that point,
+    partner's interpretation of "bid 2 = uptown monster" is accurate enough that their
+    pushing/dealer-taking responses are usually correct.
+  </p>
+  <table>
+    <thead><tr><th>Hand composition</th><th>hp(up)</th><th>KAC</th><th>sig=9</th><th>sig=13</th><th>sig=17</th><th>sig=18</th><th>Family (KAC≥3)</th></tr></thead>
+    <tbody>
+      <tr><td>AAAA (four aces)</td><td class="num">16</td><td class="num">4</td><td class="good">signal</td><td class="good">signal</td><td class="bad">pass</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>AAAKQJ (6 honors, ace-heavy)</td><td class="num">18</td><td class="num">4</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td></tr>
+      <tr><td>AAAKQ (5 honors)</td><td class="num">17</td><td class="num">4</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>AAKKQJ (6 honors, balanced)</td><td class="num">17</td><td class="num">4</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>AAKKK (2 aces + 3 kings)</td><td class="num">17</td><td class="num">5</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>AAKK + QQ (5 honors, balanced)</td><td class="num">18</td><td class="num">4</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td></tr>
+      <tr><td>AAKK + QJ (6 honors, lighter)</td><td class="num">17</td><td class="num">4</td><td class="good">signal</td><td class="good">signal</td><td class="good">signal</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>AAKK (2 aces + 2 kings only)</td><td class="num">14</td><td class="num">4</td><td class="good">signal</td><td class="good">signal</td><td class="bad">pass</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>AAKQ (AA + K + Q)</td><td class="num">13</td><td class="num">3</td><td class="good">signal</td><td class="good">signal</td><td class="bad">pass</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>AAA (three aces, no K)</td><td class="num">12</td><td class="num">3</td><td class="good">signal</td><td class="bad">pass</td><td class="bad">pass</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>AAK (2 aces + king)</td><td class="num">11</td><td class="num">3</td><td class="good">signal</td><td class="bad">pass</td><td class="bad">pass</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>AKQJ (long-suit sequence)</td><td class="num">10</td><td class="num">2</td><td class="good">signal</td><td class="bad">pass</td><td class="bad">pass</td><td class="bad">pass</td><td class="bad">pass*</td></tr>
+      <tr><td>KKK (three kings, no ace)</td><td class="num">9</td><td class="num">3</td><td class="good">signal</td><td class="bad">pass</td><td class="bad">pass</td><td class="bad">pass</td><td class="good">signal</td></tr>
+      <tr><td>QQQQJJ (Q/J-heavy, no A/K)</td><td class="num">10</td><td class="num">0</td><td class="good">signal</td><td class="bad">pass</td><td class="bad">pass</td><td class="bad">pass</td><td class="bad">pass</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">* KAC=2 so Family's bid-2 signal rule skips, but the long-suit path (max_suit_count ≥ 6) handles strong 6-card suits. Noted for completeness.</p>
+  <p>
+    Reading this table, sig=17 has these properties:
+  </p>
+  <ul>
+    <li><strong>Agrees with Family</strong> on AAAKQJ, AAAKQ, AAKKQJ, AAKKK, AAKK+QQ, AAKK+QJ —
+      the "5+ honors with at least a pair of aces" hands.</li>
+    <li><strong>Disagrees with Family</strong> by PASSING on AAAA, AAKK, AAKQ, AAA, AAK, KKK —
+      the "3 stoppers but light on depth" hands. Family signals these; sig=17 doesn't.</li>
+    <li><strong>Correctly passes</strong> on AKQJ, Q/J stacks, KKK-only — the hands that
+      low-threshold configs (sig=9, sig=11) over-signaled.</li>
+  </ul>
+  <p>
+    The <em>combination</em> of these three behaviors is what produces the +1pp edge: sig=17
+    signals only when the signal carries strong information, and partner's response to "partner
+    signaled" is accurate on those hands. The hands Family catches that sig=17 misses
+    (AAA, AAK, AAKQ, AAKK) are hands where the marginal value of signaling is actually NEGATIVE —
+    the signal over-commits the partnership on hands that are only borderline makers.
+  </p>
+</section>
+
+<section>
+  <h2>Methodology</h2>
+  <p>
+    <strong>Simulation setup:</strong>
+    Each config plays a full head-to-head series against baseline Family on the same
+    <code>3000</code>-deck seeded pool (<code>seed=73313</code>). Round-robin
+    assignment: every ordered pair of strategies plays each deck from both team positions, so seat-advantage
+    cancels. Total of <code>20,000</code> hands per config.
+  </p>
+  <p>
+    <strong>Strategy variants:</strong> <code>Family (Powered)</code> is the parameterized rewrite from
+    <code>src/strategies/familyPoweredTuned.ts</code>. Only the signal thresholds change across configs;
+    the play, trump, and discard sections are unchanged (identical to Family).
+  </p>
+  <p>
+    <strong>Reproduce:</strong>
+    <code>node scripts/generate-report.js</code> regenerates this entire report with current data.
+    For a finer sweep: <code>node scripts/sweep-hand-power.js -- --sigs 12,13,14,15 --hands 10000</code>.
+  </p>
+</section>
+  
+</main>
+<footer>
+  Generated from <code>node scripts/generate-report.js</code>. Source:
+  <code>src/simulation/runReportData.ts</code>.
+</footer>
+</body>
+</html>

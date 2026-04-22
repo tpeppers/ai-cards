@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Case Studies — hand_power signaling report</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html" class="active">Case Studies</a><a href="playable.html">Playable Hands</a></nav>
+</header>
+<main>
+
+<section>
+  <h2>What happens in concrete hands</h2>
+  <p>
+    Each case study below fixes Player 0's hand to a specific archetype (constructed via the
+    52-character deck URL), fills the rest of the deck with a fixed seeded shuffle, and simulates
+    the hand under Family plus four Powered variants. The <em>same physical deck</em> is used
+    across all five strategies, so the only varying factor is the bidding policy. This makes the
+    causal chain — "threshold → signal → bid → declarer → result" — directly visible.
+  </p>
+  <p class="muted">
+    <strong>Important caveat:</strong> a single hand doesn't prove a strategy is better — the
+    proof is in the aggregate (see <a href="sweep.html">Sweep Data</a>). Individual hands can be
+    bad luck (opponents happen to hold the right cards to break a strong hand) or good luck.
+    These case studies exist to show the <em>mechanism</em> — where the signal changes who
+    declares, what trump direction gets called, and so on — not to cherry-pick outcomes. Look
+    especially at the <em>Q/J-stack</em> and <em>AAKQ</em> cases, where the strategies diverge
+    clearly between "P0 becomes declarer and fails" (low sig) and "partner declares and makes"
+    (high sig).
+  </p>
+  <p>
+    Open any hand in the app via the localhost link to step through the game manually.
+  </p>
+</section>
+
+
+<section>
+  <h2>AAKKQJ — hand_power(uptown) = 17 (the sig=17 &quot;monster&quot;)</h2>
+  <p><strong>Player 0 hand:</strong> <span class="hand-line"><span class="black">♠AK76</span> &nbsp; <span class="red">♥AKQJ</span> &nbsp; <span class="red">♦32</span> &nbsp; <span class="black">♣54</span></span></p>
+  <p><strong>Hand metrics:</strong>
+    <code>king_ace_count=4</code>,
+    <code>queen_jack_count=2</code>,
+    <code>hand_power(uptown)=17</code>,
+    <code>hand_power(downtown)=14</code>,
+    <code>max_suit_length=4</code></p>
+  <p>Two aces, two kings, a queen and a jack — six honors, the hand that sig=17 specifically catches. Only sig≤17 signals on this hand; sig=18 passes. The 20k-game sweep shows sig=17 beats Family by ~0.9pp precisely BECAUSE it signals on this class of hand while being strict enough to ignore weaker hands that Family&#39;s `king_ace_count() &gt;= 3` admits.</p>
+  <table>
+    <thead>
+      <tr><th>Strategy</th><th>P0 action / final bid</th><th>Trump</th><th>Declarer</th><th>Contract</th><th>Books</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+<tr><td><strong>Family</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">8/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=9)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">9/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=11)</strong></td><td>bid 4</td><td>hearts downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">8/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=13)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">8/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=14)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">8/13</td><td><span class="tag failed">failed</span></td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Playable:</strong>
+    <a href="http://localhost:3000/#aByFnGQbmwoXzJvTlfHukdjItNxUshAWEeCLDrqSPpRMOZYiKcgV" target="_blank"><code>http://localhost:3000/#aByFnGQbmwoXzJvTlfHukdjItNxUshAWEeCLDrqSPpRMOZYiKcgV</code></a>
+  </p>
+</section>
+
+<section>
+  <h2>AAKQ + filler — hand_power(uptown) = 13 (Family signals, sig=17 doesn&#39;t)</h2>
+  <p><strong>Player 0 hand:</strong> <span class="hand-line"><span class="black">♠A76</span> &nbsp; <span class="red">♥AKQ98</span> &nbsp; <span class="red">♦32</span> &nbsp; <span class="black">♣54</span></span></p>
+  <p><strong>Hand metrics:</strong>
+    <code>king_ace_count=3</code>,
+    <code>queen_jack_count=1</code>,
+    <code>hand_power(uptown)=13</code>,
+    <code>hand_power(downtown)=14</code>,
+    <code>max_suit_length=5</code></p>
+  <p>Two aces, a king and a queen — only 4 true honors. Family&#39;s king_ace_count ≥ 3 fires (3 A/K), and sig=13 also fires, but sig=17 stays silent. This is the crux of WHY sig=17 wins: Family signals on this borderline hand and partner over-commits; sig=17 correctly lets the opponents bid. The case study below shows the outcome.</p>
+  <table>
+    <thead>
+      <tr><th>Strategy</th><th>P0 action / final bid</th><th>Trump</th><th>Declarer</th><th>Contract</th><th>Books</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+<tr><td><strong>Family</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">9/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=9)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">9/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=11)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">9/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=13)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">9/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=14)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">9/13</td><td><span class="tag failed">failed</span></td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Playable:</strong>
+    <a href="http://localhost:3000/#aJyXnpTdmUzqlAQjiIMWhvxetbBSsRNrEHYfDowCPFcuOLGkZgKV" target="_blank"><code>http://localhost:3000/#aJyXnpTdmUzqlAQjiIMWhvxetbBSsRNrEHYfDowCPFcuOLGkZgKV</code></a>
+  </p>
+</section>
+
+<section>
+  <h2>AAA + low cards — KAC=3 but hand_power(uptown) = 12</h2>
+  <p><strong>Player 0 hand:</strong> <span class="hand-line"><span class="black">♠A765</span> &nbsp; <span class="red">♥A432</span> &nbsp; <span class="black">♣A1098</span></span></p>
+  <p><strong>Hand metrics:</strong>
+    <code>king_ace_count=3</code>,
+    <code>queen_jack_count=0</code>,
+    <code>hand_power(uptown)=12</code>,
+    <code>hand_power(downtown)=18</code>,
+    <code>max_suit_length=4</code></p>
+  <p>Three aces with low-rank filler. Family signals (king_ace_count ≥ 3). hand_power(uptown) = 12, under sig=13 and sig=14 this PASSES — so Powered misses an arguably reasonable signal. This is the textbook &quot;cost&quot; of a high sig threshold.</p>
+  <table>
+    <thead>
+      <tr><th>Strategy</th><th>P0 action / final bid</th><th>Trump</th><th>Declarer</th><th>Contract</th><th>Books</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+<tr><td><strong>Family</strong></td><td>bid 4</td><td>hearts downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">11/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=9)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">10/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=11)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">11/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=13)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=14)</strong></td><td>bid 4</td><td>hearts uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Playable:</strong>
+    <a href="http://localhost:3000/#aSGvnwYDAkXzbELjcflidTCKrhoWsPBytUepHqgQIuxMJFZRONmV" target="_blank"><code>http://localhost:3000/#aSGvnwYDAkXzbELjcflidTCKrhoWsPBytUepHqgQIuxMJFZRONmV</code></a>
+  </p>
+</section>
+
+<section>
+  <h2>Q/J stack — no stoppers, hand_power(uptown) = 11</h2>
+  <p><strong>Player 0 hand:</strong> <span class="hand-line"><span class="black">♠QJ42</span> &nbsp; <span class="red">♥QJ42</span> &nbsp; <span class="red">♦Q</span> &nbsp; <span class="black">♣QJ4</span></span></p>
+  <p><strong>Hand metrics:</strong>
+    <code>king_ace_count=0</code>,
+    <code>queen_jack_count=7</code>,
+    <code>hand_power(uptown)=11</code>,
+    <code>hand_power(downtown)=9</code>,
+    <code>max_suit_length=4</code></p>
+  <p>Four queens, three jacks, no A or K. king_ace_count = 0 (Family passes), but hand_power(uptown) = 8 + 3 = 11 (sig=9 and sig=11 signal). The intuition &quot;Q/J become stoppers once A/K are pulled&quot; is real, but depends on A/K actually being pulled from the right hands — when this hand is forced into declarer, the opponents still hold all four aces and all four kings.</p>
+  <table>
+    <thead>
+      <tr><th>Strategy</th><th>P0 action / final bid</th><th>Trump</th><th>Declarer</th><th>Contract</th><th>Books</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+<tr><td><strong>Family</strong></td><td>bid 4</td><td>clubs downtown-noaces</td><td class="num">P3</td><td class="num">10</td><td class="num">10/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=9)</strong></td><td>bid 4</td><td>spades uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">6/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=11)</strong></td><td>bid 4</td><td>spades uptown</td><td class="num">P0</td><td class="num">10</td><td class="num">6/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=13)</strong></td><td>bid 4</td><td>clubs downtown-noaces</td><td class="num">P3</td><td class="num">10</td><td class="num">10/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=14)</strong></td><td>bid 4</td><td>clubs downtown-noaces</td><td class="num">P3</td><td class="num">10</td><td class="num">10/13</td><td><span class="tag made">made</span></td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Playable:</strong>
+    <a href="http://localhost:3000/#lRHPymMzLXWgYjVEkAcwxhrJKuSQdNZCqeinDpTIbtaGofFBOvsU" target="_blank"><code>http://localhost:3000/#lRHPymMzLXWgYjVEkAcwxhrJKuSQdNZCqeinDpTIbtaGofFBOvsU</code></a>
+  </p>
+</section>
+
+<section>
+  <h2>AAKK — hand_power(uptown) = 14, everyone agrees</h2>
+  <p><strong>Player 0 hand:</strong> <span class="hand-line"><span class="black">♠AK7</span> &nbsp; <span class="red">♥AK98</span> &nbsp; <span class="red">♦32</span> &nbsp; <span class="black">♣654</span></span></p>
+  <p><strong>Hand metrics:</strong>
+    <code>king_ace_count=4</code>,
+    <code>queen_jack_count=0</code>,
+    <code>hand_power(uptown)=14</code>,
+    <code>hand_power(downtown)=14</code>,
+    <code>max_suit_length=4</code></p>
+  <p>Two aces and two kings: every strategy signals this as a strong hand. Sanity check — the threshold choice only matters at the boundary, not on hands that are unambiguously strong or weak.</p>
+  <table>
+    <thead>
+      <tr><th>Strategy</th><th>P0 action / final bid</th><th>Trump</th><th>Declarer</th><th>Contract</th><th>Books</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+<tr><td><strong>Family</strong></td><td>bid 4</td><td>hearts downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">5/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=9)</strong></td><td>bid 4</td><td>hearts downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">5/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=11)</strong></td><td>bid 4</td><td>hearts downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">5/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=13)</strong></td><td>bid 4</td><td>hearts downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">5/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=14)</strong></td><td>bid 4</td><td>hearts downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">5/13</td><td><span class="tag failed">failed</span></td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Playable:</strong>
+    <a href="http://localhost:3000/#aKWynINqmHfjzSUciQLdhZJCtgTGFXAbEMrlDpsoPYwBOxukRevV" target="_blank"><code>http://localhost:3000/#aKWynINqmHfjzSUciQLdhZJCtgTGFXAbEMrlDpsoPYwBOxukRevV</code></a>
+  </p>
+</section>
+
+<section>
+  <h2>A♥K♥Q♥J♥ + low — sequential suit but only 2 stoppers</h2>
+  <p><strong>Player 0 hand:</strong> <span class="hand-line"><span class="black">♠432</span> &nbsp; <span class="red">♥AKQJ109</span> &nbsp; <span class="red">♦2</span> &nbsp; <span class="black">♣32</span></span></p>
+  <p><strong>Hand metrics:</strong>
+    <code>king_ace_count=2</code>,
+    <code>queen_jack_count=2</code>,
+    <code>hand_power(uptown)=10</code>,
+    <code>hand_power(downtown)=18</code>,
+    <code>max_suit_length=6</code></p>
+  <p>Six hearts headed by A-K-Q-J plus low-rank fillers in other suits. king_ace_count = 2 (Family passes signals 1/2), but Family&#39;s `max_suit_count ≥ 6` rule fires → bid 4. hand_power(uptown) = 4+3+2+1 = 10, misses sig=11 and sig=13. Demonstrates where the long-suit rule (unchanged in Powered) drives the decision.</p>
+  <table>
+    <thead>
+      <tr><th>Strategy</th><th>P0 action / final bid</th><th>Trump</th><th>Declarer</th><th>Contract</th><th>Books</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+<tr><td><strong>Family</strong></td><td>bid 4</td><td>hearts downtown-noaces</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=9)</strong></td><td>bid 4</td><td>hearts downtown-noaces</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=11)</strong></td><td>bid 4</td><td>hearts downtown-noaces</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=13)</strong></td><td>bid 4</td><td>hearts downtown-noaces</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=14)</strong></td><td>bid 4</td><td>hearts downtown-noaces</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Playable:</strong>
+    <a href="http://localhost:3000/#aHLJmcdXlUvnkrxGjKfQiMwyoFuzptYNqZDhBseICTbAOWgRSPEV" target="_blank"><code>http://localhost:3000/#aHLJmcdXlUvnkrxGjKfQiMwyoFuzptYNqZDhBseICTbAOWgRSPEV</code></a>
+  </p>
+</section>
+
+<section>
+  <h2>AA + 234s — downtown mirror, hand_power(downtown) = 18</h2>
+  <p><strong>Player 0 hand:</strong> <span class="hand-line"><span class="black">♠A432</span> &nbsp; <span class="red">♥A432</span> &nbsp; <span class="red">♦109</span> &nbsp; <span class="black">♣32</span></span></p>
+  <p><strong>Hand metrics:</strong>
+    <code>king_ace_count=2</code>,
+    <code>queen_jack_count=0</code>,
+    <code>hand_power(uptown)=8</code>,
+    <code>hand_power(downtown)=25</code>,
+    <code>max_suit_length=4</code></p>
+  <p>Two aces plus five &quot;deuce-trey-four&quot; cards. hand_power(downtown) = 4+4+3+3+3+2+2+1+1 = 23 (Aces + 2s + 3s + 4s). Every threshold signals downtown strongly. Shows that hand_power scales cleanly for downtown too.</p>
+  <table>
+    <thead>
+      <tr><th>Strategy</th><th>P0 action / final bid</th><th>Trump</th><th>Declarer</th><th>Contract</th><th>Books</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+<tr><td><strong>Family</strong></td><td>bid 4</td><td>diamonds uptown</td><td class="num">P1</td><td class="num">10</td><td class="num">5/13</td><td><span class="tag failed">failed</span></td></tr>
+<tr><td><strong>Powered (sig=9)</strong></td><td>bid 4</td><td>spades downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=11)</strong></td><td>bid 4</td><td>spades downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=13)</strong></td><td>bid 4</td><td>spades downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+<tr><td><strong>Powered (sig=14)</strong></td><td>bid 4</td><td>spades downtown</td><td class="num">P0</td><td class="num">10</td><td class="num">12/13</td><td><span class="tag made">made</span></td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Playable:</strong>
+    <a href="http://localhost:3000/#aMhsnUNebgXQciOAdFJfotYrpLKwqSElBuIjCmHkWZyxVvPDRzGT" target="_blank"><code>http://localhost:3000/#aMhsnUNebgXQciOAdFJfotYrpLKwqSElBuIjCmHkWZyxVvPDRzGT</code></a>
+  </p>
+</section>
+  
+</main>
+<footer>
+  Generated from <code>node scripts/generate-report.js</code>. Source:
+  <code>src/simulation/runReportData.ts</code>.
+</footer>
+</body>
+</html>

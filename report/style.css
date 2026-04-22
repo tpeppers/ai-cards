@@ -1,0 +1,122 @@
+
+:root {
+  --bg: #0e1117;
+  --panel: #161b22;
+  --text: #c9d1d9;
+  --accent: #58a6ff;
+  --good: #3fb950;
+  --bad: #f85149;
+  --warn: #d29922;
+  --muted: #8b949e;
+  --border: #30363d;
+  --card-red: #f47777;
+  --card-black: #dcdcdc;
+}
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: "Inter", -apple-system, system-ui, sans-serif;
+  line-height: 1.5;
+}
+header {
+  background: var(--panel); border-bottom: 1px solid var(--border);
+  padding: 1em 1.5em;
+}
+header h1 { margin: 0 0 0.5em 0; font-size: 1.2em; color: var(--text); font-weight: 600; }
+nav { display: flex; gap: 0.5em; }
+nav a {
+  color: var(--muted); text-decoration: none; padding: 0.4em 0.8em;
+  border-radius: 4px; font-size: 0.9em;
+}
+nav a.active { background: var(--accent); color: var(--bg); font-weight: 600; }
+nav a:hover:not(.active) { color: var(--accent); background: rgba(88, 166, 255, 0.1); }
+main {
+  max-width: 1100px; margin: 0 auto; padding: 1.5em;
+}
+h2 { color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.3em; margin-top: 2em; }
+h3 { color: var(--text); margin-top: 1.5em; }
+p, li { color: var(--text); }
+a { color: var(--accent); }
+code {
+  background: var(--panel); padding: 0.1em 0.3em; border-radius: 3px;
+  font-family: "SF Mono", Consolas, monospace; font-size: 0.9em;
+}
+pre {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  padding: 0.8em 1em; overflow-x: auto; font-family: "SF Mono", Consolas, monospace;
+  font-size: 0.85em;
+}
+.panel {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1em 1.5em; margin: 1em 0;
+}
+.panel.highlight { border-color: var(--accent); }
+.thesis {
+  background: linear-gradient(135deg, #1f2937, #16213e);
+  border-left: 4px solid var(--accent); padding: 1em 1.5em;
+  margin: 1.5em 0; border-radius: 6px;
+}
+.thesis h3 { margin-top: 0; color: var(--accent); }
+table {
+  border-collapse: collapse; width: 100%; margin: 1em 0;
+  font-size: 0.92em;
+}
+th, td {
+  border: 1px solid var(--border); padding: 0.5em 0.8em; text-align: left;
+}
+th { background: var(--panel); color: var(--accent); font-weight: 600; }
+tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+td.num { font-family: "SF Mono", Consolas, monospace; text-align: right; }
+td.good { color: var(--good); }
+td.bad { color: var(--bad); }
+td.highlight-row { background: rgba(88, 166, 255, 0.1) !important; }
+.bar-container {
+  display: inline-block; width: 200px; height: 12px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 6px; position: relative;
+  vertical-align: middle; margin-left: 0.5em;
+}
+.bar {
+  position: absolute; top: 0; left: 0; height: 100%; background: var(--accent);
+  border-radius: 6px;
+}
+.bar.win { background: var(--good); }
+.bar.loss { background: var(--bad); }
+.ci-marker {
+  position: absolute; top: -2px; height: 16px; width: 2px; background: var(--text);
+}
+.tag {
+  display: inline-block; padding: 0.1em 0.5em; border-radius: 3px; font-size: 0.8em;
+  font-weight: 600; margin: 0 0.2em;
+}
+.tag.sig { background: rgba(88, 166, 255, 0.2); color: var(--accent); }
+.tag.made { background: rgba(63, 185, 80, 0.2); color: var(--good); }
+.tag.failed { background: rgba(248, 81, 73, 0.2); color: var(--bad); }
+.tag.family { background: rgba(210, 153, 34, 0.2); color: var(--warn); }
+.hand-line {
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 1.05em; padding: 0.3em 0.6em;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+  display: inline-block;
+}
+.red { color: var(--card-red); }
+.black { color: var(--card-black); }
+footer {
+  margin-top: 3em; padding: 1em 1.5em; border-top: 1px solid var(--border);
+  text-align: center; color: var(--muted); font-size: 0.85em;
+}
+.outcome-grid {
+  display: grid; grid-template-columns: auto 1fr 1fr 1fr 1fr; gap: 0.5em;
+  align-items: center; font-size: 0.9em; margin: 0.8em 0;
+}
+.outcome-grid > div {
+  padding: 0.4em 0.6em; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.outcome-grid > .header { background: var(--border); color: var(--accent); font-weight: 600; }
+.kpi { display: flex; gap: 1.5em; margin: 1em 0; }
+.kpi .box {
+  flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  padding: 0.8em 1em; text-align: center;
+}
+.kpi .box .value { font-size: 1.5em; font-weight: 700; color: var(--accent); }
+.kpi .box .label { color: var(--muted); font-size: 0.85em; margin-top: 0.3em; }
