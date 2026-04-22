@@ -1,0 +1,89 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "timestamp": "2026-04-22T04:32:38.115Z"
+  },
+  "baseline": {
+    "wins": 10118,
+    "losses": 9770,
+    "games": 19888,
+    "winRate": 0.5087489943684634,
+    "ci95": 0.006948067417912784
+  },
+  "rows": [
+    {
+      "variantKey": "bid_dealer_open_2",
+      "wins": 10118,
+      "losses": 9770,
+      "games": 19888,
+      "winRate": 0.5087489943684634,
+      "ci95": 0.006948067417912784
+    },
+    {
+      "variantKey": "bid_no_bid5_via_length",
+      "wins": 9882,
+      "losses": 9838,
+      "games": 19720,
+      "winRate": 0.5011156186612576,
+      "ci95": 0.006978651954329536
+    },
+    {
+      "variantKey": "bid_seat3_bid_only_3",
+      "wins": 6712,
+      "losses": 10688,
+      "games": 17400,
+      "winRate": 0.3857471264367816,
+      "ci95": 0.007232798986983847
+    },
+    {
+      "variantKey": "lead_pull_trump_min2",
+      "wins": 9086,
+      "losses": 10218,
+      "games": 19304,
+      "winRate": 0.47067965188561955,
+      "ci95": 0.007041325539959849
+    },
+    {
+      "variantKey": "lead_pull_trump_min3",
+      "wins": 8538,
+      "losses": 10718,
+      "games": 19256,
+      "winRate": 0.44339426672206067,
+      "ci95": 0.007016845385240834
+    },
+    {
+      "variantKey": "follow_overtake_1_threat",
+      "wins": 10166,
+      "losses": 9834,
+      "games": 20000,
+      "winRate": 0.5083,
+      "ci95": 0.006928691623156568
+    },
+    {
+      "variantKey": "void_no_signal_first",
+      "wins": 9752,
+      "losses": 10024,
+      "games": 19776,
+      "winRate": 0.4931229773462783,
+      "ci95": 0.006968122332374012
+    },
+    {
+      "variantKey": "void_trump_strongest",
+      "wins": 9448,
+      "losses": 9976,
+      "games": 19424,
+      "winRate": 0.48640856672158156,
+      "ci95": 0.007029043480547885
+    },
+    {
+      "variantKey": "discard_keep_2",
+      "wins": 9906,
+      "losses": 9926,
+      "games": 19832,
+      "winRate": 0.4994957644211376,
+      "ci95": 0.0069589320835331606
+    }
+  ]
+}

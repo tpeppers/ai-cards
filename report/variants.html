@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Variants — hand_power signaling report</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a><a href="variants.html" class="active">Variants</a></nav>
+</header>
+<main>
+
+<section>
+  <h2>Strategy variants sweep</h2>
+  <p>
+    The main report tuned the <strong>signal threshold</strong> (sig=17) and the
+    <strong>bid-3 rule</strong> (disable). This page sweeps targeted modifications to
+    <em>other</em> parts of Family — bidding refinements outside the main signal logic,
+    plus the leading, following, void, and discard play sections.
+  </p>
+  <p>
+    Each variant is a single-rule string transform on the baseline Family (Powered)
+    strategy text, run head-to-head vs Family at <strong>N = 20,000</strong>
+    games per config on the same seeded deck pool. Baseline: sig=17 trust=3, bid3 disabled,
+    everything else Family-default.
+  </p>
+  <div class="kpi">
+    <div class="box"><div class="value">9</div><div class="label">Variants tested</div></div>
+    <div class="box"><div class="value">0</div><div class="label">Beat baseline</div></div>
+    <div class="box"><div class="value">7</div><div class="label">Worse than baseline</div></div>
+    <div class="box"><div class="value">2</div><div class="label">Tied with baseline</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Bidding variants</h2>
+  <p>
+    Changes to the bid section outside the main signal thresholds already explored in
+    the main report.
+  </p>
+  <table>
+    <thead><tr><th>Variant key</th><th>Modification</th><th>Win rate</th><th>Δ baseline</th><th>vs baseline</th><th>vs Family</th></tr></thead>
+    <tbody>
+      <tr class="highlight-row">
+        <td><code>baseline</code></td>
+        <td>sig=17, bid3 disabled (proven-best from addendum)</td>
+        <td class="num">50.87% ±0.69%</td>
+        <td class="num">—</td>
+        <td>—</td>
+        <td><span class="tag made">beats</span></td>
+      </tr>
+
+<tr>
+<td><code>bid_dealer_open_2</code></td>
+<td>Dealer opens with bid 2 instead of bid 1</td>
+<td class="num">50.87% ±0.69%</td>
+<td class="num ">+0.00pp</td>
+<td><span class="tag family">tied</span></td>
+<td><span class="tag made">beats Family</span></td>
+</tr>
+
+<tr>
+<td><code>bid_no_bid5_via_length</code></td>
+<td>Disable the &quot;bid 5 on 7+ long suit&quot; rule</td>
+<td class="num">50.11% ±0.70%</td>
+<td class="num bad">-0.76pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag family">tied with Family</span></td>
+</tr>
+
+<tr>
+<td><code>bid_seat3_bid_only_3</code></td>
+<td>Seat-3 bids 3 minimum (not 4) when below 4</td>
+<td class="num">38.57% ±0.72%</td>
+<td class="num bad">-12.30pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag failed">loses to Family</span></td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Leading-play variants</h2>
+  <p>How the player chooses a card to lead a new trick.</p>
+  <table>
+    <thead><tr><th>Variant key</th><th>Modification</th><th>Win rate</th><th>Δ baseline</th><th>vs baseline</th><th>vs Family</th></tr></thead>
+    <tbody>
+
+<tr>
+<td><code>lead_pull_trump_min2</code></td>
+<td>Pull trump only when 2+ outstanding</td>
+<td class="num">47.07% ±0.70%</td>
+<td class="num bad">-3.81pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag failed">loses to Family</span></td>
+</tr>
+
+<tr>
+<td><code>lead_pull_trump_min3</code></td>
+<td>Pull trump only when 3+ outstanding</td>
+<td class="num">44.34% ±0.70%</td>
+<td class="num bad">-6.54pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag failed">loses to Family</span></td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Following-play variants</h2>
+  <p>How the player chooses a card when following suit.</p>
+  <table>
+    <thead><tr><th>Variant key</th><th>Modification</th><th>Win rate</th><th>Δ baseline</th><th>vs baseline</th><th>vs Family</th></tr></thead>
+    <tbody>
+
+<tr>
+<td><code>follow_overtake_1_threat</code></td>
+<td>Following: duck partner only if ≤ 1 threat (was 0)</td>
+<td class="num">50.83% ±0.69%</td>
+<td class="num ">-0.04pp</td>
+<td><span class="tag family">tied</span></td>
+<td><span class="tag made">beats Family</span></td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Void-play variants</h2>
+  <p>How the player plays when void in the lead suit (can trump or sluff).</p>
+  <table>
+    <thead><tr><th>Variant key</th><th>Modification</th><th>Win rate</th><th>Δ baseline</th><th>vs baseline</th><th>vs Family</th></tr></thead>
+    <tbody>
+
+<tr>
+<td><code>void_no_signal_first</code></td>
+<td>Void: remove &quot;signal first&quot; rule, just trump or default</td>
+<td class="num">49.31% ±0.70%</td>
+<td class="num bad">-1.56pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag family">tied with Family</span></td>
+</tr>
+
+<tr>
+<td><code>void_trump_strongest</code></td>
+<td>Void: trump with STRONGEST (not weakest)</td>
+<td class="num">48.64% ±0.70%</td>
+<td class="num bad">-2.23pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag failed">loses to Family</span></td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Discard variants</h2>
+  <p>Rules used by the declarer when selecting which 4 cards to discard after taking the kitty.</p>
+  <table>
+    <thead><tr><th>Variant key</th><th>Modification</th><th>Win rate</th><th>Δ baseline</th><th>vs baseline</th><th>vs Family</th></tr></thead>
+    <tbody>
+
+<tr>
+<td><code>discard_keep_2</code></td>
+<td>Discard: keep 2 cards per suit (was 1)</td>
+<td class="num">49.95% ±0.70%</td>
+<td class="num bad">-0.93pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag family">tied with Family</span></td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+
+
+<section>
+  <h2>Variant rationales (full descriptions)</h2>
+  <table>
+    <thead><tr><th>Key</th><th>Section</th><th>Rationale</th></tr></thead>
+    <tbody>
+
+<tr>
+<td><code>bid_dealer_open_2</code></td>
+<td><em>bid</em></td>
+<td>When all three opponents pass, the dealer currently bids 1 (downtown signal). This variant opens with bid 2 (uptown signal) instead. Tests the hypothesis that uptown is a safer default direction when the dealer has no info about partner strength.</td>
+</tr>
+
+<tr>
+<td><code>bid_no_bid5_via_length</code></td>
+<td><em>bid</em></td>
+<td>The early-bidder rule &quot;max_suit_count() &gt;= 7 → bid 5&quot; commits to a 5 contract on length alone without checking for honors. Tests whether removing it helps (too optimistic about bare length) or hurts (missed legit opportunities).</td>
+</tr>
+
+<tr>
+<td><code>bid_seat3_bid_only_3</code></td>
+<td><em>bid</em></td>
+<td>The hot-seat rule &quot;always bid 4 if current is below 4&quot; forces a 4 contract even on weak hands. This variant lets seat 3 bid 3 instead when current bid &lt; 3, keeping the commitment lower until the dealer can respond.</td>
+</tr>
+
+<tr>
+<td><code>lead_pull_trump_min2</code></td>
+<td><em>leading</em></td>
+<td>The baseline pulls trump when enemies still have any trump at all — even a single outstanding card. This variant requires at least 2 outstanding before committing a high trump to pull. Saves trump for later trump tricks.</td>
+</tr>
+
+<tr>
+<td><code>lead_pull_trump_min3</code></td>
+<td><em>leading</em></td>
+<td>More conservative variant of the 2+ rule — require 3 outstanding trump.</td>
+</tr>
+
+<tr>
+<td><code>follow_overtake_1_threat</code></td>
+<td><em>following</em></td>
+<td>Currently when partner is winning the trick, we only duck (play weakest) if there are ZERO outstanding threats. This variant ducks even with 1 threat — i.e. we&#39;re more willing to let partner&#39;s winner ride. Tests whether the overtake logic was too trigger-happy.</td>
+</tr>
+
+<tr>
+<td><code>void_no_signal_first</code></td>
+<td><em>void</em></td>
+<td>Baseline: when I&#39;m void on lead suit, partner isn&#39;t winning, and I have trump, I trump. Otherwise if I haven&#39;t signaled yet, I signal with a non-trump discard. This variant removes the signal-first pathway entirely — either trump or play weakest. Tests whether the signal is worth the trump we&#39;re NOT using when partner wins cheap.</td>
+</tr>
+
+<tr>
+<td><code>void_trump_strongest</code></td>
+<td><em>void</em></td>
+<td>When I trump into a trick, baseline plays the weakest trump that will win. This variant plays the strongest trump instead. The gamble: using a big trump guarantees the trick (even if a bigger trump is outstanding) and drains my small trump as &quot;currency&quot; for later tricks.</td>
+</tr>
+
+<tr>
+<td><code>discard_keep_2</code></td>
+<td><em>discard</em></td>
+<td>When partner signals, baseline keeps 1 card per suit in the discard keep-set. This variant keeps 2 per suit — more conservative suit retention. Tests whether giving up depth for void creation is the right tradeoff.</td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Reproduce</h2>
+  <pre># Full sweep (~5 min)
+node scripts/variants-sweep.js
+
+# With custom N
+REPORT_HANDS=40000 node scripts/variants-sweep.js</pre>
+</section>
+
+</main>
+<footer>
+  Generated from <code>scripts/variants-sweep.js</code>. Source:
+  <code>src/simulation/runPlayVariantsSweep.ts</code>.
+</footer>
+</body>
+</html>

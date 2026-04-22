@@ -8,13 +8,132 @@
 <body>
 <header>
   <h1>hand_power signaling: finding the optimal threshold</h1>
-  <nav><a href="index.html" class="active">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a></nav>
+  <nav><a href="index.html" class="active">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a><a href="variants.html">Variants</a></nav>
 </header>
 <main>
 
+<section class="thesis">
+  <h2 style="margin-top:0">Executive summary</h2>
+  <p>
+    Starting from the <strong>Family</strong> strategy as shipped in
+    <code>src/strategies/index.ts</code>, this report documents an end-to-end exploration of
+    <strong>15 distinct areas</strong> of the bidding, play, and discard
+    policy. The key question the whole project asks: can a finer-grained, number-based signaling
+    primitive (<code>hand_power(direction)</code>) beat Family's integer-count rules, and what else
+    is worth changing?
+  </p>
+  <p>
+    <strong>Best configuration found so far: <code>Family (Powered)</code> with
+    <code>sig = 17</code>, <code>trust = 3</code>, <code>bid3 disabled</code></strong>.
+    Head-to-head vs Family at N = 19,888 games:
+    <strong>50.87% ± 0.69%</strong>
+    (CI lower bound 50.18% — <strong>beats Family at 95% confidence</strong>).
+  </p>
+  <div class="kpi">
+    <div class="box"><div class="value">17</div><div class="label">Best sig threshold</div></div>
+    <div class="box"><div class="value">50.87%</div><div class="label">Best win rate vs Family</div></div>
+    <div class="box"><div class="value">+0.87pp</div><div class="label">Gain over Family</div></div>
+    <div class="box"><div class="value">15</div><div class="label">Areas tested</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Report map</h2>
+  <ul>
+    <li><strong>Overview (this page)</strong> — Executive summary, main threshold-sweep data, and the hand-composition reasoning.</li>
+    <li><strong><a href="sweep.html">Sweep Data</a></strong> — Full threshold sweep with CI visualization; per-config ranking.</li>
+    <li><strong><a href="cases.html">Case Studies</a></strong> — Seven constructed archetype hands (AAKKQJ, AAKQ, AAA, Q/J stack, etc.) simulated under Family and Powered at multiple sigs with 52-char deck URLs.</li>
+    <li><strong><a href="playable.html">Playable Hands</a></strong> — Fifteen seed-searched divergent hands with <code>localhost:3000</code> links to play in the app.</li>
+    <li><strong><a href="addendum.html">Addendum</a></strong> — Opponent-signal defense (null result) and bid-3 ablation (big win: disable it).</li>
+    <li><strong><a href="variants.html">Variants</a></strong> — Targeted single-rule modifications to bidding, play (leading/following/void), and discard sections.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>What improved over original Family</h2>
+  <p>
+    Broken down by intervention, measured on the same 20,000-game head-to-head setup vs Family:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Area</th>
+        <th>Intervention</th>
+        <th>Net effect</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Signal threshold</td>
+        <td>Replace <code>king_ace_count() &gt;= 3</code> with <code>hand_power(direction) &gt;= sig</code></td>
+        <td class="good">+6.37pp from sig=9 to sig=17</td>
+        <td>Sweep sig=9 through sig=20; sig=17 peaks at 50.24%.</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Bid 3 rule</td>
+        <td>Disable <code>bid 3</code> entirely</td>
+        <td class="good">+0.63pp vs sig=17 alone</td>
+        <td>Bid 3 fires on &lt;1% of hands at sig=17; removing it tips win rate above 50%.</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Opponent-signal defense</td>
+        <td>Dealer defensive take on contested signals</td>
+        <td class="muted">null (no effect)</td>
+        <td>Contested-signal deals are ~0.04% of hands at sig=17 — too rare.</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Seat-3 contested push</td>
+        <td>Push to 5 when partner vs enemy signals disagree</td>
+        <td class="muted">null (no effect)</td>
+        <td>Same rarity issue.</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>min_stoppers compound guard</td>
+        <td>Require <code>king_ace_count ≥ N</code> alongside hand_power threshold</td>
+        <td class="muted">null (redundant)</td>
+        <td>At sig ≥ 13, the power threshold implicitly requires stoppers anyway.</td>
+      </tr>
+      <tr>
+        <td>6+</td>
+        <td>Play &amp; discard variants</td>
+        <td>Nine targeted modifications to leading / following / void / discard rules + two bid tweaks</td>
+        <td>0 beat baseline, 7 worse, 2 tied</td>
+        <td>See <a href="variants.html">Variants page</a> for per-rule results.</td>
+      </tr>
+    </tbody>
+  </table>
+  <details>
+    <summary>Complete list of <strong>15 areas</strong> that were examined (click to expand)</summary>
+    <ul>
+      <li>Bidding: hand_power signal threshold (sig=7-20)</li>
+      <li>Bidding: min_stoppers guard (compound predicate)</li>
+      <li>Bidding: bid-3 &quot;both directions&quot; rule</li>
+      <li>Bidding: dealer default open bid</li>
+      <li>Bidding: no-bid-5-via-length rule</li>
+      <li>Bidding: seat-3 opposite-direction pass</li>
+      <li>Bidding: dealer defensive take on contested signals</li>
+      <li>Bidding: seat-3 contested-signal push</li>
+      <li>Bidding: seat-3 minimum bid</li>
+      <li>Play leading: pull-trump threshold</li>
+      <li>Play following: overtake threshold</li>
+      <li>Play void: always-trump vs signal-first</li>
+      <li>Play void: weakest vs strongest trump</li>
+      <li>Discard: suit_keepers count</li>
+      <li>Trump-selection: partner-signal trust bonus</li>
+    </ul>
+  </details>
+</section>
+
 <section>
   <div class="thesis">
-    <h3>Thesis: the optimal hand_power threshold is sig = 17</h3>
+    <h3>Primary thesis: sig = 17 with bid 3 disabled</h3>
     <p>
       After a sweep at 19,888 head-to-head games per config against baseline
       Family, the best threshold for hand_power-based signaling is <strong>sig = 17</strong>,
@@ -36,12 +155,6 @@
       threshold, and I took that as the answer. With 19,888-game CIs (±0.7pp)
       the actual ranking is: sig=9–11 clearly worse, sig=13–15 measurably worse, sig=16–17 the
       tied peak, sig=18+ falls off again.
-    </p>
-    <p>
-      <strong>Update:</strong> a follow-up sweep (see the
-      <a href="addendum.html">Addendum</a>) found that simply <em>disabling</em> bid 3 at sig=17
-      bumps the win rate to <strong>50.87% ± 0.69%</strong> — a statistically significant win over
-      Family. The final recommended config is sig=17 with bid 3 removed.
     </p>
   </div>
 </section>
