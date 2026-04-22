@@ -1,0 +1,21 @@
+{
+  "agg": {
+    "totalDecks": 20000,
+    "bothRedeal": 0,
+    "oneRedeal": 0,
+    "sameEverything": 19934,
+    "diffDirection": 64,
+    "diffBidAmount": 3,
+    "diffDeclarer": 24,
+    "diffMade": 44,
+    "baselineMadeOnly": 33,
+    "enabledMadeOnly": 11,
+    "bothMade": 11054,
+    "bothFailed": 8902,
+    "bid3FiredSomeone": 286
+  },
+  "caseCount": 8,
+  "decks": 20000,
+  "seed": 123123,
+  "timestamp": "2026-04-22T05:27:10.782Z"
+}

@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bid 3 Deep-dive — hand_power signaling report</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.bid-cell { display: inline-block; padding: 0.15em 0.5em; background: var(--panel); border: 1px solid var(--border); border-radius: 3px; font-family: "SF Mono", Consolas, monospace; font-size: 0.85em; margin: 0 0.1em; }
+.bid-cell.bid3-highlight { background: rgba(210, 153, 34, 0.25); border-color: var(--warn); color: var(--warn); font-weight: 600; }
+.bid-arrow { color: var(--muted); margin: 0 0.2em; }
+table.tricks-table td { font-family: "SF Mono", Consolas, monospace; font-size: 0.85em; }
+table.tricks-table tr.diff { background: rgba(248, 81, 73, 0.08); }
+table.hands-table td:nth-child(2) { font-family: "SF Mono", Consolas, monospace; }
+.case-study { border-left: 3px solid var(--border); padding-left: 1em; margin: 2em 0; }
+.case-study h3 { margin-top: 0; }
+details { background: var(--panel); padding: 0.8em 1em; border-radius: 4px; border: 1px solid var(--border); margin: 0.5em 0; }
+details summary { cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a><a href="variants.html">Variants</a><a href="bid3-analysis.html" class="active">Bid 3 Deep-dive</a></nav>
+</header>
+<main>
+
+<section>
+  <h2>Why does disabling bid 3 help?</h2>
+  <p>
+    The <a href="addendum.html">addendum</a> showed that <em>disabling</em> bid 3 at sig=17 moves
+    win rate from 50.24% (tied) to 50.87% (beats Family). The gain is small but it's the largest
+    single-knob improvement in the entire project. This page investigates <strong>why</strong>.
+  </p>
+</section>
+
+<section>
+  <h2>Two structural mechanisms</h2>
+  <p>
+    The case studies below reveal <strong>two</strong> distinct mechanisms by which bid 3 hurts.
+    Which one applies depends on the declarer's hand shape:
+  </p>
+  <h3>Mechanism A: bid 3 under-commits on long-suit hands</h3>
+  <p>
+    Look at the rule order in the bid section:
+  </p>
+  <pre>1. bid 3   — hand_power(up) ≥ bid3_threshold AND hand_power(down) ≥ bid3_threshold
+2. bid 4   — max_suit_count() ≥ 6
+3. bid 5   — max_suit_count() ≥ 7
+4. bid 2   — hand_power(up) ≥ sig_threshold
+5. bid 1   — hand_power(down) ≥ sig_threshold</pre>
+  <p>
+    <strong>Bid 3 fires BEFORE bid 4.</strong> A hand with a 6+ suit AND high power in both
+    directions would fire bid 4 (contract 10) under baseline, but fires bid 3 (contract 9) when
+    bid 3 is enabled. <strong>Bid 3 is a step BACKWARD</strong>: it's a lower commitment than
+    what the hand actually supports. Worse, it leaves room for the next bidder (seat 3 — an
+    opponent with probability ½) to cheaply bump to bid 4 and steal the bid. See Case 1 below
+    for a perfect instance: P3 has AKQJ42 of spades + AKJ of clubs + 2♥ + 3♦, bids 4 under
+    baseline and makes it, but bids 3 with bid-3 enabled, which lets P1 (enemy) bump to 4 and
+    declare with a hand of 3 uptown points.
+  </p>
+
+  <h3>Mechanism B: bid 3 carries no directional information</h3>
+  <p>
+    For hands that fire bid 3 but DON'T have a 6+ long suit, the harm comes from a different
+    direction. Read the <code>trump:</code> section:
+  </p>
+  <pre>trump:
+  when partner_bid == 1 and low_count() + 3 > high_count() and ace_count() >= 2:
+    choose suit: best_suit(downtown) direction: downtown
+  when partner_bid == 1 and low_count() + 3 > high_count():
+    choose suit: best_suit(downtown-noaces) direction: downtown-noaces
+  when partner_bid == 1:
+    choose suit: best_suit(uptown) direction: uptown
+
+  when partner_bid == 2 and high_count() + 3 > low_count():
+    choose suit: best_suit(uptown) direction: uptown
+  when partner_bid == 2 and ace_count() >= 2:
+    choose suit: best_suit(downtown) direction: downtown
+  when partner_bid == 2:
+    choose suit: best_suit(downtown-noaces) direction: downtown-noaces
+
+  <span class="red">(no partner_bid == 3 branch)</span>
+
+  when low_count() > high_count() and ace_count() >= 2:
+    choose suit: best_suit(downtown) direction: downtown
+  when low_count() > high_count():
+    choose suit: best_suit(downtown-noaces) direction: downtown-noaces
+  default:
+    choose suit: best_suit(uptown) direction: uptown</pre>
+
+  <p>
+    <strong>There is no <code>partner_bid == 3</code> branch.</strong> When the receiver reads
+    partner's bid, a "3" signal falls through to the default trump-selection logic that only reads
+    the receiver's own hand — the partner's bid-3 signal effectively carries <em>no directional
+    information</em> downstream.
+  </p>
+  <p>
+    Compare to bid 1 and bid 2, which each have three distinct interpretation rules. When partner
+    signals 1 or 2, the receiver uses that information to decide trump direction. When partner
+    signals 3, the receiver treats the signal as if partner had passed.
+  </p>
+  <p>
+    <strong>Prediction:</strong> if this hypothesis is right, the cost of bid 3 shows up mostly as
+    <em>wrong-direction trump selection</em> — the bidder's team picks trump based on the
+    receiver's own hand alone, ignoring the signaler's strong-both-directions info. Disabling bid
+    3 forces these hands to fire bid 2 (or bid 1) instead, which <em>is</em> interpreted, leading
+    to better trump direction choices.
+  </p>
+</section>
+
+<section>
+  <h2>Empirical: 20,000 decks, same pool, all-four-seats-the-same</h2>
+  <p>
+    For each of 20,000 seeded decks we ran two simulations with the strategy
+    occupying all four seats: once with baseline (sig=17, bid3 disabled) and once with bid3
+    enabled at threshold 17. This removes seat luck as a variable — differences between the two
+    runs are attributable to the bid-3 rule directly.
+  </p>
+  <div class="kpi">
+    <div class="box"><div class="value">286</div><div class="label">decks with bid 3 firing (enabled side)</div></div>
+    <div class="box"><div class="value">1.43%</div><div class="label">of all informative decks</div></div>
+    <div class="box"><div class="value">64</div><div class="label">decks where trump direction differs</div></div>
+    <div class="box"><div class="value">44</div><div class="label">decks where contract-made flips</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Outcome</th><th>Decks</th><th>%</th></tr></thead>
+    <tbody>
+      <tr><td>Same bidding + trump + make/fail across both configs</td><td class="num">19,934</td><td class="num">99.67%</td></tr>
+      <tr><td>Different trump direction/suit</td><td class="num">64</td><td class="num">0.32%</td></tr>
+      <tr><td>Different bid amount</td><td class="num">3</td><td class="num">0.01%</td></tr>
+      <tr><td>Different declarer</td><td class="num">24</td><td class="num">0.12%</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Outcomes when they differ</h3>
+  <table>
+    <thead><tr><th>Outcome</th><th>Decks</th></tr></thead>
+    <tbody>
+      <tr><td>Both strategies made the contract</td><td class="num">11,054</td></tr>
+      <tr><td>Both strategies failed</td><td class="num">8,902</td></tr>
+      <tr class="highlight-row"><td>Baseline made, enabled failed (<strong>disabling bid 3 helped</strong>)</td><td class="num">33</td></tr>
+      <tr><td>Enabled made, baseline failed (bid 3 helped)</td><td class="num">11</td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Net effect of disabling bid 3:</strong>
+    +22 deck-wins in favor of the baseline (disabling bid 3) across 20,000 informative decks.
+  </p>
+</section>
+
+<section>
+  <h2>Case studies: bid-3-specific deals</h2>
+  <p>
+    Each case below is a single deck where bid 3 fired in the enabled config and the outcome
+    differed from the baseline. The hands, bidding, and trick-by-trick play are shown
+    side-by-side so the mechanism is directly visible.
+  </p>
+  
+<section class="case-study">
+  <h3>Case 1: Bid 3 fires, declarer-team FAILS; without bid 3, the same team MAKES the contract.</h3>
+  <p><strong>Deck:</strong> <code>CSaAmetPwZVxYWLFOGlnIihbHEuqJfkosRdzcjpMUrQygvNKXBDT</code>
+    &nbsp;<a href="http://localhost:3000/#CSaAmetPwZVxYWLFOGlnIihbHEuqJfkosRdzcjpMUrQygvNKXBDT" target="_blank">[play]</a></p>
+
+  <h4>Hands</h4>
+  <table class="hands-table">
+    <thead><tr><th>Seat</th><th>Hand</th><th>hp(up)</th><th>hp(down)</th></tr></thead>
+    <tbody>
+      <tr><td>P0 (You, S)</td><td><span class="hand-line"><span class="black">♠106</span> &nbsp; <span class="red">♥K73</span> &nbsp; <span class="red">♦Q82</span> &nbsp; <span class="black">♣10983</span></span></td><td class="num">5</td><td class="num">7</td></tr>
+      <tr><td>P1 (East)</td><td><span class="hand-line"><span class="black">♠95</span> &nbsp; <span class="red">♥10965</span> &nbsp; <span class="red">♦K1065</span> &nbsp; <span class="black">♣75</span></span></td><td class="num">3</td><td class="num">0</td></tr>
+      <tr><td>P2 (North)</td><td><span class="hand-line"><span class="black">♠873</span> &nbsp; <span class="red">♥AQJ84</span> &nbsp; <span class="red">♦A94</span> &nbsp; <span class="black">♣Q</span></span></td><td class="num">13</td><td class="num">12</td></tr>
+      <tr><td>P3 (West)</td><td><span class="hand-line"><span class="black">♠AKQJ42</span> &nbsp; <span class="red">♥2</span> &nbsp; <span class="red">♦3</span> &nbsp; <span class="black">♣AKJ6</span></span></td><td class="num">18</td><td class="num">17</td></tr>
+      <tr><td>Kitty</td><td><span class="hand-line"><span class="red">♦J7</span> &nbsp; <span class="black">♣42</span></span></td><td colspan="2"></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Bidding</h4>
+  <table>
+    <thead><tr><th>Strategy</th><th>Bidding sequence</th><th>Winner</th><th>Trump</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Baseline (bid3 disabled)</strong></td><td><span class="bid-cell ">P3: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P3 @ 4</td><td>spades uptown</td></tr>
+      <tr><td><strong>Enabled (bid3=17)</strong></td><td><span class="bid-cell bid3-highlight">P3: bid 3</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P1 @ 4</td><td>diamonds downtown-noaces</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Play (trick-by-trick)</h4>
+  <table class="tricks-table">
+    <thead>
+      <tr>
+        <th rowspan="2">#</th>
+        <th colspan="2">Baseline (bid3 disabled)</th>
+        <th colspan="2">Enabled (bid3=17)</th>
+      </tr>
+      <tr>
+        <th>Plays</th><th>Winner</th>
+        <th>Plays</th><th>Winner</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr class="diff"><td class="num">1</td><td>P3:<span class="black">A♠</span> P2:<span class="black">3♠</span> P1:<span class="black">5♠</span> P0:<span class="black">6♠</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">5♦</span> P0:<span class="red">2♦</span> P3:<span class="red">3♦</span> P2:<span class="red">A♦</span></td><td class="num">P0 (S/N)</td></tr>
+<tr><td class="num">2</td><td>P3:<span class="black">K♠</span> P2:<span class="black">7♠</span> P1:<span class="black">9♠</span> P0:<span class="black">10♠</span></td><td class="num">P3 (E/W)</td><td>P0:<span class="red">K♥</span> P3:<span class="red">2♥</span> P2:<span class="red">A♥</span> P1:<span class="red">10♥</span></td><td class="num">P3 (E/W)</td></tr>
+<tr class="diff"><td class="num">3</td><td>P3:<span class="black">Q♠</span> P2:<span class="black">8♠</span> P1:<span class="red">5♥</span> P0:<span class="red">2♦</span></td><td class="num">P3 (E/W)</td><td>P3:<span class="black">2♠</span> P2:<span class="black">8♠</span> P1:<span class="red">K♦</span> P0:<span class="black">10♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">4</td><td>P3:<span class="black">K♣</span> P2:<span class="black">Q♣</span> P1:<span class="black">5♣</span> P0:<span class="black">3♣</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">6♦</span> P0:<span class="red">Q♦</span> P3:<span class="black">A♠</span> P2:<span class="red">4♦</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">5</td><td>P3:<span class="black">J♣</span> P2:<span class="red">4♥</span> P1:<span class="black">7♣</span> P0:<span class="black">8♣</span></td><td class="num">P3 (E/W)</td><td>P2:<span class="black">3♠</span> P1:<span class="red">J♦</span> P0:<span class="black">6♠</span> P3:<span class="black">K♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">6</td><td>P3:<span class="black">A♣</span> P2:<span class="red">4♦</span> P1:<span class="red">5♦</span> P0:<span class="black">9♣</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">7♦</span> P0:<span class="red">8♦</span> P3:<span class="black">A♣</span> P2:<span class="red">9♦</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">7</td><td>P3:<span class="red">3♦</span> P2:<span class="red">9♦</span> P1:<span class="red">10♦</span> P0:<span class="red">Q♦</span></td><td class="num">P0 (S/N)</td><td>P1:<span class="black">2♣</span> P0:<span class="black">10♣</span> P3:<span class="black">K♣</span> P2:<span class="black">Q♣</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">8</td><td>P0:<span class="black">10♣</span> P3:<span class="black">2♠</span> P2:<span class="red">8♥</span> P1:<span class="red">6♥</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">9♥</span> P0:<span class="red">7♥</span> P3:<span class="black">Q♠</span> P2:<span class="red">Q♥</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">9</td><td>P3:<span class="red">7♦</span> P2:<span class="red">A♦</span> P1:<span class="red">6♦</span> P0:<span class="red">8♦</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="red">3♥</span> P3:<span class="black">J♠</span> P2:<span class="red">J♥</span> P1:<span class="red">6♥</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">10</td><td>P2:<span class="red">A♥</span> P1:<span class="red">9♥</span> P0:<span class="red">3♥</span> P3:<span class="black">4♠</span></td><td class="num">P3 (E/W)</td><td>P0:<span class="black">3♣</span> P3:<span class="black">J♣</span> P2:<span class="red">8♥</span> P1:<span class="black">7♣</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">11</td><td>P3:<span class="black">J♠</span> P2:<span class="red">J♥</span> P1:<span class="red">10♥</span> P0:<span class="red">7♥</span></td><td class="num">P3 (E/W)</td><td>P0:<span class="black">9♣</span> P3:<span class="black">6♣</span> P2:<span class="black">7♠</span> P1:<span class="red">10♦</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">12</td><td>P3:<span class="red">J♦</span> P2:<span class="red">Q♥</span> P1:<span class="red">K♦</span> P0:<span class="red">K♥</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">5♥</span> P0:<span class="black">8♣</span> P3:<span class="black">4♠</span> P2:<span class="red">4♥</span></td><td class="num">P2 (S/N)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Result</h4>
+  <ul>
+    <li><strong>Baseline:</strong> <span class="tag made">made</span> — declarer team books 11/10 (contract made)</li>
+    <li><strong>Enabled:</strong> <span class="tag failed">failed</span> — declarer team books 7/10</li>
+  </ul>
+</section>
+
+<section class="case-study">
+  <h3>Case 2: Bid 3 fires, declarer-team FAILS; without bid 3, the same team MAKES the contract.</h3>
+  <p><strong>Deck:</strong> <code>iOLxyaCjszpVHEmQwTSZPXGKlvJBtreNdghDUfonIbWAFckuRYMq</code>
+    &nbsp;<a href="http://localhost:3000/#iOLxyaCjszpVHEmQwTSZPXGKlvJBtreNdghDUfonIbWAFckuRYMq" target="_blank">[play]</a></p>
+
+  <h4>Hands</h4>
+  <table class="hands-table">
+    <thead><tr><th>Seat</th><th>Hand</th><th>hp(up)</th><th>hp(down)</th></tr></thead>
+    <tbody>
+      <tr><td>P0 (You, S)</td><td><span class="hand-line"><span class="black">♠Q1076</span> &nbsp; <span class="red">♥Q94</span> &nbsp; <span class="red">♦83</span> &nbsp; <span class="black">♣986</span></span></td><td class="num">4</td><td class="num">3</td></tr>
+      <tr><td>P1 (East)</td><td><span class="hand-line"><span class="black">♠K95</span> &nbsp; <span class="red">♥A7632</span> &nbsp; <span class="red">♦J72</span> &nbsp; <span class="black">♣5</span></span></td><td class="num">8</td><td class="num">12</td></tr>
+      <tr><td>P2 (North)</td><td><span class="hand-line"><span class="black">♠32</span> &nbsp; <span class="red">♥KJ85</span> &nbsp; <span class="red">♦106</span> &nbsp; <span class="black">♣Q1073</span></span></td><td class="num">6</td><td class="num">7</td></tr>
+      <tr><td>P3 (West)</td><td><span class="hand-line"><span class="black">♠AJ8</span> &nbsp; <span class="red">♥10</span> &nbsp; <span class="red">♦AK94</span> &nbsp; <span class="black">♣AJ42</span></span></td><td class="num">17</td><td class="num">17</td></tr>
+      <tr><td>Kitty</td><td><span class="hand-line"><span class="black">♠4</span> &nbsp; <span class="red">♦Q5</span> &nbsp; <span class="black">♣K</span></span></td><td colspan="2"></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Bidding</h4>
+  <table>
+    <thead><tr><th>Strategy</th><th>Bidding sequence</th><th>Winner</th><th>Trump</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Baseline (bid3 disabled)</strong></td><td><span class="bid-cell ">P3: bid 2</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P1 @ 4</td><td>diamonds uptown</td></tr>
+      <tr><td><strong>Enabled (bid3=17)</strong></td><td><span class="bid-cell bid3-highlight">P3: bid 3</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P1 @ 4</td><td>hearts downtown-noaces</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Play (trick-by-trick)</h4>
+  <table class="tricks-table">
+    <thead>
+      <tr>
+        <th rowspan="2">#</th>
+        <th colspan="2">Baseline (bid3 disabled)</th>
+        <th colspan="2">Enabled (bid3=17)</th>
+      </tr>
+      <tr>
+        <th>Plays</th><th>Winner</th>
+        <th>Plays</th><th>Winner</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr><td class="num">1</td><td>P1:<span class="red">Q♦</span> P0:<span class="red">3♦</span> P3:<span class="red">4♦</span> P2:<span class="red">6♦</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">2♥</span> P0:<span class="red">Q♥</span> P3:<span class="red">10♥</span> P2:<span class="red">K♥</span></td><td class="num">P1 (E/W)</td></tr>
+<tr><td class="num">2</td><td>P1:<span class="red">J♦</span> P0:<span class="red">8♦</span> P3:<span class="red">9♦</span> P2:<span class="red">10♦</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">3♥</span> P0:<span class="red">9♥</span> P3:<span class="black">A♠</span> P2:<span class="red">J♥</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">3</td><td>P1:<span class="red">7♦</span> P0:<span class="red">4♥</span> P3:<span class="red">K♦</span> P2:<span class="black">2♠</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">6♥</span> P0:<span class="red">4♥</span> P3:<span class="black">A♣</span> P2:<span class="red">8♥</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">4</td><td>P3:<span class="black">A♠</span> P2:<span class="black">3♠</span> P1:<span class="black">4♠</span> P0:<span class="black">6♠</span></td><td class="num">P3 (E/W)</td><td>P0:<span class="black">Q♠</span> P3:<span class="black">J♠</span> P2:<span class="black">3♠</span> P1:<span class="black">K♠</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">5</td><td>P3:<span class="black">A♣</span> P2:<span class="black">3♣</span> P1:<span class="black">K♣</span> P0:<span class="black">6♣</span></td><td class="num">P3 (E/W)</td><td>P2:<span class="black">2♠</span> P1:<span class="black">9♠</span> P0:<span class="black">10♠</span> P3:<span class="black">8♠</span></td><td class="num">P2 (S/N)</td></tr>
+<tr><td class="num">6</td><td>P3:<span class="black">2♣</span> P2:<span class="black">7♣</span> P1:<span class="red">2♦</span> P0:<span class="black">8♣</span></td><td class="num">P1 (E/W)</td><td>P2:<span class="black">Q♣</span> P1:<span class="red">A♥</span> P0:<span class="black">9♣</span> P3:<span class="black">J♣</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">7</td><td>P1:<span class="black">K♠</span> P0:<span class="black">7♠</span> P3:<span class="black">8♠</span> P2:<span class="red">5♥</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">7♥</span> P0:<span class="black">8♣</span> P3:<span class="red">A♦</span> P2:<span class="red">5♥</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">8</td><td>P1:<span class="red">A♥</span> P0:<span class="red">9♥</span> P3:<span class="red">10♥</span> P2:<span class="red">8♥</span></td><td class="num">P1 (E/W)</td><td>P2:<span class="black">10♣</span> P1:<span class="red">Q♦</span> P0:<span class="black">6♣</span> P3:<span class="black">4♣</span></td><td class="num">P3 (E/W)</td></tr>
+<tr><td class="num">9</td><td>P1:<span class="red">2♥</span> P0:<span class="red">Q♥</span> P3:<span class="red">A♦</span> P2:<span class="red">J♥</span></td><td class="num">P3 (E/W)</td><td>P3:<span class="black">2♣</span> P2:<span class="black">7♣</span> P1:<span class="black">5♠</span> P0:<span class="red">8♦</span></td><td class="num">P3 (E/W)</td></tr>
+<tr class="diff"><td class="num">10</td><td>P3:<span class="black">4♣</span> P2:<span class="black">10♣</span> P1:<span class="red">5♦</span> P0:<span class="black">9♣</span></td><td class="num">P1 (E/W)</td><td>P3:<span class="red">K♦</span> P2:<span class="red">10♦</span> P1:<span class="red">5♦</span> P0:<span class="red">3♦</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">11</td><td>P1:<span class="red">7♥</span> P0:<span class="black">10♠</span> P3:<span class="black">J♠</span> P2:<span class="red">K♥</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="black">7♠</span> P3:<span class="red">9♦</span> P2:<span class="red">6♦</span> P1:<span class="black">4♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">12</td><td>P2:<span class="black">Q♣</span> P1:<span class="black">9♠</span> P0:<span class="black">Q♠</span> P3:<span class="black">J♣</span></td><td class="num">P2 (S/N)</td><td>P1:<span class="red">2♦</span> P0:<span class="black">6♠</span> P3:<span class="red">4♦</span> P2:<span class="black">3♣</span></td><td class="num">P1 (E/W)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Result</h4>
+  <ul>
+    <li><strong>Baseline:</strong> <span class="tag made">made</span> — declarer team books 11/10 (contract made)</li>
+    <li><strong>Enabled:</strong> <span class="tag failed">failed</span> — declarer team books 8/10</li>
+  </ul>
+</section>
+
+<section class="case-study">
+  <h3>Case 3: Bid 3 fires, declarer-team FAILS; without bid 3, the same team MAKES the contract.</h3>
+  <p><strong>Deck:</strong> <code>EeFYQCSoiqImgkOcvWfAVhMyBJXnHRsUPrxTZldbKjuGzDLaNwtp</code>
+    &nbsp;<a href="http://localhost:3000/#EeFYQCSoiqImgkOcvWfAVhMyBJXnHRsUPrxTZldbKjuGzDLaNwtp" target="_blank">[play]</a></p>
+
+  <h4>Hands</h4>
+  <table class="hands-table">
+    <thead><tr><th>Seat</th><th>Hand</th><th>hp(up)</th><th>hp(down)</th></tr></thead>
+    <tbody>
+      <tr><td>P0 (You, S)</td><td><span class="hand-line"><span class="black">♠K9</span> &nbsp; <span class="red">♥97</span> &nbsp; <span class="red">♦K943</span> &nbsp; <span class="black">♣J852</span></span></td><td class="num">7</td><td class="num">6</td></tr>
+      <tr><td>P1 (East)</td><td><span class="hand-line"><span class="black">♠54</span> &nbsp; <span class="red">♥QJ1085</span> &nbsp; <span class="red">♦105</span> &nbsp; <span class="black">♣1043</span></span></td><td class="num">3</td><td class="num">4</td></tr>
+      <tr><td>P2 (North)</td><td><span class="hand-line"><span class="black">♠J86</span> &nbsp; <span class="red">♥64</span> &nbsp; <span class="red">♦J62</span> &nbsp; <span class="black">♣KQ96</span></span></td><td class="num">7</td><td class="num">4</td></tr>
+      <tr><td>P3 (West)</td><td><span class="hand-line"><span class="black">♠AQ2</span> &nbsp; <span class="red">♥AK32</span> &nbsp; <span class="red">♦Q87</span> &nbsp; <span class="black">♣A7</span></span></td><td class="num">19</td><td class="num">20</td></tr>
+      <tr><td>Kitty</td><td><span class="hand-line"><span class="black">♠1073</span> &nbsp; <span class="red">♦A</span></span></td><td colspan="2"></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Bidding</h4>
+  <table>
+    <thead><tr><th>Strategy</th><th>Bidding sequence</th><th>Winner</th><th>Trump</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Baseline (bid3 disabled)</strong></td><td><span class="bid-cell ">P3: bid 2</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P1 @ 4</td><td>spades downtown-noaces</td></tr>
+      <tr><td><strong>Enabled (bid3=17)</strong></td><td><span class="bid-cell bid3-highlight">P3: bid 3</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P1 @ 4</td><td>spades downtown-noaces</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Play (trick-by-trick)</h4>
+  <table class="tricks-table">
+    <thead>
+      <tr>
+        <th rowspan="2">#</th>
+        <th colspan="2">Baseline (bid3 disabled)</th>
+        <th colspan="2">Enabled (bid3=17)</th>
+      </tr>
+      <tr>
+        <th>Plays</th><th>Winner</th>
+        <th>Plays</th><th>Winner</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr><td class="num">1</td><td>P1:<span class="black">3♠</span> P0:<span class="black">K♠</span> P3:<span class="black">A♠</span> P2:<span class="black">J♠</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="black">3♠</span> P0:<span class="black">K♠</span> P3:<span class="black">A♠</span> P2:<span class="black">J♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr><td class="num">2</td><td>P1:<span class="black">4♠</span> P0:<span class="black">9♠</span> P3:<span class="black">Q♠</span> P2:<span class="black">8♠</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="black">4♠</span> P0:<span class="black">9♠</span> P3:<span class="black">Q♠</span> P2:<span class="black">8♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr><td class="num">3</td><td>P1:<span class="black">5♠</span> P0:<span class="red">K♦</span> P3:<span class="black">2♠</span> P2:<span class="black">6♠</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="black">5♠</span> P0:<span class="red">K♦</span> P3:<span class="black">2♠</span> P2:<span class="black">6♠</span></td><td class="num">P3 (E/W)</td></tr>
+<tr><td class="num">4</td><td>P3:<span class="red">3♥</span> P2:<span class="red">6♥</span> P1:<span class="red">10♥</span> P0:<span class="red">9♥</span></td><td class="num">P3 (E/W)</td><td>P3:<span class="red">3♥</span> P2:<span class="red">6♥</span> P1:<span class="red">8♥</span> P0:<span class="red">9♥</span></td><td class="num">P3 (E/W)</td></tr>
+<tr><td class="num">5</td><td>P3:<span class="red">2♥</span> P2:<span class="red">4♥</span> P1:<span class="red">8♥</span> P0:<span class="red">7♥</span></td><td class="num">P3 (E/W)</td><td>P3:<span class="red">2♥</span> P2:<span class="red">4♥</span> P1:<span class="red">5♥</span> P0:<span class="red">7♥</span></td><td class="num">P3 (E/W)</td></tr>
+<tr><td class="num">6</td><td>P3:<span class="red">A♥</span> P2:<span class="black">K♣</span> P1:<span class="red">5♥</span> P0:<span class="black">J♣</span></td><td class="num">P1 (E/W)</td><td>P3:<span class="red">A♥</span> P2:<span class="black">K♣</span> P1:<span class="black">10♠</span> P0:<span class="black">J♣</span></td><td class="num">P1 (E/W)</td></tr>
+<tr><td class="num">7</td><td>P1:<span class="red">10♦</span> P0:<span class="red">9♦</span> P3:<span class="red">8♦</span> P2:<span class="red">6♦</span></td><td class="num">P2 (S/N)</td><td>P1:<span class="black">10♣</span> P0:<span class="black">8♣</span> P3:<span class="black">7♣</span> P2:<span class="black">6♣</span></td><td class="num">P2 (S/N)</td></tr>
+<tr><td class="num">8</td><td>P2:<span class="red">2♦</span> P1:<span class="red">5♦</span> P0:<span class="red">4♦</span> P3:<span class="red">Q♦</span></td><td class="num">P2 (S/N)</td><td>P2:<span class="red">2♦</span> P1:<span class="red">10♦</span> P0:<span class="red">9♦</span> P3:<span class="red">Q♦</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">9</td><td>P2:<span class="red">J♦</span> P1:<span class="black">10♠</span> P0:<span class="red">3♦</span> P3:<span class="red">7♦</span></td><td class="num">P1 (E/W)</td><td>P2:<span class="red">J♦</span> P1:<span class="red">5♦</span> P0:<span class="red">4♦</span> P3:<span class="red">8♦</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">10</td><td>P1:<span class="black">4♣</span> P0:<span class="black">2♣</span> P3:<span class="black">A♣</span> P2:<span class="black">Q♣</span></td><td class="num">P0 (S/N)</td><td>P0:<span class="red">3♦</span> P3:<span class="red">7♦</span> P2:<span class="red">6♦</span> P1:<span class="black">7♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">11</td><td>P0:<span class="black">8♣</span> P3:<span class="black">7♣</span> P2:<span class="black">6♣</span> P1:<span class="black">3♣</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="black">4♣</span> P0:<span class="black">2♣</span> P3:<span class="black">A♣</span> P2:<span class="black">Q♣</span></td><td class="num">P0 (S/N)</td></tr>
+<tr><td class="num">12</td><td>P1:<span class="black">7♠</span> P0:<span class="black">5♣</span> P3:<span class="red">K♥</span> P2:<span class="black">9♣</span></td><td class="num">P1 (E/W)</td><td>P0:<span class="black">5♣</span> P3:<span class="red">K♥</span> P2:<span class="black">9♣</span> P1:<span class="black">3♣</span></td><td class="num">P1 (E/W)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Result</h4>
+  <ul>
+    <li><strong>Baseline:</strong> <span class="tag made">made</span> — declarer team books 10/10 (contract made)</li>
+    <li><strong>Enabled:</strong> <span class="tag failed">failed</span> — declarer team books 9/10</li>
+  </ul>
+</section>
+
+<section class="case-study">
+  <h3>Case 4: Same declarer (P0), different trump direction: baseline=uptown diamonds, enabled=downtown-noaces diamonds. Bid 3 leaves the receiver without direction info.</h3>
+  <p><strong>Deck:</strong> <code>hpCibSJsYDaeRHrtokdQWMnGAvzOPTuKUEmZFXBqwINyVgflLjcx</code>
+    &nbsp;<a href="http://localhost:3000/#hpCibSJsYDaeRHrtokdQWMnGAvzOPTuKUEmZFXBqwINyVgflLjcx" target="_blank">[play]</a></p>
+
+  <h4>Hands</h4>
+  <table class="hands-table">
+    <thead><tr><th>Seat</th><th>Hand</th><th>hp(up)</th><th>hp(down)</th></tr></thead>
+    <tbody>
+      <tr><td>P0 (You, S)</td><td><span class="hand-line"><span class="black">♠102</span> &nbsp; <span class="red">♥82</span> &nbsp; <span class="red">♦Q109853</span> &nbsp; <span class="black">♣A6</span></span></td><td class="num">6</td><td class="num">12</td></tr>
+      <tr><td>P1 (East)</td><td><span class="hand-line"><span class="black">♠93</span> &nbsp; <span class="red">♥J7</span> &nbsp; <span class="red">♦J76</span> &nbsp; <span class="black">♣K9854</span></span></td><td class="num">5</td><td class="num">3</td></tr>
+      <tr><td>P2 (North)</td><td><span class="hand-line"><span class="black">♠AK85</span> &nbsp; <span class="red">♥AK64</span> &nbsp; <span class="red">♦A</span> &nbsp; <span class="black">♣1032</span></span></td><td class="num">18</td><td class="num">18</td></tr>
+      <tr><td>P3 (West)</td><td><span class="hand-line"><span class="black">♠Q764</span> &nbsp; <span class="red">♥Q95</span> &nbsp; <span class="red">♦K42</span> &nbsp; <span class="black">♣J7</span></span></td><td class="num">8</td><td class="num">5</td></tr>
+      <tr><td>Kitty</td><td><span class="hand-line"><span class="black">♠J</span> &nbsp; <span class="red">♥103</span> &nbsp; <span class="black">♣Q</span></span></td><td colspan="2"></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Bidding</h4>
+  <table>
+    <thead><tr><th>Strategy</th><th>Bidding sequence</th><th>Winner</th><th>Trump</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Baseline (bid3 disabled)</strong></td><td><span class="bid-cell ">P3: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: bid 2</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: bid 4</span></td><td>P0 @ 4</td><td>diamonds uptown</td></tr>
+      <tr><td><strong>Enabled (bid3=17)</strong></td><td><span class="bid-cell ">P3: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell bid3-highlight">P2: bid 3</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: bid 4</span></td><td>P0 @ 4</td><td>diamonds downtown-noaces</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Play (trick-by-trick)</h4>
+  <table class="tricks-table">
+    <thead>
+      <tr>
+        <th rowspan="2">#</th>
+        <th colspan="2">Baseline (bid3 disabled)</th>
+        <th colspan="2">Enabled (bid3=17)</th>
+      </tr>
+      <tr>
+        <th>Plays</th><th>Winner</th>
+        <th>Plays</th><th>Winner</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr class="diff"><td class="num">1</td><td>P0:<span class="red">Q♦</span> P3:<span class="red">K♦</span> P2:<span class="red">A♦</span> P1:<span class="red">6♦</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="red">3♦</span> P3:<span class="red">2♦</span> P2:<span class="red">A♦</span> P1:<span class="red">J♦</span></td><td class="num">P3 (E/W)</td></tr>
+<tr class="diff"><td class="num">2</td><td>P2:<span class="black">K♠</span> P1:<span class="black">3♠</span> P0:<span class="black">10♠</span> P3:<span class="black">4♠</span></td><td class="num">P2 (S/N)</td><td>P3:<span class="black">Q♠</span> P2:<span class="black">8♠</span> P1:<span class="black">3♠</span> P0:<span class="black">J♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr><td class="num">3</td><td>P2:<span class="red">K♥</span> P1:<span class="red">7♥</span> P0:<span class="red">3♥</span> P3:<span class="red">5♥</span></td><td class="num">P2 (S/N)</td><td>P1:<span class="black">K♣</span> P0:<span class="black">Q♣</span> P3:<span class="black">J♣</span> P2:<span class="black">10♣</span></td><td class="num">P2 (S/N)</td></tr>
+<tr><td class="num">4</td><td>P2:<span class="black">A♠</span> P1:<span class="black">9♠</span> P0:<span class="black">J♠</span> P3:<span class="black">6♠</span></td><td class="num">P2 (S/N)</td><td>P2:<span class="black">3♣</span> P1:<span class="black">9♣</span> P0:<span class="black">A♣</span> P3:<span class="black">7♣</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">5</td><td>P2:<span class="red">A♥</span> P1:<span class="red">J♥</span> P0:<span class="red">8♥</span> P3:<span class="red">9♥</span></td><td class="num">P2 (S/N)</td><td>P2:<span class="black">2♣</span> P1:<span class="black">8♣</span> P0:<span class="black">6♣</span> P3:<span class="red">K♦</span></td><td class="num">P3 (E/W)</td></tr>
+<tr class="diff"><td class="num">6</td><td>P2:<span class="black">2♣</span> P1:<span class="black">4♣</span> P0:<span class="black">6♣</span> P3:<span class="black">7♣</span></td><td class="num">P3 (E/W)</td><td>P3:<span class="red">Q♥</span> P2:<span class="red">6♥</span> P1:<span class="red">J♥</span> P0:<span class="red">2♥</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">7</td><td>P3:<span class="black">Q♠</span> P2:<span class="black">5♠</span> P1:<span class="red">7♦</span> P0:<span class="red">3♦</span></td><td class="num">P1 (E/W)</td><td>P0:<span class="red">5♦</span> P3:<span class="red">4♦</span> P2:<span class="black">A♠</span> P1:<span class="red">7♦</span></td><td class="num">P3 (E/W)</td></tr>
+<tr class="diff"><td class="num">8</td><td>P1:<span class="black">5♣</span> P0:<span class="red">5♦</span> P3:<span class="black">J♣</span> P2:<span class="black">3♣</span></td><td class="num">P0 (S/N)</td><td>P3:<span class="red">9♥</span> P2:<span class="red">4♥</span> P1:<span class="red">7♥</span> P0:<span class="red">10♥</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">9</td><td>P0:<span class="red">10♦</span> P3:<span class="red">2♦</span> P2:<span class="red">4♥</span> P1:<span class="red">J♦</span></td><td class="num">P1 (E/W)</td><td>P2:<span class="black">K♠</span> P1:<span class="black">9♠</span> P0:<span class="red">Q♦</span> P3:<span class="black">7♠</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">10</td><td>P1:<span class="black">8♣</span> P0:<span class="red">8♦</span> P3:<span class="red">4♦</span> P2:<span class="black">10♣</span></td><td class="num">P0 (S/N)</td><td>P0:<span class="red">8♦</span> P3:<span class="black">6♠</span> P2:<span class="red">A♥</span> P1:<span class="red">6♦</span></td><td class="num">P1 (E/W)</td></tr>
+<tr><td class="num">11</td><td>P0:<span class="red">9♦</span> P3:<span class="black">7♠</span> P2:<span class="red">6♥</span> P1:<span class="black">9♣</span></td><td class="num">P0 (S/N)</td><td>P1:<span class="black">5♣</span> P0:<span class="red">10♦</span> P3:<span class="red">5♥</span> P2:<span class="red">K♥</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">12</td><td>P0:<span class="red">10♥</span> P3:<span class="red">Q♥</span> P2:<span class="black">8♠</span> P1:<span class="black">K♣</span></td><td class="num">P3 (E/W)</td><td>P0:<span class="red">9♦</span> P3:<span class="black">4♠</span> P2:<span class="black">5♠</span> P1:<span class="black">4♣</span></td><td class="num">P0 (S/N)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Result</h4>
+  <ul>
+    <li><strong>Baseline:</strong> <span class="tag failed">failed</span> — declarer team books 9/10 (short by 1)</li>
+    <li><strong>Enabled:</strong> <span class="tag failed">failed</span> — declarer team books 8/10</li>
+  </ul>
+</section>
+
+<section class="case-study">
+  <h3>Case 5: Same declarer (P0), different trump direction: baseline=uptown hearts, enabled=downtown-noaces clubs. Bid 3 leaves the receiver without direction info.</h3>
+  <p><strong>Deck:</strong> <code>JhCEdbAmGvNurenBkxLXlyRzDcaPIwtfSUKFVOpWgoZjMYHsiTqQ</code>
+    &nbsp;<a href="http://localhost:3000/#JhCEdbAmGvNurenBkxLXlyRzDcaPIwtfSUKFVOpWgoZjMYHsiTqQ" target="_blank">[play]</a></p>
+
+  <h4>Hands</h4>
+  <table class="hands-table">
+    <thead><tr><th>Seat</th><th>Hand</th><th>hp(up)</th><th>hp(down)</th></tr></thead>
+    <tbody>
+      <tr><td>P0 (You, S)</td><td><span class="hand-line"><span class="black">♠5</span> &nbsp; <span class="red">♥QJ74</span> &nbsp; <span class="red">♦96</span> &nbsp; <span class="black">♣K10974</span></span></td><td class="num">6</td><td class="num">2</td></tr>
+      <tr><td>P1 (East)</td><td><span class="hand-line"><span class="black">♠QJ1092</span> &nbsp; <span class="red">♥8532</span> &nbsp; <span class="red">♦Q82</span></span></td><td class="num">5</td><td class="num">11</td></tr>
+      <tr><td>P2 (North)</td><td><span class="hand-line"><span class="black">♠A73</span> &nbsp; <span class="red">♥A</span> &nbsp; <span class="red">♦AK5</span> &nbsp; <span class="black">♣AQJ83</span></span></td><td class="num">22</td><td class="num">20</td></tr>
+      <tr><td>P3 (West)</td><td><span class="hand-line"><span class="black">♠K86</span> &nbsp; <span class="red">♥K106</span> &nbsp; <span class="red">♦J103</span> &nbsp; <span class="black">♣652</span></span></td><td class="num">7</td><td class="num">5</td></tr>
+      <tr><td>Kitty</td><td><span class="hand-line"><span class="black">♠4</span> &nbsp; <span class="red">♥9</span> &nbsp; <span class="red">♦74</span></span></td><td colspan="2"></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Bidding</h4>
+  <table>
+    <thead><tr><th>Strategy</th><th>Bidding sequence</th><th>Winner</th><th>Trump</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Baseline (bid3 disabled)</strong></td><td><span class="bid-cell ">P3: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: bid 2</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: bid 4</span></td><td>P0 @ 4</td><td>hearts uptown</td></tr>
+      <tr><td><strong>Enabled (bid3=17)</strong></td><td><span class="bid-cell ">P3: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell bid3-highlight">P2: bid 3</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: bid 4</span></td><td>P0 @ 4</td><td>clubs downtown-noaces</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Play (trick-by-trick)</h4>
+  <table class="tricks-table">
+    <thead>
+      <tr>
+        <th rowspan="2">#</th>
+        <th colspan="2">Baseline (bid3 disabled)</th>
+        <th colspan="2">Enabled (bid3=17)</th>
+      </tr>
+      <tr>
+        <th>Plays</th><th>Winner</th>
+        <th>Plays</th><th>Winner</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr class="diff"><td class="num">1</td><td>P0:<span class="red">Q♥</span> P3:<span class="red">K♥</span> P2:<span class="red">A♥</span> P1:<span class="red">2♥</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="black">4♣</span> P3:<span class="black">2♣</span> P2:<span class="black">A♣</span> P1:<span class="black">Q♠</span></td><td class="num">P3 (E/W)</td></tr>
+<tr class="diff"><td class="num">2</td><td>P2:<span class="red">K♦</span> P1:<span class="red">2♦</span> P0:<span class="red">4♦</span> P3:<span class="red">3♦</span></td><td class="num">P2 (S/N)</td><td>P3:<span class="black">K♠</span> P2:<span class="black">7♠</span> P1:<span class="black">2♠</span> P0:<span class="black">K♣</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">3</td><td>P2:<span class="black">A♠</span> P1:<span class="black">2♠</span> P0:<span class="red">4♥</span> P3:<span class="black">6♠</span></td><td class="num">P0 (S/N)</td><td>P0:<span class="black">7♣</span> P3:<span class="black">6♣</span> P2:<span class="black">3♣</span> P1:<span class="red">Q♦</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">4</td><td>P0:<span class="red">J♥</span> P3:<span class="red">6♥</span> P2:<span class="black">3♠</span> P1:<span class="red">3♥</span></td><td class="num">P0 (S/N)</td><td>P2:<span class="black">8♣</span> P1:<span class="black">J♠</span> P0:<span class="black">10♣</span> P3:<span class="black">5♣</span></td><td class="num">P3 (E/W)</td></tr>
+<tr class="diff"><td class="num">5</td><td>P0:<span class="red">9♥</span> P3:<span class="red">10♥</span> P2:<span class="black">3♣</span> P1:<span class="red">5♥</span></td><td class="num">P3 (E/W)</td><td>P3:<span class="black">8♠</span> P2:<span class="black">3♠</span> P1:<span class="black">10♠</span> P0:<span class="black">9♣</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">6</td><td>P3:<span class="black">K♠</span> P2:<span class="black">7♠</span> P1:<span class="black">9♠</span> P0:<span class="red">7♥</span></td><td class="num">P0 (S/N)</td><td>P0:<span class="red">9♥</span> P3:<span class="red">6♥</span> P2:<span class="red">A♥</span> P1:<span class="red">3♥</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">7</td><td>P0:<span class="black">4♣</span> P3:<span class="black">5♣</span> P2:<span class="black">8♣</span> P1:<span class="red">8♥</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">2♥</span> P0:<span class="red">7♥</span> P3:<span class="red">K♥</span> P2:<span class="black">Q♣</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">8</td><td>P1:<span class="black">10♠</span> P0:<span class="red">6♦</span> P3:<span class="black">8♠</span> P2:<span class="red">5♦</span></td><td class="num">P1 (E/W)</td><td>P2:<span class="black">A♠</span> P1:<span class="black">9♠</span> P0:<span class="red">9♦</span> P3:<span class="black">6♠</span></td><td class="num">P3 (E/W)</td></tr>
+<tr><td class="num">9</td><td>P1:<span class="black">J♠</span> P0:<span class="red">7♦</span> P3:<span class="black">2♣</span> P2:<span class="black">J♣</span></td><td class="num">P1 (E/W)</td><td>P3:<span class="red">J♦</span> P2:<span class="red">5♦</span> P1:<span class="red">2♦</span> P0:<span class="red">7♦</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">10</td><td>P1:<span class="black">Q♠</span> P0:<span class="red">9♦</span> P3:<span class="black">6♣</span> P2:<span class="black">Q♣</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">8♥</span> P0:<span class="red">4♥</span> P3:<span class="red">10♥</span> P2:<span class="red">A♦</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">11</td><td>P1:<span class="red">8♦</span> P0:<span class="black">10♣</span> P3:<span class="red">10♦</span> P2:<span class="red">A♦</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="red">6♦</span> P3:<span class="red">3♦</span> P2:<span class="red">K♦</span> P1:<span class="red">8♦</span></td><td class="num">P3 (E/W)</td></tr>
+<tr><td class="num">12</td><td>P2:<span class="black">A♣</span> P1:<span class="red">Q♦</span> P0:<span class="black">K♣</span> P3:<span class="red">J♦</span></td><td class="num">P2 (S/N)</td><td>P3:<span class="red">10♦</span> P2:<span class="black">J♣</span> P1:<span class="red">5♥</span> P0:<span class="red">4♦</span></td><td class="num">P2 (S/N)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Result</h4>
+  <ul>
+    <li><strong>Baseline:</strong> <span class="tag failed">failed</span> — declarer team books 8/10 (short by 2)</li>
+    <li><strong>Enabled:</strong> <span class="tag failed">failed</span> — declarer team books 7/10</li>
+  </ul>
+</section>
+
+<section class="case-study">
+  <h3>Case 6: Same declarer (P1), different trump direction: baseline=uptown diamonds, enabled=downtown-noaces hearts. Bid 3 leaves the receiver without direction info.</h3>
+  <p><strong>Deck:</strong> <code>iOLxyaCjszpVHEmQwTSZPXGKlvJBtreNdghDUfonIbWAFckuRYMq</code>
+    &nbsp;<a href="http://localhost:3000/#iOLxyaCjszpVHEmQwTSZPXGKlvJBtreNdghDUfonIbWAFckuRYMq" target="_blank">[play]</a></p>
+
+  <h4>Hands</h4>
+  <table class="hands-table">
+    <thead><tr><th>Seat</th><th>Hand</th><th>hp(up)</th><th>hp(down)</th></tr></thead>
+    <tbody>
+      <tr><td>P0 (You, S)</td><td><span class="hand-line"><span class="black">♠Q1076</span> &nbsp; <span class="red">♥Q94</span> &nbsp; <span class="red">♦83</span> &nbsp; <span class="black">♣986</span></span></td><td class="num">4</td><td class="num">3</td></tr>
+      <tr><td>P1 (East)</td><td><span class="hand-line"><span class="black">♠K95</span> &nbsp; <span class="red">♥A7632</span> &nbsp; <span class="red">♦J72</span> &nbsp; <span class="black">♣5</span></span></td><td class="num">8</td><td class="num">12</td></tr>
+      <tr><td>P2 (North)</td><td><span class="hand-line"><span class="black">♠32</span> &nbsp; <span class="red">♥KJ85</span> &nbsp; <span class="red">♦106</span> &nbsp; <span class="black">♣Q1073</span></span></td><td class="num">6</td><td class="num">7</td></tr>
+      <tr><td>P3 (West)</td><td><span class="hand-line"><span class="black">♠AJ8</span> &nbsp; <span class="red">♥10</span> &nbsp; <span class="red">♦AK94</span> &nbsp; <span class="black">♣AJ42</span></span></td><td class="num">17</td><td class="num">17</td></tr>
+      <tr><td>Kitty</td><td><span class="hand-line"><span class="black">♠4</span> &nbsp; <span class="red">♦Q5</span> &nbsp; <span class="black">♣K</span></span></td><td colspan="2"></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Bidding</h4>
+  <table>
+    <thead><tr><th>Strategy</th><th>Bidding sequence</th><th>Winner</th><th>Trump</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Baseline (bid3 disabled)</strong></td><td><span class="bid-cell ">P3: bid 2</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P1 @ 4</td><td>diamonds uptown</td></tr>
+      <tr><td><strong>Enabled (bid3=17)</strong></td><td><span class="bid-cell bid3-highlight">P3: bid 3</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P1 @ 4</td><td>hearts downtown-noaces</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Play (trick-by-trick)</h4>
+  <table class="tricks-table">
+    <thead>
+      <tr>
+        <th rowspan="2">#</th>
+        <th colspan="2">Baseline (bid3 disabled)</th>
+        <th colspan="2">Enabled (bid3=17)</th>
+      </tr>
+      <tr>
+        <th>Plays</th><th>Winner</th>
+        <th>Plays</th><th>Winner</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr><td class="num">1</td><td>P1:<span class="red">Q♦</span> P0:<span class="red">3♦</span> P3:<span class="red">4♦</span> P2:<span class="red">6♦</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">2♥</span> P0:<span class="red">Q♥</span> P3:<span class="red">10♥</span> P2:<span class="red">K♥</span></td><td class="num">P1 (E/W)</td></tr>
+<tr><td class="num">2</td><td>P1:<span class="red">J♦</span> P0:<span class="red">8♦</span> P3:<span class="red">9♦</span> P2:<span class="red">10♦</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">3♥</span> P0:<span class="red">9♥</span> P3:<span class="black">A♠</span> P2:<span class="red">J♥</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">3</td><td>P1:<span class="red">7♦</span> P0:<span class="red">4♥</span> P3:<span class="red">K♦</span> P2:<span class="black">2♠</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">6♥</span> P0:<span class="red">4♥</span> P3:<span class="black">A♣</span> P2:<span class="red">8♥</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">4</td><td>P3:<span class="black">A♠</span> P2:<span class="black">3♠</span> P1:<span class="black">4♠</span> P0:<span class="black">6♠</span></td><td class="num">P3 (E/W)</td><td>P0:<span class="black">Q♠</span> P3:<span class="black">J♠</span> P2:<span class="black">3♠</span> P1:<span class="black">K♠</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">5</td><td>P3:<span class="black">A♣</span> P2:<span class="black">3♣</span> P1:<span class="black">K♣</span> P0:<span class="black">6♣</span></td><td class="num">P3 (E/W)</td><td>P2:<span class="black">2♠</span> P1:<span class="black">9♠</span> P0:<span class="black">10♠</span> P3:<span class="black">8♠</span></td><td class="num">P2 (S/N)</td></tr>
+<tr><td class="num">6</td><td>P3:<span class="black">2♣</span> P2:<span class="black">7♣</span> P1:<span class="red">2♦</span> P0:<span class="black">8♣</span></td><td class="num">P1 (E/W)</td><td>P2:<span class="black">Q♣</span> P1:<span class="red">A♥</span> P0:<span class="black">9♣</span> P3:<span class="black">J♣</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">7</td><td>P1:<span class="black">K♠</span> P0:<span class="black">7♠</span> P3:<span class="black">8♠</span> P2:<span class="red">5♥</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">7♥</span> P0:<span class="black">8♣</span> P3:<span class="red">A♦</span> P2:<span class="red">5♥</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">8</td><td>P1:<span class="red">A♥</span> P0:<span class="red">9♥</span> P3:<span class="red">10♥</span> P2:<span class="red">8♥</span></td><td class="num">P1 (E/W)</td><td>P2:<span class="black">10♣</span> P1:<span class="red">Q♦</span> P0:<span class="black">6♣</span> P3:<span class="black">4♣</span></td><td class="num">P3 (E/W)</td></tr>
+<tr><td class="num">9</td><td>P1:<span class="red">2♥</span> P0:<span class="red">Q♥</span> P3:<span class="red">A♦</span> P2:<span class="red">J♥</span></td><td class="num">P3 (E/W)</td><td>P3:<span class="black">2♣</span> P2:<span class="black">7♣</span> P1:<span class="black">5♠</span> P0:<span class="red">8♦</span></td><td class="num">P3 (E/W)</td></tr>
+<tr class="diff"><td class="num">10</td><td>P3:<span class="black">4♣</span> P2:<span class="black">10♣</span> P1:<span class="red">5♦</span> P0:<span class="black">9♣</span></td><td class="num">P1 (E/W)</td><td>P3:<span class="red">K♦</span> P2:<span class="red">10♦</span> P1:<span class="red">5♦</span> P0:<span class="red">3♦</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">11</td><td>P1:<span class="red">7♥</span> P0:<span class="black">10♠</span> P3:<span class="black">J♠</span> P2:<span class="red">K♥</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="black">7♠</span> P3:<span class="red">9♦</span> P2:<span class="red">6♦</span> P1:<span class="black">4♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">12</td><td>P2:<span class="black">Q♣</span> P1:<span class="black">9♠</span> P0:<span class="black">Q♠</span> P3:<span class="black">J♣</span></td><td class="num">P2 (S/N)</td><td>P1:<span class="red">2♦</span> P0:<span class="black">6♠</span> P3:<span class="red">4♦</span> P2:<span class="black">3♣</span></td><td class="num">P1 (E/W)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Result</h4>
+  <ul>
+    <li><strong>Baseline:</strong> <span class="tag made">made</span> — declarer team books 11/10 (contract made)</li>
+    <li><strong>Enabled:</strong> <span class="tag failed">failed</span> — declarer team books 8/10</li>
+  </ul>
+</section>
+
+<section class="case-study">
+  <h3>Case 7: Reverse case: bid 3 firing HELPED — without bid 3, the team failed.</h3>
+  <p><strong>Deck:</strong> <code>iOkAgUjLVdtcSnQrZEIfsMezWPlCHGDayxXpumqNJRBovhwKFYbT</code>
+    &nbsp;<a href="http://localhost:3000/#iOkAgUjLVdtcSnQrZEIfsMezWPlCHGDayxXpumqNJRBovhwKFYbT" target="_blank">[play]</a></p>
+
+  <h4>Hands</h4>
+  <table class="hands-table">
+    <thead><tr><th>Seat</th><th>Hand</th><th>hp(up)</th><th>hp(down)</th></tr></thead>
+    <tbody>
+      <tr><td>P0 (You, S)</td><td><span class="hand-line"><span class="black">♠Q986</span> &nbsp; <span class="red">♥97</span> &nbsp; <span class="red">♦K1096</span> &nbsp; <span class="black">♣108</span></span></td><td class="num">5</td><td class="num">0</td></tr>
+      <tr><td>P1 (East)</td><td><span class="hand-line"><span class="black">♠AJ</span> &nbsp; <span class="red">♥K84</span> &nbsp; <span class="red">♦8532</span> &nbsp; <span class="black">♣K75</span></span></td><td class="num">11</td><td class="num">10</td></tr>
+      <tr><td>P2 (North)</td><td><span class="hand-line"><span class="black">♠1074</span> &nbsp; <span class="red">♥QJ105</span> &nbsp; <span class="red">♦J4</span> &nbsp; <span class="black">♣942</span></span></td><td class="num">4</td><td class="num">6</td></tr>
+      <tr><td>P3 (West)</td><td><span class="hand-line"><span class="black">♠K532</span> &nbsp; <span class="red">♥A63</span> &nbsp; <span class="red">♦A</span> &nbsp; <span class="black">♣AQJ3</span></span></td><td class="num">18</td><td class="num">21</td></tr>
+      <tr><td>Kitty</td><td><span class="hand-line"><span class="red">♥2</span> &nbsp; <span class="red">♦Q7</span> &nbsp; <span class="black">♣6</span></span></td><td colspan="2"></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Bidding</h4>
+  <table>
+    <thead><tr><th>Strategy</th><th>Bidding sequence</th><th>Winner</th><th>Trump</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Baseline (bid3 disabled)</strong></td><td><span class="bid-cell ">P3: bid 2</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P1 @ 4</td><td>diamonds uptown</td></tr>
+      <tr><td><strong>Enabled (bid3=17)</strong></td><td><span class="bid-cell bid3-highlight">P3: bid 3</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P1 @ 4</td><td>diamonds downtown-noaces</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Play (trick-by-trick)</h4>
+  <table class="tricks-table">
+    <thead>
+      <tr>
+        <th rowspan="2">#</th>
+        <th colspan="2">Baseline (bid3 disabled)</th>
+        <th colspan="2">Enabled (bid3=17)</th>
+      </tr>
+      <tr>
+        <th>Plays</th><th>Winner</th>
+        <th>Plays</th><th>Winner</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr class="diff"><td class="num">1</td><td>P1:<span class="red">Q♦</span> P0:<span class="red">K♦</span> P3:<span class="red">A♦</span> P2:<span class="red">4♦</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">2♦</span> P0:<span class="red">K♦</span> P3:<span class="red">A♦</span> P2:<span class="red">J♦</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">2</td><td>P3:<span class="red">A♥</span> P2:<span class="red">5♥</span> P1:<span class="red">2♥</span> P0:<span class="red">7♥</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">3♦</span> P0:<span class="red">10♦</span> P3:<span class="black">K♠</span> P2:<span class="red">4♦</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">3</td><td>P3:<span class="black">A♣</span> P2:<span class="black">2♣</span> P1:<span class="black">5♣</span> P0:<span class="black">8♣</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">5♦</span> P0:<span class="red">9♦</span> P3:<span class="red">A♥</span> P2:<span class="red">Q♥</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">4</td><td>P3:<span class="black">2♠</span> P2:<span class="black">4♠</span> P1:<span class="red">2♦</span> P0:<span class="black">6♠</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="red">7♦</span> P0:<span class="red">6♦</span> P3:<span class="black">A♣</span> P2:<span class="red">J♥</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">5</td><td>P1:<span class="red">8♦</span> P0:<span class="red">9♦</span> P3:<span class="black">3♠</span> P2:<span class="red">J♦</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="red">9♥</span> P3:<span class="red">6♥</span> P2:<span class="red">5♥</span> P1:<span class="red">2♥</span></td><td class="num">P1 (E/W)</td></tr>
+<tr><td class="num">6</td><td>P2:<span class="black">4♣</span> P1:<span class="black">7♣</span> P0:<span class="black">10♣</span> P3:<span class="black">J♣</span></td><td class="num">P3 (E/W)</td><td>P1:<span class="red">K♥</span> P0:<span class="red">7♥</span> P3:<span class="red">3♥</span> P2:<span class="red">10♥</span></td><td class="num">P3 (E/W)</td></tr>
+<tr><td class="num">7</td><td>P3:<span class="black">5♠</span> P2:<span class="black">7♠</span> P1:<span class="red">3♦</span> P0:<span class="black">8♠</span></td><td class="num">P1 (E/W)</td><td>P3:<span class="black">3♠</span> P2:<span class="black">10♠</span> P1:<span class="red">Q♦</span> P0:<span class="black">Q♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">8</td><td>P1:<span class="red">7♦</span> P0:<span class="red">10♦</span> P3:<span class="red">3♥</span> P2:<span class="black">9♣</span></td><td class="num">P0 (S/N)</td><td>P1:<span class="black">K♣</span> P0:<span class="black">10♣</span> P3:<span class="black">3♣</span> P2:<span class="black">2♣</span></td><td class="num">P2 (S/N)</td></tr>
+<tr class="diff"><td class="num">9</td><td>P0:<span class="black">9♠</span> P3:<span class="black">K♠</span> P2:<span class="black">10♠</span> P1:<span class="red">5♦</span></td><td class="num">P1 (E/W)</td><td>P2:<span class="black">4♣</span> P1:<span class="black">7♣</span> P0:<span class="black">8♣</span> P3:<span class="black">Q♣</span></td><td class="num">P2 (S/N)</td></tr>
+<tr><td class="num">10</td><td>P1:<span class="red">K♥</span> P0:<span class="red">9♥</span> P3:<span class="red">6♥</span> P2:<span class="red">10♥</span></td><td class="num">P1 (E/W)</td><td>P2:<span class="black">9♣</span> P1:<span class="black">6♣</span> P0:<span class="black">9♠</span> P3:<span class="black">J♣</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">11</td><td>P1:<span class="black">K♣</span> P0:<span class="red">6♦</span> P3:<span class="black">3♣</span> P2:<span class="red">J♥</span></td><td class="num">P0 (S/N)</td><td>P1:<span class="red">8♦</span> P0:<span class="black">8♠</span> P3:<span class="black">5♠</span> P2:<span class="black">7♠</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">12</td><td>P0:<span class="black">Q♠</span> P3:<span class="black">Q♣</span> P2:<span class="red">Q♥</span> P1:<span class="red">8♥</span></td><td class="num">P0 (S/N)</td><td>P1:<span class="black">5♣</span> P0:<span class="black">6♠</span> P3:<span class="black">2♠</span> P2:<span class="black">4♠</span></td><td class="num">P1 (E/W)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Result</h4>
+  <ul>
+    <li><strong>Baseline:</strong> <span class="tag failed">failed</span> — declarer team books 9/10 (short by 1)</li>
+    <li><strong>Enabled:</strong> <span class="tag made">made</span> — declarer team books 10/10</li>
+  </ul>
+</section>
+
+<section class="case-study">
+  <h3>Case 8: Reverse case: bid 3 firing HELPED — without bid 3, the team failed.</h3>
+  <p><strong>Deck:</strong> <code>GiojFLlEaWVXMJAHfINQqYubhKOPckwytxRzCpSUTdnserZDgmvB</code>
+    &nbsp;<a href="http://localhost:3000/#GiojFLlEaWVXMJAHfINQqYubhKOPckwytxRzCpSUTdnserZDgmvB" target="_blank">[play]</a></p>
+
+  <h4>Hands</h4>
+  <table class="hands-table">
+    <thead><tr><th>Seat</th><th>Hand</th><th>hp(up)</th><th>hp(down)</th></tr></thead>
+    <tbody>
+      <tr><td>P0 (You, S)</td><td><span class="hand-line"><span class="black">♠74</span> &nbsp; <span class="red">♥A8653</span> &nbsp; <span class="red">♦7</span> &nbsp; <span class="black">♣K763</span></span></td><td class="num">7</td><td class="num">9</td></tr>
+      <tr><td>P1 (East)</td><td><span class="hand-line"><span class="black">♠J53</span> &nbsp; <span class="red">♥J94</span> &nbsp; <span class="red">♦Q10</span> &nbsp; <span class="black">♣QJ109</span></span></td><td class="num">7</td><td class="num">3</td></tr>
+      <tr><td>P2 (North)</td><td><span class="hand-line"><span class="black">♠A1082</span> &nbsp; <span class="red">♥Q</span> &nbsp; <span class="red">♦AK9652</span> &nbsp; <span class="black">♣A</span></span></td><td class="num">17</td><td class="num">18</td></tr>
+      <tr><td>P3 (West)</td><td><span class="hand-line"><span class="black">♠KQ6</span> &nbsp; <span class="red">♥102</span> &nbsp; <span class="red">♦J843</span> &nbsp; <span class="black">♣854</span></span></td><td class="num">6</td><td class="num">7</td></tr>
+      <tr><td>Kitty</td><td><span class="hand-line"><span class="black">♠9</span> &nbsp; <span class="red">♥K7</span> &nbsp; <span class="black">♣2</span></span></td><td colspan="2"></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Bidding</h4>
+  <table>
+    <thead><tr><th>Strategy</th><th>Bidding sequence</th><th>Winner</th><th>Trump</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Baseline (bid3 disabled)</strong></td><td><span class="bid-cell ">P3: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P2: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: pass</span></td><td>P2 @ 4</td><td>diamonds uptown</td></tr>
+      <tr><td><strong>Enabled (bid3=17)</strong></td><td><span class="bid-cell ">P3: pass</span> <span class="bid-arrow">→</span> <span class="bid-cell bid3-highlight">P2: bid 3</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P1: bid 4</span> <span class="bid-arrow">→</span> <span class="bid-cell ">P0: bid 4</span></td><td>P0 @ 4</td><td>hearts downtown-noaces</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Play (trick-by-trick)</h4>
+  <table class="tricks-table">
+    <thead>
+      <tr>
+        <th rowspan="2">#</th>
+        <th colspan="2">Baseline (bid3 disabled)</th>
+        <th colspan="2">Enabled (bid3=17)</th>
+      </tr>
+      <tr>
+        <th>Plays</th><th>Winner</th>
+        <th>Plays</th><th>Winner</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr class="diff"><td class="num">1</td><td>P2:<span class="red">A♦</span> P1:<span class="red">10♦</span> P0:<span class="red">7♦</span> P3:<span class="red">3♦</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="red">3♥</span> P3:<span class="red">2♥</span> P2:<span class="red">Q♥</span> P1:<span class="red">J♥</span></td><td class="num">P3 (E/W)</td></tr>
+<tr class="diff"><td class="num">2</td><td>P2:<span class="red">K♦</span> P1:<span class="red">Q♦</span> P0:<span class="red">3♥</span> P3:<span class="red">4♦</span></td><td class="num">P2 (S/N)</td><td>P3:<span class="black">K♠</span> P2:<span class="black">10♠</span> P1:<span class="black">5♠</span> P0:<span class="black">4♠</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">3</td><td>P2:<span class="red">9♦</span> P1:<span class="black">3♠</span> P0:<span class="black">3♣</span> P3:<span class="red">J♦</span></td><td class="num">P3 (E/W)</td><td>P0:<span class="red">5♥</span> P3:<span class="red">10♥</span> P2:<span class="black">A♠</span> P1:<span class="red">4♥</span></td><td class="num">P1 (E/W)</td></tr>
+<tr class="diff"><td class="num">4</td><td>P3:<span class="black">6♠</span> P2:<span class="black">8♠</span> P1:<span class="black">J♠</span> P0:<span class="black">4♠</span></td><td class="num">P1 (E/W)</td><td>P1:<span class="black">Q♣</span> P0:<span class="black">2♣</span> P3:<span class="black">8♣</span> P2:<span class="black">A♣</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">5</td><td>P1:<span class="red">4♥</span> P0:<span class="red">5♥</span> P3:<span class="red">10♥</span> P2:<span class="red">Q♥</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="red">6♥</span> P3:<span class="black">Q♠</span> P2:<span class="red">A♦</span> P1:<span class="red">9♥</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">6</td><td>P2:<span class="red">6♦</span> P1:<span class="black">5♠</span> P0:<span class="red">6♥</span> P3:<span class="red">8♦</span></td><td class="num">P3 (E/W)</td><td>P0:<span class="black">9♠</span> P3:<span class="black">6♠</span> P2:<span class="black">2♠</span> P1:<span class="black">J♠</span></td><td class="num">P2 (S/N)</td></tr>
+<tr><td class="num">7</td><td>P3:<span class="black">Q♠</span> P2:<span class="black">A♠</span> P1:<span class="red">9♥</span> P0:<span class="black">7♠</span></td><td class="num">P2 (S/N)</td><td>P2:<span class="red">2♦</span> P1:<span class="red">Q♦</span> P0:<span class="black">K♣</span> P3:<span class="red">J♦</span></td><td class="num">P2 (S/N)</td></tr>
+<tr><td class="num">8</td><td>P2:<span class="red">K♥</span> P1:<span class="red">J♥</span> P0:<span class="red">A♥</span> P3:<span class="red">2♥</span></td><td class="num">P0 (S/N)</td><td>P2:<span class="red">K♦</span> P1:<span class="red">10♦</span> P0:<span class="red">A♥</span> P3:<span class="red">8♦</span></td><td class="num">P0 (S/N)</td></tr>
+<tr><td class="num">9</td><td>P0:<span class="red">8♥</span> P3:<span class="black">4♣</span> P2:<span class="black">9♠</span> P1:<span class="black">9♣</span></td><td class="num">P0 (S/N)</td><td>P0:<span class="red">7♥</span> P3:<span class="black">5♣</span> P2:<span class="red">9♦</span> P1:<span class="black">J♣</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">10</td><td>P0:<span class="black">6♣</span> P3:<span class="black">8♣</span> P2:<span class="red">2♦</span> P1:<span class="black">10♣</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="red">8♥</span> P3:<span class="black">4♣</span> P2:<span class="black">8♠</span> P1:<span class="black">10♣</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">11</td><td>P2:<span class="red">5♦</span> P1:<span class="black">J♣</span> P0:<span class="black">7♣</span> P3:<span class="black">5♣</span></td><td class="num">P2 (S/N)</td><td>P0:<span class="red">K♥</span> P3:<span class="red">4♦</span> P2:<span class="red">6♦</span> P1:<span class="black">9♣</span></td><td class="num">P0 (S/N)</td></tr>
+<tr class="diff"><td class="num">12</td><td>P2:<span class="black">10♠</span> P1:<span class="black">Q♣</span> P0:<span class="black">K♣</span> P3:<span class="black">K♠</span></td><td class="num">P3 (E/W)</td><td>P0:<span class="black">7♠</span> P3:<span class="red">3♦</span> P2:<span class="red">5♦</span> P1:<span class="black">3♠</span></td><td class="num">P1 (E/W)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Result</h4>
+  <ul>
+    <li><strong>Baseline:</strong> <span class="tag failed">failed</span> — declarer team books 9/10 (short by 1)</li>
+    <li><strong>Enabled:</strong> <span class="tag made">made</span> — declarer team books 10/10</li>
+  </ul>
+</section>
+</section>
+
+<section>
+  <h2>Summary of the case studies</h2>
+  <p>
+    The pattern visible in the hand-by-hand comparisons matches the structural prediction:
+    when bid 3 fires, the receiver's trump-selection falls through to own-hand logic and picks
+    a direction that ignores the signaler's strength. Disabling bid 3 forces the same
+    strong-hand player to fire bid 2 (or bid 1), and the receiver's <em>interpretation-laden</em>
+    rules for those signals produce a better-aligned trump direction.
+  </p>
+  <p>
+    It's a small effect in absolute terms — only 0.73% of hands fire bid 3 at sig=17, so the
+    per-deck mechanism only matters on a small fraction of deals. But when it does matter, it
+    matters enough to move the aggregate win rate by ~0.6pp.
+  </p>
+</section>
+
+<section>
+  <h2>Why not just add a <code>partner_bid == 3</code> trump rule?</h2>
+  <p>
+    A natural follow-up: <em>can we SALVAGE bid 3 by adding an interpretation rule?</em> For
+    example:
+  </p>
+  <pre>when partner_bid == 3 and high_count() + 2 > low_count():
+  choose suit: best_suit(uptown) direction: uptown
+when partner_bid == 3 and ace_count() >= 2:
+  choose suit: best_suit(downtown) direction: downtown
+when partner_bid == 3:
+  choose suit: best_suit(downtown-noaces) direction: downtown-noaces</pre>
+  <p>
+    This is a reasonable next experiment and would be easy to add to the
+    <code>FamilyPoweredParams</code> template (new thresholds for how the receiver interprets
+    bid 3). The current sweep result only says <em>as currently interpreted</em>, bid 3 hurts.
+    It doesn't rule out that a well-crafted receiver-side rule could make bid 3 useful.
+  </p>
+</section>
+
+<section>
+  <h2>Reproduce</h2>
+  <pre>node scripts/bid3-analysis.js
+# with more decks: DECKS=10000 node scripts/bid3-analysis.js</pre>
+</section>
+
+</main>
+<footer>
+  Generated from <code>scripts/bid3-analysis.js</code>. Source:
+  <code>src/simulation/runBid3Analysis.ts</code>.
+</footer>
+</body>
+</html>

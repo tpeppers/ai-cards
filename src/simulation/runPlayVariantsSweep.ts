@@ -262,6 +262,7 @@ function navBar(active: string): string {
     ['playable.html', 'Playable Hands'],
     ['addendum.html', 'Addendum'],
     ['variants.html', 'Variants'],
+    ['bid3-analysis.html', 'Bid 3 Deep-dive'],
   ];
   return `<nav>${pages.map(([href, label]) => {
     const cls = href === active ? ' class="active"' : '';

@@ -584,6 +584,7 @@ function navBar(active: string): string {
     ['playable.html', 'Playable Hands'],
     ['addendum.html', 'Addendum'],
     ['variants.html', 'Variants'],
+    ['bid3-analysis.html', 'Bid 3 Deep-dive'],
   ];
   return `<nav>${pages.map(([href, label]) => {
     const cls = href === active ? ' class="active"' : '';
@@ -913,6 +914,7 @@ function renderIndex(
     <li><strong><a href="playable.html">Playable Hands</a></strong> — Fifteen seed-searched divergent hands with <code>localhost:3000</code> links to play in the app.</li>
     <li><strong><a href="addendum.html">Addendum</a></strong> — Opponent-signal defense (null result) and bid-3 ablation (big win: disable it).</li>
     <li><strong><a href="variants.html">Variants</a></strong> — Targeted single-rule modifications to bidding, play (leading/following/void), and discard sections.</li>
+    <li><strong><a href="bid3-analysis.html">Bid 3 Deep-dive</a></strong> — Why disabling bid 3 helps, with side-by-side trick-by-trick case studies on specific decks.</li>
   </ul>
 </section>
 
