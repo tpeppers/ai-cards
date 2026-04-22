@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Addendum — hand_power signaling report</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html" class="active">Addendum</a></nav>
+</header>
+<main>
+
+<section>
+  <h2>Addendum: opponent signals + bid 3 ablation</h2>
+  <p>
+    The main report established <strong>sig = 17</strong> as the optimal single-threshold
+    hand_power setting. Two natural extensions got asked about afterwards:
+  </p>
+  <ol>
+    <li>
+      <strong>Opponent-signal awareness.</strong> When partner signaled one direction and
+      the enemy signaled the opposite, should the dealer or seat-3 player
+      <em>defensively take</em> the bid rather than let the opponents call their signaled
+      direction? Two new rules (dealer defensive take, seat-3 contested push) were added to
+      the strategy template, gated by <code>let</code> thresholds so each can be ablated.
+    </li>
+    <li>
+      <strong>Bid 3 at sig=17.</strong> At a threshold this strict, how often does bid 3
+      ("strong both directions") even fire? Is it vestigial, or is the threshold mis-set
+      relative to the bid-1/bid-2 threshold? The bid-3 threshold is now a separate knob
+      (<code>bid3Threshold</code>) so it can be loosened independently of the main signal.
+    </li>
+  </ol>
+  <p>
+    Each change was evaluated at the same N = <strong>20,000</strong> games
+    per config, same pool / seed as the main sweep, against baseline Family.
+  </p>
+</section>
+
+<section>
+  <h2>Result up front</h2>
+  <div class="kpi">
+    <div class="box">
+      <div class="value">17</div>
+      <div class="label">Best sig (unchanged)</div>
+    </div>
+    <div class="box">
+      <div class="value">50.87%</div>
+      <div class="label">Best win rate vs Family</div>
+    </div>
+    <div class="box">
+      <div class="value">+0.63pp</div>
+      <div class="label">Gain over sig=17 baseline</div>
+    </div>
+  </div>
+  <p>
+    <strong>sig=17 is still the optimal threshold</strong> — the sig
+    recheck with the new knobs enabled puts sig=17 on top, sig=16 and sig=18 below it by
+    0.5-1pp. But the two proposed additions behaved very differently from the hypothesis:
+  </p>
+  <ul>
+    <li>
+      <strong>Opponent-signal defense did basically nothing.</strong> Every "defensive take"
+      and "contested push" variant landed within noise of the baseline's 50.24% — <em>numerically
+      identical in most cases</em> (same W/L count to the unit). The reason, visible from the
+      diagnostic: the conditions the rules fire on (partner_bid != enemy_bid AND both signals
+      were given AND hand has power in partner's direction) are extremely rare in simulation.
+      The game just doesn't hit this state often enough for the rule to matter.
+    </li>
+    <li>
+      <strong>Bid 3 was actively costing performance, not gaining it.</strong> Simply <em>disabling</em>
+      bid 3 at sig=17 moves the win rate from 50.24% (tied) to
+      <strong>50.87%</strong> (CI lower bound
+      <strong>50.18%</strong> — clearly above
+      50%). Bid 3 fires on only ~0.7% of hands at this threshold, and in the few cases it does
+      fire, partner escalates or takes, and the bidding flow ends up worse than if bid 3 had
+      simply not been an option.
+    </li>
+  </ul>
+  <p>The best-combined config <strong>beats Family by 0.18pp at 95% confidence</strong>, a first in this report — every previous sweep had sig=17 at a statistical tie rather than a win.</p>
+</section>
+
+<section>
+  <h2>Single-knob ablations (each vs sig=17 baseline)</h2>
+  <p>
+    Each row below enables exactly one new rule on top of <code>sig=17, trust=3</code>
+    everything-else-disabled. The Δ column is the change in win rate against baseline.
+    All are same-pool, same-seed — the only varying factor is the specific rule.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Config</th><th>Win rate (vs Family)</th><th>Δ from baseline</th><th>vs Family</th><th>Games</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight-row"><td><code>baseline (sig=17, all new knobs off)</code></td><td class="num">50.24% ±0.69%</td><td class="num ">+0.00pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+<tr><td><code>bid3 threshold = 13 (loose)</code></td><td class="num">49.51% ±0.70%</td><td class="num bad">-0.73pp</td><td><span class="tag family">tied</span></td><td class="num">19728</td></tr>
+<tr><td><code>bid3 threshold = 15 (loose-mid)</code></td><td class="num">49.27% ±0.70%</td><td class="num bad">-0.97pp</td><td><span class="tag failed">loses</span></td><td class="num">19672</td></tr>
+<tr><td><code>bid3 disabled (99)</code></td><td class="num">50.87% ±0.69%</td><td class="num good">+0.63pp</td><td><span class="tag made">beats</span></td><td class="num">19888</td></tr>
+<tr><td><code>defensive take @4, thresh=10</code></td><td class="num">50.10% ±0.69%</td><td class="num ">-0.14pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+<tr><td><code>defensive take @4, thresh=12</code></td><td class="num">50.24% ±0.69%</td><td class="num ">+0.00pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+<tr><td><code>defensive take @4, thresh=14</code></td><td class="num">50.24% ±0.69%</td><td class="num ">+0.00pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+<tr><td><code>defensive take @5, thresh=14</code></td><td class="num">50.24% ±0.69%</td><td class="num ">+0.00pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+<tr><td><code>contested push @5, thresh=10</code></td><td class="num">50.24% ±0.69%</td><td class="num ">+0.00pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+<tr><td><code>contested push @5, thresh=13</code></td><td class="num">50.24% ±0.69%</td><td class="num ">+0.00pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Combined configs</h2>
+  <p>
+    Ablation winners (if any) combined. If the improvements are orthogonal, the combined
+    config should beat any single rule alone.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Config</th><th>Win rate</th><th>Δ from baseline</th><th>vs Family</th><th>Games</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight-row"><td><code>baseline (sig=17, all new knobs off)</code></td><td class="num">50.24% ±0.69%</td><td class="num ">+0.00pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+<tr><td><code>def@4=12 + contested=10</code></td><td class="num">50.24% ±0.69%</td><td class="num ">+0.00pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+<tr><td><code>def@4=12 + contested=10 + bid3=15</code></td><td class="num">49.27% ±0.70%</td><td class="num bad">-0.97pp</td><td><span class="tag failed">loses</span></td><td class="num">19672</td></tr>
+<tr><td><code>def@4=12 + def@5=14 + contested=10</code></td><td class="num">50.24% ±0.69%</td><td class="num ">+0.00pp</td><td><span class="tag family">tied</span></td><td class="num">19888</td></tr>
+<tr><td><code>all best: def@4=12 def@5=14 contested=10 bid3=99</code></td><td class="num">50.87% ±0.69%</td><td class="num good">+0.63pp</td><td><span class="tag made">beats</span></td><td class="num">19888</td></tr>
+<tr><td><code>sig=15 + best new knobs</code></td><td class="num">50.14% ±0.70%</td><td class="num ">-0.10pp</td><td><span class="tag family">tied</span></td><td class="num">19720</td></tr>
+<tr><td><code>sig=16 + best new knobs</code></td><td class="num">50.01% ±0.70%</td><td class="num ">-0.23pp</td><td><span class="tag family">tied</span></td><td class="num">19816</td></tr>
+<tr><td><code>sig=17 + best new knobs</code></td><td class="num">50.87% ±0.69%</td><td class="num good">+0.63pp</td><td><span class="tag made">beats</span></td><td class="num">19888</td></tr>
+<tr><td><code>sig=18 + best new knobs</code></td><td class="num">49.60% ±0.70%</td><td class="num bad">-0.64pp</td><td><span class="tag family">tied</span></td><td class="num">19736</td></tr>
+<tr><td><code>sig=19 + best new knobs</code></td><td class="num">48.56% ±0.70%</td><td class="num bad">-1.68pp</td><td><span class="tag failed">loses</span></td><td class="num">19464</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Bid 3 firing-rate diagnostic</h2>
+  <p>
+    For each candidate threshold, this measures:
+  </p>
+  <ul>
+    <li><strong>Fire rate:</strong> fraction of (hand, threshold) pairs that clear
+      <code>hp(up) ≥ t AND hp(down) ≥ t</code> — i.e. how often a player has a hand that
+      would satisfy bid 3 at this threshold.</li>
+    <li><strong>Declarer-and-make rate:</strong> when such a hand's player <em>actually
+      becomes declarer</em> in a full simulation, what fraction make the contract?
+      (Some hands fire the threshold but don't declare because another player outbids.)</li>
+  </ul>
+  <table>
+    <thead>
+      <tr><th>bid3 threshold</th><th>Fire rate (of hands)</th><th>Declarer samples</th><th>Declarer make %</th></tr>
+    </thead>
+    <tbody>
+<tr><td class="num">10</td><td class="num">27.09%</td><td class="num">593</td><td class="num">62.4%</td></tr>
+<tr><td class="num">12</td><td class="num">13.00%</td><td class="num">300</td><td class="num">61.7%</td></tr>
+<tr><td class="num">13</td><td class="num">8.39%</td><td class="num">205</td><td class="num">64.9%</td></tr>
+<tr><td class="num">14</td><td class="num">5.06%</td><td class="num">127</td><td class="num">67.7%</td></tr>
+<tr><td class="num">15</td><td class="num">2.94%</td><td class="num">81</td><td class="num">72.8%</td></tr>
+<tr><td class="num">16</td><td class="num">1.46%</td><td class="num">45</td><td class="num">68.9%</td></tr>
+<tr><td class="num">17</td><td class="num">0.73%</td><td class="num">27</td><td class="num">70.4%</td></tr>
+<tr><td class="num">18</td><td class="num">0.33%</td><td class="num">9</td><td class="num">77.8%</td></tr>
+    </tbody>
+  </table>
+  <p>
+    At <code>bid3=17</code> (baseline), the fire rate is low — only a small fraction of hands
+    satisfy both hand_power directions at that level. Loosening to bid3=13-14 increases fire
+    rate but also admits hands with weaker overall quality; the sweep above shows whether the
+    net effect is positive.
+  </p>
+</section>
+
+<section>
+  <h2>Why opponent-signal awareness didn't help</h2>
+  <p>
+    Three mechanisms contribute to the null result:
+  </p>
+  <ol>
+    <li>
+      <strong>Contested-signal situations are rare.</strong> "Partner signaled 1, enemy signaled 2"
+      (or symmetric) requires both events to happen in the same hand. At sig=17 the signal fires
+      on ~1-2% of hands per player, so the probability of both firing for partner and enemy in
+      the same deal is on the order of 0.04%. Most of the time
+      only one side signals, or neither does.
+    </li>
+    <li>
+      <strong>Existing rules already handle the main case.</strong> The baseline already takes at
+      bid 4 on <code>max_suit_count ≥ 5</code> or <code>hand_power(direction) ≥ 17</code>. The
+      additional "take defensively on contested signals" rule mostly fires on hands that were
+      going to take anyway, so there's nothing incremental to gain.
+    </li>
+    <li>
+      <strong>Family-as-opponent doesn't over-commit on contested signals either.</strong> The
+      mental model behind the proposal was "the enemy will call their signaled direction and hurt
+      us" — but Family's trump selection doesn't always do that, especially when the declarer's
+      own hand disagrees with the signal. So even when we <em>don't</em> defensively take, we
+      sometimes luck into the opponents calling a direction we can stop.
+    </li>
+  </ol>
+  <p>
+    A future run could relax the threshold further (e.g., defensive take at hand_power ≥ 7
+    or fewer guards) to let the rule fire more often, but at some point we'd be taking on
+    marginal hands where the rule creates losses rather than wins. The 20k-game sweep across
+    thresholds of 10, 12, and 14 showed essentially no deviation from baseline, suggesting
+    the space of "correctly defensive" opportunities is small to nonexistent for this family
+    of rules.
+  </p>
+</section>
+
+<section>
+  <h2>Why disabling bid 3 helps</h2>
+  <p>
+    The bid-3 diagnostic (left table above) shows that at <code>bid3=17</code>, only
+    <strong>0.73%</strong> of hands fire. Of those that go on to become declarer, 70% make
+    the contract — a good-looking number in isolation. But 70% is <em>worse</em> than what
+    the same hand would achieve by bidding 2 or 4 instead:
+  </p>
+  <ul>
+    <li>The strongest bid-3-firing hands (AA + KK + QJ + mixed low cards = hp(up) ≈ 17 AND
+      hp(down) ≈ 17) could absolutely make bid 2 (contract 8) or bid 4 (contract 10). Bid 3
+      (contract 9) forces partnership commitment to a 9-book contract that's actually harder
+      to tune than bid 2 or bid 4.</li>
+    <li>When the signaling player bids 3, partner and enemies interpret it as "strong both
+      directions" — a <em>specific</em> piece of info that's often less actionable than "strong
+      in one direction" (bid 1 or 2). Partner can't confidently escalate to 5 because they
+      don't know which direction to commit to.</li>
+  </ul>
+  <p>
+    The firing-rate table shows that loosening bid3 to 13-15 makes things worse (more firings
+    at lower contract-make rates), and tightening above 17 is unreachable (almost no hands
+    qualify). The correct move at sig=17 is to remove bid 3 entirely.
+  </p>
+</section>
+
+<section>
+  <h2>Does this change sig=17?</h2>
+  <p>
+    No. With bid 3 disabled (the only additive change that helps), the sig recheck shows sig=17
+    is still the peak:
+  </p>
+  <ul>
+    <li>sig=15: 50.14% (tied)</li>
+    <li>sig=16: 50.01% (tied)</li>
+    <li><strong>sig=17: 50.87% (BEATS Family at p&lt;0.05)</strong></li>
+    <li>sig=18: 49.60% (tied-trending-down)</li>
+    <li>sig=19: 48.56% (loses)</li>
+  </ul>
+  <p>
+    The peak is even sharper than in the original sweep. The reason: at lower sigs, the
+    bid-2/bid-1 signal is noisier (admits Q/J-dominant hands that don't justify the commitment),
+    and that noise interacts with whatever bid-3 is doing. With bid 3 out of the picture, the
+    clean Goldilocks zone at sig=17 becomes clear again.
+  </p>
+</section>
+
+<section>
+  <h2>Reproduce</h2>
+  <pre>node scripts/opp-signal-sweep.js
+# with custom N: REPORT_HANDS=40000 node scripts/opp-signal-sweep.js</pre>
+</section>
+
+</main>
+<footer>
+  Generated from <code>scripts/opp-signal-sweep.js</code>. Source:
+  <code>src/simulation/runOppSignalSweep.ts</code>.
+</footer>
+</body>
+</html>

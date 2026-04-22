@@ -1,0 +1,436 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "timestamp": "2026-04-22T03:46:45.928Z"
+  },
+  "baseline": {
+    "label": "baseline (sig=17, all new knobs off)",
+    "params": {
+      "sigThreshold": 17,
+      "trustBonus": 3,
+      "oppPassThreshold": 99,
+      "dealerLongSuit": 5,
+      "minStoppers": 0,
+      "bid3Threshold": 17,
+      "defensiveTakeThreshold": 99,
+      "defensiveTakeAt5Threshold": 99,
+      "contestedPushThreshold": 99
+    },
+    "wins": 9992,
+    "losses": 9896,
+    "games": 19888,
+    "winRate": 0.502413515687852,
+    "ci95": 0.0069490503818606785
+  },
+  "ablations": [
+    {
+      "label": "bid3 threshold = 13 (loose)",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 13,
+        "defensiveTakeThreshold": 99,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 99
+      },
+      "wins": 9768,
+      "losses": 9960,
+      "games": 19728,
+      "winRate": 0.4951338199513382,
+      "ci95": 0.006976923758173689
+    },
+    {
+      "label": "bid3 threshold = 15 (loose-mid)",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 15,
+        "defensiveTakeThreshold": 99,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 99
+      },
+      "wins": 9692,
+      "losses": 9980,
+      "games": 19672,
+      "winRate": 0.49267995119967467,
+      "ci95": 0.006986429342131873
+    },
+    {
+      "label": "bid3 disabled (99)",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 99,
+        "defensiveTakeThreshold": 99,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 99
+      },
+      "wins": 10118,
+      "losses": 9770,
+      "games": 19888,
+      "winRate": 0.5087489943684634,
+      "ci95": 0.006948067417912784
+    },
+    {
+      "label": "defensive take @4, thresh=10",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 17,
+        "defensiveTakeThreshold": 10,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 99
+      },
+      "wins": 9964,
+      "losses": 9924,
+      "games": 19888,
+      "winRate": 0.5010056315366049,
+      "ci95": 0.006949117285263328
+    },
+    {
+      "label": "defensive take @4, thresh=12",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 17,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 99
+      },
+      "wins": 9992,
+      "losses": 9896,
+      "games": 19888,
+      "winRate": 0.502413515687852,
+      "ci95": 0.0069490503818606785
+    },
+    {
+      "label": "defensive take @4, thresh=14",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 17,
+        "defensiveTakeThreshold": 14,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 99
+      },
+      "wins": 9992,
+      "losses": 9896,
+      "games": 19888,
+      "winRate": 0.502413515687852,
+      "ci95": 0.0069490503818606785
+    },
+    {
+      "label": "defensive take @5, thresh=14",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 17,
+        "defensiveTakeThreshold": 99,
+        "defensiveTakeAt5Threshold": 14,
+        "contestedPushThreshold": 99
+      },
+      "wins": 9992,
+      "losses": 9896,
+      "games": 19888,
+      "winRate": 0.502413515687852,
+      "ci95": 0.0069490503818606785
+    },
+    {
+      "label": "contested push @5, thresh=10",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 17,
+        "defensiveTakeThreshold": 99,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 10
+      },
+      "wins": 9992,
+      "losses": 9896,
+      "games": 19888,
+      "winRate": 0.502413515687852,
+      "ci95": 0.0069490503818606785
+    },
+    {
+      "label": "contested push @5, thresh=13",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 17,
+        "defensiveTakeThreshold": 99,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 13
+      },
+      "wins": 9992,
+      "losses": 9896,
+      "games": 19888,
+      "winRate": 0.502413515687852,
+      "ci95": 0.0069490503818606785
+    }
+  ],
+  "combos": [
+    {
+      "label": "def@4=12 + contested=10",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 17,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 10
+      },
+      "wins": 9992,
+      "losses": 9896,
+      "games": 19888,
+      "winRate": 0.502413515687852,
+      "ci95": 0.0069490503818606785
+    },
+    {
+      "label": "def@4=12 + contested=10 + bid3=15",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 15,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 99,
+        "contestedPushThreshold": 10
+      },
+      "wins": 9692,
+      "losses": 9980,
+      "games": 19672,
+      "winRate": 0.49267995119967467,
+      "ci95": 0.006986429342131873
+    },
+    {
+      "label": "def@4=12 + def@5=14 + contested=10",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 17,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 14,
+        "contestedPushThreshold": 10
+      },
+      "wins": 9992,
+      "losses": 9896,
+      "games": 19888,
+      "winRate": 0.502413515687852,
+      "ci95": 0.0069490503818606785
+    },
+    {
+      "label": "all best: def@4=12 def@5=14 contested=10 bid3=99",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 99,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 14,
+        "contestedPushThreshold": 10
+      },
+      "wins": 10118,
+      "losses": 9770,
+      "games": 19888,
+      "winRate": 0.5087489943684634,
+      "ci95": 0.006948067417912784
+    }
+  ],
+  "sigRecheck": [
+    {
+      "label": "sig=15 + best new knobs",
+      "params": {
+        "sigThreshold": 15,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 99,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 14,
+        "contestedPushThreshold": 10
+      },
+      "wins": 9888,
+      "losses": 9832,
+      "games": 19720,
+      "winRate": 0.5014198782961461,
+      "ci95": 0.006978641186914198
+    },
+    {
+      "label": "sig=16 + best new knobs",
+      "params": {
+        "sigThreshold": 16,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 99,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 14,
+        "contestedPushThreshold": 10
+      },
+      "wins": 9910,
+      "losses": 9906,
+      "games": 19816,
+      "winRate": 0.5001009285425918,
+      "ci95": 0.0069617443344178655
+    },
+    {
+      "label": "sig=17 + best new knobs",
+      "params": {
+        "sigThreshold": 17,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 99,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 14,
+        "contestedPushThreshold": 10
+      },
+      "wins": 10118,
+      "losses": 9770,
+      "games": 19888,
+      "winRate": 0.5087489943684634,
+      "ci95": 0.006948067417912784
+    },
+    {
+      "label": "sig=18 + best new knobs",
+      "params": {
+        "sigThreshold": 18,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 99,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 14,
+        "contestedPushThreshold": 10
+      },
+      "wins": 9790,
+      "losses": 9946,
+      "games": 19736,
+      "winRate": 0.4960478313741386,
+      "ci95": 0.006975622020589486
+    },
+    {
+      "label": "sig=19 + best new knobs",
+      "params": {
+        "sigThreshold": 19,
+        "trustBonus": 3,
+        "oppPassThreshold": 99,
+        "dealerLongSuit": 5,
+        "minStoppers": 0,
+        "bid3Threshold": 99,
+        "defensiveTakeThreshold": 12,
+        "defensiveTakeAt5Threshold": 14,
+        "contestedPushThreshold": 10
+      },
+      "wins": 9452,
+      "losses": 10012,
+      "games": 19464,
+      "winRate": 0.4856144677353062,
+      "ci95": 0.007021504918791787
+    }
+  ],
+  "bid3": {
+    "thresholds": [
+      10,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "fireRates": [
+      0.270875,
+      0.13,
+      0.083875,
+      0.050625,
+      0.029375,
+      0.014625,
+      0.00725,
+      0.00325
+    ],
+    "contractsMade": [
+      370,
+      185,
+      133,
+      86,
+      59,
+      31,
+      19,
+      7
+    ],
+    "contractsTotal": [
+      593,
+      300,
+      205,
+      127,
+      81,
+      45,
+      27,
+      9
+    ]
+  },
+  "bestOverall": {
+    "label": "bid3 disabled (99)",
+    "params": {
+      "sigThreshold": 17,
+      "trustBonus": 3,
+      "oppPassThreshold": 99,
+      "dealerLongSuit": 5,
+      "minStoppers": 0,
+      "bid3Threshold": 99,
+      "defensiveTakeThreshold": 99,
+      "defensiveTakeAt5Threshold": 99,
+      "contestedPushThreshold": 99
+    },
+    "wins": 10118,
+    "losses": 9770,
+    "games": 19888,
+    "winRate": 0.5087489943684634,
+    "ci95": 0.006948067417912784
+  }
+}

@@ -582,6 +582,7 @@ function navBar(active: string): string {
     ['sweep.html', 'Sweep Data'],
     ['cases.html', 'Case Studies'],
     ['playable.html', 'Playable Hands'],
+    ['addendum.html', 'Addendum'],
   ];
   return `<nav>${pages.map(([href, label]) => {
     const cls = href === active ? ' class="active"' : '';
