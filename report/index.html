@@ -8,7 +8,7 @@
 <body>
 <header>
   <h1>hand_power signaling: finding the optimal threshold</h1>
-  <nav><a href="index.html" class="active">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a><a href="variants.html">Variants</a><a href="bid3-analysis.html">Bid 3 Deep-dive</a></nav>
+  <nav><a href="index.html" class="active">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a><a href="variants.html">Variants</a><a href="bid3-analysis.html">Bid 3 Deep-dive</a><a href="aces-signal.html">Aces Signal</a></nav>
 </header>
 <main>
 
@@ -17,7 +17,7 @@
   <p>
     Starting from the <strong>Family</strong> strategy as shipped in
     <code>src/strategies/index.ts</code>, this report documents an end-to-end exploration of
-    <strong>15 distinct areas</strong> of the bidding, play, and discard
+    <strong>19 distinct areas</strong> of the bidding, play, and discard
     policy. The key question the whole project asks: can a finer-grained, number-based signaling
     primitive (<code>hand_power(direction)</code>) beat Family's integer-count rules, and what else
     is worth changing?
@@ -33,7 +33,7 @@
     <div class="box"><div class="value">17</div><div class="label">Best sig threshold</div></div>
     <div class="box"><div class="value">50.87%</div><div class="label">Best win rate vs Family</div></div>
     <div class="box"><div class="value">+0.87pp</div><div class="label">Gain over Family</div></div>
-    <div class="box"><div class="value">15</div><div class="label">Areas tested</div></div>
+    <div class="box"><div class="value">19</div><div class="label">Areas tested</div></div>
   </div>
 </section>
 
@@ -47,6 +47,7 @@
     <li><strong><a href="addendum.html">Addendum</a></strong> — Opponent-signal defense (null result) and bid-3 ablation (big win: disable it).</li>
     <li><strong><a href="variants.html">Variants</a></strong> — Targeted single-rule modifications to bidding, play (leading/following/void), and discard sections.</li>
     <li><strong><a href="bid3-analysis.html">Bid 3 Deep-dive</a></strong> — Why disabling bid 3 helps, with side-by-side trick-by-trick case studies on specific decks.</li>
+    <li><strong><a href="aces-signal.html">Aces Signal</a></strong> — Can bid 3 be resurrected by redefining it as "I have 2+ aces" with matching receiver logic?</li>
   </ul>
 </section>
 
@@ -108,14 +109,23 @@
         <td>0 beat baseline, 7 worse, 2 tied</td>
         <td>See <a href="variants.html">Variants page</a> for per-rule results.</td>
       </tr>
+      <tr>
+        <td>7</td>
+        <td>Bid 3 as "2+ aces" (re-introduction)</td>
+        <td>Bid 3 re-interpreted as <code>ace_count() >= 2</code>, placed after long-suit rules, with receiver trump rules and smart discard</td>
+        <td class="muted">0 beat baseline, 4 worse, 1 tied</td>
+        <td>See <a href="aces-signal.html">Aces Signal page</a> for full results.</td>
+      </tr>
     </tbody>
   </table>
   <details>
-    <summary>Complete list of <strong>15 areas</strong> that were examined (click to expand)</summary>
+    <summary>Complete list of <strong>19 areas</strong> that were examined (click to expand)</summary>
     <ul>
       <li>Bidding: hand_power signal threshold (sig=7-20)</li>
       <li>Bidding: min_stoppers guard (compound predicate)</li>
       <li>Bidding: bid-3 &quot;both directions&quot; rule</li>
+      <li>Bidding: bid-3 as &quot;2+ aces&quot; re-interpretation</li>
+      <li>Bidding: bid-3 placement (before vs after long-suit rules)</li>
       <li>Bidding: dealer default open bid</li>
       <li>Bidding: no-bid-5-via-length rule</li>
       <li>Bidding: seat-3 opposite-direction pass</li>
@@ -126,8 +136,10 @@
       <li>Play following: overtake threshold</li>
       <li>Play void: always-trump vs signal-first</li>
       <li>Play void: weakest vs strongest trump</li>
-      <li>Discard: suit_keepers count</li>
       <li>Trump-selection: partner-signal trust bonus</li>
+      <li>Trump-selection: partner_bid == 3 receiver rules</li>
+      <li>Discard: suit_keepers count</li>
+      <li>Discard: smart void on opposite-direction partner signal</li>
     </ul>
   </details>
 </section>

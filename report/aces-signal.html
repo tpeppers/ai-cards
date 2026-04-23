@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Aces Signal — hand_power signaling report</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a><a href="variants.html">Variants</a><a href="bid3-analysis.html">Bid 3 Deep-dive</a><a href="aces-signal.html" class="active">Aces Signal</a></nav>
+</header>
+<main>
+
+<section>
+  <h2>Bid 3 as "2+ aces" — can we resurrect bid 3 with a better interpretation?</h2>
+  <p>
+    The <a href="bid3-analysis.html">Bid 3 Deep-dive</a> ended with an obvious follow-up: since
+    bid 3 hurts partly because the receiver has no <code>partner_bid == 3</code> branch and partly
+    because it under-commits on long-suit hands, what if we <em>redefine</em> bid 3 as a
+    concrete, actionable signal ("I have 2+ aces") and add matching receiver logic? This page
+    tests that hypothesis.
+  </p>
+  <p>
+    Three changes, tested both individually and combined, starting from the proven baseline
+    (sig=17, trust=3, bid 3 disabled):
+  </p>
+  <ol>
+    <li>
+      <strong>bid3Mode = "aces":</strong> the bid-3 rule fires on <code>ace_count() &gt;= 2</code>
+      instead of compound hand_power. Placed AFTER the long-suit rules so a hand with 6+ cards in
+      a suit still gets bid 4 via length.
+    </li>
+    <li>
+      <strong>trumpBid3Aware:</strong> adds receiver-side rules to the trump section — given
+      partner has 2+ aces, prefer downtown (aces-good) when I can contribute at least one ace
+      OR create a void, fall back to uptown when I'm predominantly high.
+    </li>
+    <li>
+      <strong>smartDiscardOpposite:</strong> adds explicit <code>drop void_candidates()</code>
+      rules for the case where partner's signal is the opposite direction from the one called
+      (their low/high cards don't help in my direction, so I want to trump via a void).
+    </li>
+  </ol>
+</section>
+
+<section>
+  <h2>Sweep results (N = 20,000 games per config vs Family)</h2>
+  <div class="kpi">
+    <div class="box"><div class="value">0</div><div class="label">Variants beat baseline</div></div>
+    <div class="box"><div class="value">1</div><div class="label">Variants beat Family</div></div>
+    <div class="box"><div class="value">4</div><div class="label">Worse than baseline</div></div>
+    <div class="box"><div class="value">50.94%</div><div class="label">Best point estimate</div></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Variant key</th>
+        <th>Description</th>
+        <th>Win rate</th>
+        <th>Δ baseline</th>
+        <th>vs baseline</th>
+        <th>vs Family</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight-row">
+        <td><code>baseline</code></td>
+        <td>sig=17, bid3 disabled (proven best)</td>
+        <td class="num">50.87% ±0.69%</td>
+        <td class="num">—</td>
+        <td>—</td>
+        <td><span class="tag made">beats Family</span></td>
+      </tr>
+<tr>
+<td><code>A_aces_only</code></td>
+<td>Bid 3 = aces (no receiver changes)</td>
+<td class="num">49.16% ±0.70%</td>
+<td class="num bad">-1.71pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag failed">loses to Family</span></td>
+</tr>
+<tr>
+<td><code>B_aces_plus_trump</code></td>
+<td>Bid 3 = aces + partner_bid=3 trump rules</td>
+<td class="num">49.68% ±0.70%</td>
+<td class="num bad">-1.20pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag family">tied</span></td>
+</tr>
+<tr>
+<td><code>C_full_combo</code></td>
+<td>Bid 3 = aces + trump rules + smart discard</td>
+<td class="num">49.68% ±0.70%</td>
+<td class="num bad">-1.20pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag family">tied</span></td>
+</tr>
+<tr>
+<td><code>D_discard_only</code></td>
+<td>Smart discard alone (no bid 3 reintroduction)</td>
+<td class="num">50.94% ±0.69%</td>
+<td class="num ">+0.06pp</td>
+<td><span class="tag family">tied</span></td>
+<td><span class="tag made">beats Family</span></td>
+</tr>
+<tr>
+<td><code>E_aces_trump_no_discard</code></td>
+<td>Bid 3 = aces + smart discard, no trump rules</td>
+<td class="num">49.16% ±0.70%</td>
+<td class="num bad">-1.71pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag failed">loses to Family</span></td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Interpretation</h2>
+  
+    <p>
+      <strong>None of the variants beat the baseline at p&lt;0.05.</strong>
+      The best point estimate is <code>D_discard_only</code> at
+      <strong>50.94%</strong>, which is
+      +0.06pp above baseline on point estimate, but within CI noise.
+    </p>
+    <p>
+      The hypothesis was that a concrete "2+ aces" signal with matching receiver logic should
+      recover the information that disabling bid 3 leaves unused. At 20k games we don't see
+      an improvement — either the signal information is small (the hands that fire bid 3 were
+      already making their contracts at roughly the baseline rate anyway) or the specific
+      trump / discard rules added here aren't the right shape to extract the signal's value.
+    </p>
+  
+  <p>
+    Note that 1/6 of the configs
+    (including baseline) beat Family at 95% confidence on this seed. When evaluating the new
+    variants, the relevant comparison is vs <em>baseline</em> (not vs Family) — baseline already
+    beats Family, so a new variant has to do even better to be worth adopting.
+  </p>
+</section>
+
+<section>
+  <h2>Why these particular trump-receiver rules?</h2>
+  <p>
+    The premise of "2+ aces" is a <em>specific</em> claim about stopper count. The receiver's
+    rules try to exploit that specificity:
+  </p>
+  <ul>
+    <li>
+      <strong>I have ≥ 1 ace myself → downtown</strong>. Combined ace count ≥ 3. With 3+ aces
+      on one team, downtown-aces-good becomes very attractive: the aces always win their tricks,
+      and we want to play directions where low cards (our non-aces) are the other winners.
+    </li>
+    <li>
+      <strong>I can void a suit (min_suit_count == 0 or ≤ 2) → downtown</strong>. If partner has
+      2+ aces spread across suits, and I void a suit, I trump the voided suit while partner's
+      aces stop the others. This is the scenario the user specifically identified:
+      "<em>I can short-suit myself in one suit, because then I'll trump that suit and partner's
+      aces stop the other 3</em>".
+    </li>
+    <li>
+      <strong>I'm predominantly high → uptown</strong>. If I have few low cards and partner has
+      aces, going uptown still works — partner's aces are high cards on both directions, so
+      they're always useful.
+    </li>
+    <li>
+      <strong>Otherwise → downtown-noaces</strong>. Conservative fallback: trust partner's aces
+      to be stoppers, but don't bet on them being enough on their own for the aces-good ruleset.
+    </li>
+  </ul>
+  <p>
+    If variants don't beat baseline, one reason could be the <em>declarer</em> on bid-3 hands
+    typically has a strong hand (2+ aces) already, so they'd already make their contract under a
+    reasonable trump direction. The signal informs partner more than declarer — and partner
+    mostly reacts in seat 3 (push to 5) or as dealer (take). The current strategy doesn't use
+    the aces signal in those places, so the receiver-side gain here is partially wasted.
+  </p>
+</section>
+
+<section>
+  <h2>Reproduce</h2>
+  <pre>node scripts/aces-signal-sweep.js
+# with custom N:
+REPORT_HANDS=40000 node scripts/aces-signal-sweep.js</pre>
+</section>
+
+</main>
+<footer>
+  Generated from <code>scripts/aces-signal-sweep.js</code>. Source:
+  <code>src/simulation/runAcesSignalSweep.ts</code>.
+</footer>
+</body>
+</html>

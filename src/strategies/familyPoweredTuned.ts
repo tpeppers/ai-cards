@@ -62,6 +62,41 @@ export interface FamilyPoweredParams {
    * same direction + low/high count edge" push rules.
    */
   contestedPushThreshold?: number;
+
+  // ── Bid 3 re-interpretation ──
+  /**
+   * How the bid-3 rule is structured:
+   *   - 'hand_power' (default): fire when hand_power(up) >= bid3Threshold
+   *     AND hand_power(down) >= bid3Threshold. Legacy / original sense.
+   *   - 'aces': fire when ace_count() >= 2. The bid now specifically
+   *     signals "I have 2+ aces" — a concrete stopper count that the
+   *     receiver can act on. Placed AFTER the long-suit rules so a
+   *     6+-card hand that would win with bid 4 doesn't get downgraded
+   *     to a 3. (Mechanism A in the bid3 deep-dive.)
+   * Set `bid3Threshold = 99` to disable bid 3 entirely regardless of mode.
+   */
+  bid3Mode?: 'hand_power' | 'aces';
+
+  /**
+   * When true, add receiver-side trump-selection rules for partner_bid == 3.
+   * Only meaningful when bid3Mode = 'aces' (the signal carries semantic
+   * content). The new rules prefer downtown-aces-good when the signaler's
+   * 2+ aces combined with our own aces or a voidable short suit make
+   * that direction viable.
+   */
+  trumpBid3Aware?: boolean;
+
+  /**
+   * When true, add explicit void-creation discard rules for the case
+   * where partner signaled a direction but I called the opposite —
+   * specifically `partner_bid == 1 and bid_direction == "uptown"` and
+   * the symmetric `partner_bid == 2 and bid_direction != "uptown"`. In
+   * those cases partner's signal is non-useful in the chosen direction,
+   * so we want to create a void to regain control via trumping.
+   * Family's min_suit_count fallback already does this implicitly; the
+   * flag makes it an explicit, earlier-matching rule.
+   */
+  smartDiscardOpposite?: boolean;
 }
 
 export function generateFamilyPoweredTuned(p: FamilyPoweredParams): string {
@@ -70,18 +105,86 @@ export function generateFamilyPoweredTuned(p: FamilyPoweredParams): string {
   const defT = p.defensiveTakeThreshold ?? 99;
   const def5T = p.defensiveTakeAt5Threshold ?? 99;
   const contestedT = p.contestedPushThreshold ?? 99;
+  const bid3Mode = p.bid3Mode ?? 'hand_power';
+  const trumpBid3Aware = p.trumpBid3Aware ?? false;
+  const smartDiscardOpposite = p.smartDiscardOpposite ?? false;
   const parts = [
     `sig=${p.sigThreshold}`,
     `trust=${p.trustBonus}`,
     `opp=${p.oppPassThreshold}`,
     `minStop=${minStop}`,
     `bid3=${bid3T}`,
+    `bid3Mode=${bid3Mode}`,
     `defT=${defT}`,
     `def5T=${def5T}`,
     `contested=${contestedT}`,
-  ];
+    trumpBid3Aware ? 'b3trump' : '',
+    smartDiscardOpposite ? 'b3discard' : '',
+  ].filter(s => s);
   const name = `Family (Powered ${parts.join(' ')})`;
   const stopGuard = minStop > 0 ? ' and king_ace_count() >= min_stoppers' : '';
+
+  // Bid-3 rule — content + placement depend on bid3Mode. In 'aces' mode
+  // the rule fires on ace_count >= 2 and is placed AFTER the long-suit
+  // rules (fixes the "under-commit" mechanism). In 'hand_power' mode the
+  // rule fires on compound hand_power and is placed FIRST (legacy).
+  const bid3RuleHandPower =
+    `  # Signal 3: strong both directions (legacy hand_power mode).
+  when bid_count < 2 and hand_power(uptown) >= bid3_threshold and hand_power(downtown) >= bid3_threshold${stopGuard} and bid.current < 3:
+    bid 3`;
+  const bid3RuleAces =
+    `  # Signal 3: 2+ aces (aces-signal mode). Placed after long-suit rules
+  # so hands with a 6+ suit get bid 4 via length, not downgraded to bid 3.
+  when bid_count < 2 and ace_count() >= 2 and bid.current < 3:
+    bid 3`;
+  const longSuitRules =
+    `  # 6+ long suit
+  when bid_count < 2 and max_suit_count() >= 6 and bid.current < 4:
+    bid 4
+  # 7+ very long suit
+  when bid_count < 2 and max_suit_count() >= 7 and bid.current < 5:
+    bid 5`;
+
+  const bidHeader = bid3Mode === 'aces'
+    ? `${longSuitRules}\n${bid3RuleAces}`
+    : `${bid3RuleHandPower}\n${longSuitRules}`;
+
+  // Trump rules for partner_bid == 3 under the aces interpretation.
+  // Only relevant when trumpBid3Aware is true and bid3Mode is 'aces'
+  // (otherwise the signal isn't guaranteed to mean "2+ aces").
+  const trumpBid3Rules = (trumpBid3Aware && bid3Mode === 'aces') ? `
+  # Partner signaled 2+ aces (bid 3). Downtown-aces-good is strong:
+  # combined ace count ≥ 3, so low cards in our hand become winners.
+  # I have at least 1 ace — combined ≥ 3 aces, strong downtown
+  when partner_bid == 3 and ace_count() >= 1:
+    choose suit: best_suit(downtown) direction: downtown
+  # I have no aces but can create a void — partner's aces stop the other
+  # three suits, I trump the fourth.
+  when partner_bid == 3 and min_suit_count() == 0:
+    choose suit: best_suit(downtown) direction: downtown
+  when partner_bid == 3 and min_suit_count() <= 2:
+    choose suit: best_suit(downtown) direction: downtown
+  # I'm predominantly high — go uptown, partner's aces still help.
+  when partner_bid == 3 and high_count() + 2 > low_count():
+    choose suit: best_suit(uptown) direction: uptown
+  # Fallback: downtown but tag aces as no-good (conservative — partner's
+  # aces still work as the only stoppers).
+  when partner_bid == 3:
+    choose suit: best_suit(downtown-noaces) direction: downtown-noaces
+` : '';
+
+  // Discard rules for the "going opposite to partner's signal" case.
+  // Makes the void-creation explicit rather than relying on fall-through
+  // to min_suit_count.
+  const smartDiscardRules = smartDiscardOpposite ? `
+  # Partner signaled down but we called up (or vice versa) — partner's
+  # direction doesn't help, so create a void to regain control by
+  # trumping.
+  when partner_bid == 1 and bid_direction == "uptown":
+    drop void_candidates()
+  when partner_bid == 2 and bid_direction != "uptown":
+    drop void_candidates()
+` : '';
 
   return `strategy "${name}"
 game: bidwhist
@@ -136,17 +239,7 @@ play:
       play hand.weakest
 
 bid:
-  # Signal 3: strong both directions. bid3_threshold is independent of
-  # sig_threshold so it can be loosened/tightened without breaking the
-  # bid-1/bid-2 calibration. Set to 99 to disable bid 3 entirely.
-  when bid_count < 2 and hand_power(uptown) >= bid3_threshold and hand_power(downtown) >= bid3_threshold${stopGuard} and bid.current < 3:
-    bid 3
-  # 6+ long suit
-  when bid_count < 2 and max_suit_count() >= 6 and bid.current < 4:
-    bid 4
-  # 7+ very long suit
-  when bid_count < 2 and max_suit_count() >= 7 and bid.current < 5:
-    bid 5
+${bidHeader}
   # Signal 2: uptown power (optional stopper guard)
   when bid_count < 2 and hand_power(uptown) >= sig_threshold${stopGuard} and bid.current < 2:
     bid 2
@@ -212,7 +305,7 @@ bid:
     pass
 
 trump:
-  # Partner signaled downtown (bid 1) — trust it with the 'trust' bonus
+${trumpBid3Rules}  # Partner signaled downtown (bid 1) — trust it with the 'trust' bonus
   when partner_bid == 1 and low_count() + trust > high_count() and ace_count() >= 2:
     choose suit: best_suit(downtown) direction: downtown
   when partner_bid == 1 and low_count() + trust > high_count():
@@ -247,7 +340,7 @@ discard:
     keep suit_keepers(1)
   when partner_bid == 2 and bid_direction == "uptown":
     keep suit_keepers(1)
-  when enemy_bid == 1 and bid_direction != "uptown" and partner_bid != 3:
+${smartDiscardRules}  when enemy_bid == 1 and bid_direction != "uptown" and partner_bid != 3:
     drop void_candidates()
   when enemy_bid == 2 and bid_direction == "uptown" and partner_bid != 3:
     drop void_candidates()

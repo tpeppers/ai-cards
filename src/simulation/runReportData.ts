@@ -585,6 +585,7 @@ function navBar(active: string): string {
     ['addendum.html', 'Addendum'],
     ['variants.html', 'Variants'],
     ['bid3-analysis.html', 'Bid 3 Deep-dive'],
+    ['aces-signal.html', 'Aces Signal'],
   ];
   return `<nav>${pages.map(([href, label]) => {
     const cls = href === active ? ' class="active"' : '';
@@ -794,6 +795,40 @@ interface VariantsSummary {
   tiesCount: number;
 }
 
+interface AcesSignalSummary {
+  baselineRate: number;
+  baselineCi: number;
+  rows: Array<{ key: string; winRate: number; ci95: number; delta: number }>;
+  winnersCount: number;
+  losersCount: number;
+  tiesCount: number;
+  bestDelta: number;
+}
+
+function loadAcesSignalSummary(): AcesSignalSummary | null {
+  try {
+    const p = path.join(OUT_DIR, 'aces-signal-data.json');
+    if (!fs.existsSync(p)) return null;
+    const d = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const b = d.baseline;
+    const rows = (d.rows as any[]).map((r: any) => ({
+      key: r.variantKey,
+      winRate: r.winRate, ci95: r.ci95,
+      delta: r.winRate - b.winRate,
+    }));
+    const winners = rows.filter(r => (r.winRate - r.ci95) > b.winRate).length;
+    const losers = rows.filter(r => (r.winRate + r.ci95) < b.winRate).length;
+    const bestDelta = rows.length > 0 ? Math.max(...rows.map(r => r.delta)) : 0;
+    return {
+      baselineRate: b.winRate, baselineCi: b.ci95, rows,
+      winnersCount: winners, losersCount: losers, tiesCount: rows.length - winners - losers,
+      bestDelta,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function loadVariantsSummary(): VariantsSummary | null {
   try {
     const p = path.join(OUT_DIR, 'variants-data.json');
@@ -833,6 +868,7 @@ function renderIndex(
   const others = sweep.filter(r => r.sig !== bestSig).sort((a, b) => b.winRate - a.winRate);
   const addendum = loadAddendumSummary();
   const variants = loadVariantsSummary();
+  const acesSignal = loadAcesSignalSummary();
   const winRowsHtml = sweep.map(r => {
     const pct = (r.winRate * 100).toFixed(1);
     const ci = (r.ci95 * 100).toFixed(2);
@@ -865,6 +901,8 @@ function renderIndex(
     'Bidding: hand_power signal threshold (sig=7-20)',
     'Bidding: min_stoppers guard (compound predicate)',
     'Bidding: bid-3 "both directions" rule',
+    'Bidding: bid-3 as "2+ aces" re-interpretation',
+    'Bidding: bid-3 placement (before vs after long-suit rules)',
     'Bidding: dealer default open bid',
     'Bidding: no-bid-5-via-length rule',
     'Bidding: seat-3 opposite-direction pass',
@@ -875,8 +913,10 @@ function renderIndex(
     'Play following: overtake threshold',
     'Play void: always-trump vs signal-first',
     'Play void: weakest vs strongest trump',
-    'Discard: suit_keepers count',
     'Trump-selection: partner-signal trust bonus',
+    'Trump-selection: partner_bid == 3 receiver rules',
+    'Discard: suit_keepers count',
+    'Discard: smart void on opposite-direction partner signal',
   ];
 
   return pageShell('Overview', 'index.html', `
@@ -915,6 +955,7 @@ function renderIndex(
     <li><strong><a href="addendum.html">Addendum</a></strong> — Opponent-signal defense (null result) and bid-3 ablation (big win: disable it).</li>
     <li><strong><a href="variants.html">Variants</a></strong> — Targeted single-rule modifications to bidding, play (leading/following/void), and discard sections.</li>
     <li><strong><a href="bid3-analysis.html">Bid 3 Deep-dive</a></strong> — Why disabling bid 3 helps, with side-by-side trick-by-trick case studies on specific decks.</li>
+    <li><strong><a href="aces-signal.html">Aces Signal</a></strong> — Can bid 3 be resurrected by redefining it as "I have 2+ aces" with matching receiver logic?</li>
   </ul>
 </section>
 
@@ -980,6 +1021,19 @@ ${variants ? `      <tr>
         <td>Play &amp; discard variants</td>
         <td>Nine targeted modifications — results pending</td>
         <td class="muted">See <a href="variants.html">Variants page</a></td>
+        <td></td>
+      </tr>`}
+${acesSignal ? `      <tr>
+        <td>7</td>
+        <td>Bid 3 as "2+ aces" (re-introduction)</td>
+        <td>Bid 3 re-interpreted as <code>ace_count() >= 2</code>, placed after long-suit rules, with receiver trump rules and smart discard</td>
+        <td class="${acesSignal.winnersCount > 0 ? 'good' : 'muted'}">${acesSignal.winnersCount} beat baseline, ${acesSignal.losersCount} worse, ${acesSignal.tiesCount} tied</td>
+        <td>See <a href="aces-signal.html">Aces Signal page</a> for full results.</td>
+      </tr>` : `      <tr>
+        <td>7</td>
+        <td>Bid 3 as "2+ aces" (re-introduction)</td>
+        <td>Bid 3 re-interpreted with receiver trump rules and smart discard</td>
+        <td class="muted">See <a href="aces-signal.html">Aces Signal page</a></td>
         <td></td>
       </tr>`}
     </tbody>

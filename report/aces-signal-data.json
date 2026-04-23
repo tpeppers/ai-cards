@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "timestamp": "2026-04-23T22:36:55.902Z"
+  },
+  "baseline": {
+    "wins": 10118,
+    "losses": 9770,
+    "games": 19888,
+    "winRate": 0.5087489943684634,
+    "ci95": 0.006948067417912784
+  },
+  "rows": [
+    {
+      "variantKey": "A_aces_only",
+      "wins": 9648,
+      "losses": 9976,
+      "games": 19624,
+      "winRate": 0.49164288626172037,
+      "ci95": 0.006994740968495745
+    },
+    {
+      "variantKey": "B_aces_plus_trump",
+      "wins": 9784,
+      "losses": 9912,
+      "games": 19696,
+      "winRate": 0.4967506092607636,
+      "ci95": 0.006982772400242287
+    },
+    {
+      "variantKey": "C_full_combo",
+      "wins": 9784,
+      "losses": 9912,
+      "games": 19696,
+      "winRate": 0.4967506092607636,
+      "ci95": 0.006982772400242287
+    },
+    {
+      "variantKey": "D_discard_only",
+      "wins": 10130,
+      "losses": 9758,
+      "games": 19888,
+      "winRate": 0.5093523732904264,
+      "ci95": 0.006947915596411699
+    },
+    {
+      "variantKey": "E_aces_trump_no_discard",
+      "wins": 9648,
+      "losses": 9976,
+      "games": 19624,
+      "winRate": 0.49164288626172037,
+      "ci95": 0.006994740968495745
+    }
+  ]
+}
