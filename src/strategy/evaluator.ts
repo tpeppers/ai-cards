@@ -377,6 +377,8 @@ function resolveVariable(name: string, ctx: StrategyContext): any {
     case 'partner_winning': return ctx.partnerWinning;
     case 'partner_led': return ctx.partnerLed;
     case 'on_declarer_team': return ctx.onDeclarerTeam;
+    case 'am_declarer': return ctx.amDeclarer;
+    case 'partner_is_declarer': return ctx.partnerIsDeclarer;
     case 'is_dealer': return ctx.isDealer;
     case 'has_trump': return ctx.hasTrump;
     case 'is_first_trick': return ctx.isFirstTrick;

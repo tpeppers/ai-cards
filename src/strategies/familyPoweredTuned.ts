@@ -87,6 +87,48 @@ export interface FamilyPoweredParams {
   trumpBid3Aware?: boolean;
 
   /**
+   * Minimum ace_count to trigger bid 3 in aces mode. Default 2. Tightening
+   * to 3 (or 4) makes bid 3 a rarer, more specific signal about partner's
+   * stopper density. With 2 the signal fires on ~20% of hands; with 3
+   * on ~1.5%; with 4 on ~0.25%.
+   */
+  bid3AceCount?: number;
+
+  /**
+   * When true AND bid3Mode = 'aces', seat 3 pushes to 5 on partner_bid == 3
+   * based on my own ace or downtown-strength contribution. Without this,
+   * the existing seat-3 push rules only look at partner_bid in {1, 2}.
+   */
+  bid3ReceiverSeat3?: boolean;
+
+  /**
+   * When true AND bid3Mode = 'aces', the dealer is more willing to TAKE
+   * bid 4 specifically on partner_bid == 3 — even with a moderate hand
+   * because partner's 2+ aces combine with our own hand to usually make
+   * the contract.
+   */
+  bid3ReceiverDealer?: boolean;
+
+  /**
+   * When true, add receiver rules that interpret partner's bid 1 or bid 2
+   * at sig=17 as a genuinely strong signal (3+ winners in the signaled
+   * direction) rather than the weaker "3+ K/A" semantics of Family's
+   * existing rules. Pushes to 5 more aggressively in seat 3 and has
+   * dealer take bid 4 more often when we have any support in partner's
+   * direction.
+   */
+  sig17ReceiverBoost?: boolean;
+
+  /**
+   * Add a bid-4 rule triggered by "hand_power(direction) >= sig AND
+   * max_suit_count >= this threshold". 0 disables the rule. Typical
+   * values: 4 (liberal — commits to 4 on sig-strong hands with a 4+
+   * suit) or 5 (conservative). Placed after the existing max_suit >= 6
+   * rule so truly long hands still bid 4 via length.
+   */
+  bid4OnSigAndSuit?: number;
+
+  /**
    * When true, add explicit void-creation discard rules for the case
    * where partner signaled a direction but I called the opposite —
    * specifically `partner_bid == 1 and bid_direction == "uptown"` and
@@ -108,6 +150,11 @@ export function generateFamilyPoweredTuned(p: FamilyPoweredParams): string {
   const bid3Mode = p.bid3Mode ?? 'hand_power';
   const trumpBid3Aware = p.trumpBid3Aware ?? false;
   const smartDiscardOpposite = p.smartDiscardOpposite ?? false;
+  const bid3AceCount = p.bid3AceCount ?? 2;
+  const bid3ReceiverSeat3 = p.bid3ReceiverSeat3 ?? false;
+  const bid3ReceiverDealer = p.bid3ReceiverDealer ?? false;
+  const sig17ReceiverBoost = p.sig17ReceiverBoost ?? false;
+  const bid4OnSigAndSuit = p.bid4OnSigAndSuit ?? 0;
   const parts = [
     `sig=${p.sigThreshold}`,
     `trust=${p.trustBonus}`,
@@ -115,10 +162,15 @@ export function generateFamilyPoweredTuned(p: FamilyPoweredParams): string {
     `minStop=${minStop}`,
     `bid3=${bid3T}`,
     `bid3Mode=${bid3Mode}`,
+    bid3Mode === 'aces' ? `aces=${bid3AceCount}` : '',
     `defT=${defT}`,
     `def5T=${def5T}`,
     `contested=${contestedT}`,
     trumpBid3Aware ? 'b3trump' : '',
+    bid3ReceiverSeat3 ? 'b3seat3' : '',
+    bid3ReceiverDealer ? 'b3dealer' : '',
+    sig17ReceiverBoost ? 'sigBoost' : '',
+    bid4OnSigAndSuit > 0 ? `bid4sig${bid4OnSigAndSuit}` : '',
     smartDiscardOpposite ? 'b3discard' : '',
   ].filter(s => s);
   const name = `Family (Powered ${parts.join(' ')})`;
@@ -133,9 +185,9 @@ export function generateFamilyPoweredTuned(p: FamilyPoweredParams): string {
   when bid_count < 2 and hand_power(uptown) >= bid3_threshold and hand_power(downtown) >= bid3_threshold${stopGuard} and bid.current < 3:
     bid 3`;
   const bid3RuleAces =
-    `  # Signal 3: 2+ aces (aces-signal mode). Placed after long-suit rules
-  # so hands with a 6+ suit get bid 4 via length, not downgraded to bid 3.
-  when bid_count < 2 and ace_count() >= 2 and bid.current < 3:
+    `  # Signal 3: ${bid3AceCount}+ aces (aces-signal mode). Placed after long-suit
+  # rules so hands with a 6+ suit get bid 4 via length, not downgraded.
+  when bid_count < 2 and ace_count() >= bid3_ace_count and bid.current < 3:
     bid 3`;
   const longSuitRules =
     `  # 6+ long suit
@@ -144,10 +196,18 @@ export function generateFamilyPoweredTuned(p: FamilyPoweredParams): string {
   # 7+ very long suit
   when bid_count < 2 and max_suit_count() >= 7 and bid.current < 5:
     bid 5`;
+  const bid4SigAndSuitRules = bid4OnSigAndSuit > 0 ? `
+  # Direct bid 4 on strong hand with a moderately long suit (opt-in).
+  # Fires before bid 2/bid 1 signals so strong-enough hands commit to a
+  # 4-contract rather than sending a lesser signal.
+  when bid_count < 2 and hand_power(uptown) >= sig_threshold and max_suit_count() >= bid4_on_sig_suit and bid.current < 4:
+    bid 4
+  when bid_count < 2 and hand_power(downtown) >= sig_threshold and max_suit_count() >= bid4_on_sig_suit and bid.current < 4:
+    bid 4` : '';
 
   const bidHeader = bid3Mode === 'aces'
-    ? `${longSuitRules}\n${bid3RuleAces}`
-    : `${bid3RuleHandPower}\n${longSuitRules}`;
+    ? `${longSuitRules}\n${bid3RuleAces}${bid4SigAndSuitRules}`
+    : `${bid3RuleHandPower}\n${longSuitRules}${bid4SigAndSuitRules}`;
 
   // Trump rules for partner_bid == 3 under the aces interpretation.
   // Only relevant when trumpBid3Aware is true and bid3Mode is 'aces'
@@ -186,6 +246,45 @@ export function generateFamilyPoweredTuned(p: FamilyPoweredParams): string {
     drop void_candidates()
 ` : '';
 
+  // Seat-3 push rules for partner_bid == 3 under aces mode. The signal
+  // says partner has 2+ aces — with any support in my hand, push to 5.
+  const seat3Bid3Rules = (bid3ReceiverSeat3 && bid3Mode === 'aces') ? `  # Partner signaled 2+ aces (bid 3) — push to 5 if I have any ace support
+  # or moderate downtown depth (combined aces stop tricks in downtown).
+  when bid_count == 2 and bid.current == 4 and partner_bid == 3 and ace_count() >= 1:
+    bid 5
+  when bid_count == 2 and bid.current == 4 and partner_bid == 3 and hand_power(downtown) >= 8:
+    bid 5
+` : '';
+
+  // Seat-3 push rules when partner signaled bid 1/2 at sig=17 — the
+  // signal means "3+ winners in my direction", so push to 5 if I have
+  // any matching depth (not just a low/high count edge).
+  const seat3Sig17Rules = sig17ReceiverBoost ? `  # Sig-17 aware: partner's bid 1/2 = 3+ winners in signaled direction.
+  # Push to 5 on any matching depth (not just count edge).
+  when bid_count == 2 and bid.current == 4 and partner_bid == 1 and hand_power(downtown) >= 8:
+    bid 5
+  when bid_count == 2 and bid.current == 4 and partner_bid == 2 and hand_power(uptown) >= 8:
+    bid 5
+` : '';
+
+  // Dealer take rules for partner_bid == 3 under aces mode. Take the 4
+  // if I have any ace or a 4+ suit — combined strength usually makes.
+  const dealerBid3Rules = (bid3ReceiverDealer && bid3Mode === 'aces') ? `  # Partner signaled 2+ aces (bid 3) — take bid 4 aggressively.
+  when is_dealer and bid.current == 4 and partner_bid == 3 and ace_count() >= 1:
+    bid take
+  when is_dealer and bid.current == 4 and partner_bid == 3 and max_suit_count() >= 4:
+    bid take
+` : '';
+
+  // Dealer take rules when partner signaled bid 1/2 at sig=17 — take
+  // more aggressively knowing partner's signal carries real strength.
+  const dealerSig17Rules = sig17ReceiverBoost ? `  # Sig-17 aware dealer take: partner's signal is 3+ winners.
+  when is_dealer and bid.current == 4 and partner_bid == 1 and hand_power(downtown) >= 8:
+    bid take
+  when is_dealer and bid.current == 4 and partner_bid == 2 and hand_power(uptown) >= 8:
+    bid take
+` : '';
+
   return `strategy "${name}"
 game: bidwhist
 
@@ -195,6 +294,8 @@ let opp_pass = ${p.oppPassThreshold}
 let dealer_bid4_suit_req = ${p.dealerLongSuit}
 let min_stoppers = ${minStop}
 let bid3_threshold = ${bid3T}
+let bid3_ace_count = ${bid3AceCount}
+let bid4_on_sig_suit = ${bid4OnSigAndSuit}
 let defense_take = ${defT}
 let defense_take_at_5 = ${def5T}
 let contested_push = ${contestedT}
@@ -257,7 +358,7 @@ ${bidHeader}
   # Always bid at least 4 in seat 3
   when bid_count == 2 and bid.current < 4:
     bid 4
-  # Contested-signal push to 5: partner signaled one way, enemy the other.
+${seat3Bid3Rules}${seat3Sig17Rules}  # Contested-signal push to 5: partner signaled one way, enemy the other.
   # If I'm also strong in partner's direction, push to 5 before the
   # opponents can take the bid and call their signaled direction.
   when bid_count == 2 and bid.current == 4 and partner_bid == 1 and enemy_bid == 2 and hand_power(downtown) >= contested_push:
@@ -295,7 +396,7 @@ ${bidHeader}
     bid take
   when is_dealer and bid.current == 5 and partner_bid == 2 and enemy_bid == 1 and hand_power(uptown) >= defense_take_at_5:
     bid take
-  when is_dealer and bid.current == 4 and max_suit_count() >= dealer_bid4_suit_req:
+${dealerBid3Rules}${dealerSig17Rules}  when is_dealer and bid.current == 4 and max_suit_count() >= dealer_bid4_suit_req:
     bid take
   when is_dealer and bid.current == 4 and hand_power(uptown) >= sig_threshold:
     bid take

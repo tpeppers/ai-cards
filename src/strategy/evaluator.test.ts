@@ -19,6 +19,8 @@ function ctxFromHand(cards: Card[], partial: Partial<StrategyContext> = {}): Str
     dealer: 0,
     isDealer: false,
     onDeclarerTeam: false,
+    amDeclarer: false,
+    partnerIsDeclarer: false,
     hasTrump: false,
     partnerWinning: false,
     partnerLed: false,
@@ -224,5 +226,56 @@ bid:
     pass
 `;
     expect(() => parseStrategy(STRAT)).toThrow(/duplicate let binding/);
+  });
+});
+
+describe('am_declarer / partner_is_declarer DSL variables', () => {
+  const h = hand('amlk' + 'bcdefghi'); // AKQJ hearts + 8 low hearts
+
+  // Use a bid rule that reads the declarer-state variables. During the bid
+  // phase there's no declarer yet, so am_declarer/partner_is_declarer are
+  // false. We have to override the context via partial to test.
+  function evalWithContext(strategyText: string, partial: Partial<StrategyContext>): number {
+    const ast = parseStrategy(strategyText);
+    const result = evaluateBid(ast, ctxFromHand(h, partial));
+    return typeof result === 'number' ? result : 0;
+  }
+
+  const STRAT = `strategy "decl test"
+game: bidwhist
+
+bid:
+  when am_declarer:
+    bid 5
+  when partner_is_declarer:
+    bid 4
+  when on_declarer_team:
+    bid 3
+  default:
+    bid 1
+`;
+
+  it('am_declarer fires only when I am the declarer', () => {
+    expect(evalWithContext(STRAT, { playerId: 0, declarer: 0, onDeclarerTeam: true, amDeclarer: true, partnerIsDeclarer: false })).toBe(5);
+  });
+
+  it('partner_is_declarer fires when partner is declarer but not me', () => {
+    expect(evalWithContext(STRAT, { playerId: 0, declarer: 2, onDeclarerTeam: true, amDeclarer: false, partnerIsDeclarer: true })).toBe(4);
+  });
+
+  it('on_declarer_team still fires when I am declarer (am_declarer implies on_declarer_team)', () => {
+    // Bid 5 wins — first rule matches, later rules don't run even if they would
+    expect(evalWithContext(STRAT, { playerId: 0, declarer: 0, onDeclarerTeam: true, amDeclarer: true, partnerIsDeclarer: false })).toBe(5);
+  });
+
+  it('neither flag fires when opponents are the declarer', () => {
+    expect(evalWithContext(STRAT, { playerId: 0, declarer: 1, onDeclarerTeam: false, amDeclarer: false, partnerIsDeclarer: false })).toBe(1);
+  });
+
+  it('partnerIsDeclarer implies onDeclarerTeam (invariant check)', () => {
+    // Rule order: am_declarer, partner_is_declarer, on_declarer_team, default.
+    // With partnerIsDeclarer=true we expect rule 2 to fire (bid 4).
+    const result = evalWithContext(STRAT, { playerId: 0, declarer: 2, onDeclarerTeam: true, amDeclarer: false, partnerIsDeclarer: true });
+    expect(result).toBe(4);
   });
 });

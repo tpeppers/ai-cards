@@ -145,6 +145,14 @@ export interface StrategyContext {
   dealer: number;
   isDealer: boolean;
   onDeclarerTeam: boolean;
+  // True only when I am the declarer. Strategy rules sometimes need to
+  // distinguish "I called trump" from "I'm the declarer's partner"
+  // because the play pattern differs (declarer pulls trump, partner
+  // supports declarer by cashing winners when given control).
+  amDeclarer: boolean;
+  // True when my partner (not me) is the declarer. Implies onDeclarerTeam
+  // but NOT amDeclarer.
+  partnerIsDeclarer: boolean;
   hasTrump: boolean;
 
   // Trick context

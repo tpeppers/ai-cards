@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "timestamp": "2026-04-23T23:36:24.900Z"
+  },
+  "baseline": {
+    "wins": 10118,
+    "losses": 9770,
+    "games": 19888,
+    "winRate": 0.5087489943684634,
+    "ci95": 0.006948067417912784
+  },
+  "rows": [
+    {
+      "variantKey": "I_blanket",
+      "wins": 9150,
+      "losses": 10194,
+      "games": 19344,
+      "winRate": 0.47301488833746896,
+      "ci95": 0.007035897561174372
+    },
+    {
+      "variantKey": "I_partner_declarer",
+      "wins": 9824,
+      "losses": 9912,
+      "games": 19736,
+      "winRate": 0.4977705715443859,
+      "ci95": 0.006975770599072605
+    },
+    {
+      "variantKey": "I_on_team_not_me",
+      "wins": 9824,
+      "losses": 9912,
+      "games": 19736,
+      "winRate": 0.4977705715443859,
+      "ci95": 0.006975770599072605
+    },
+    {
+      "variantKey": "I_dual_role",
+      "wins": 9824,
+      "losses": 9912,
+      "games": 19736,
+      "winRate": 0.4977705715443859,
+      "ci95": 0.006975770599072605
+    }
+  ]
+}

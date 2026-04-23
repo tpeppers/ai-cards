@@ -586,6 +586,8 @@ function navBar(active: string): string {
     ['variants.html', 'Variants'],
     ['bid3-analysis.html', 'Bid 3 Deep-dive'],
     ['aces-signal.html', 'Aces Signal'],
+    ['aces-full.html', 'Full Receiver'],
+    ['lead-declarer.html', 'Lead Role-Aware'],
   ];
   return `<nav>${pages.map(([href, label]) => {
     const cls = href === active ? ' class="active"' : '';
@@ -829,6 +831,54 @@ function loadAcesSignalSummary(): AcesSignalSummary | null {
   }
 }
 
+function loadAcesFullSummary(): AcesSignalSummary | null {
+  try {
+    const p = path.join(OUT_DIR, 'aces-full-data.json');
+    if (!fs.existsSync(p)) return null;
+    const d = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const b = d.baseline;
+    const rows = (d.rows as any[]).map((r: any) => ({
+      key: r.variantKey,
+      winRate: r.winRate, ci95: r.ci95,
+      delta: r.winRate - b.winRate,
+    }));
+    const winners = rows.filter(r => (r.winRate - r.ci95) > b.winRate).length;
+    const losers = rows.filter(r => (r.winRate + r.ci95) < b.winRate).length;
+    const bestDelta = rows.length > 0 ? Math.max(...rows.map(r => r.delta)) : 0;
+    return {
+      baselineRate: b.winRate, baselineCi: b.ci95, rows,
+      winnersCount: winners, losersCount: losers, tiesCount: rows.length - winners - losers,
+      bestDelta,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function loadLeadDeclarerSummary(): AcesSignalSummary | null {
+  try {
+    const p = path.join(OUT_DIR, 'lead-declarer-data.json');
+    if (!fs.existsSync(p)) return null;
+    const d = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const b = d.baseline;
+    const rows = (d.rows as any[]).map((r: any) => ({
+      key: r.variantKey,
+      winRate: r.winRate, ci95: r.ci95,
+      delta: r.winRate - b.winRate,
+    }));
+    const winners = rows.filter(r => (r.winRate - r.ci95) > b.winRate).length;
+    const losers = rows.filter(r => (r.winRate + r.ci95) < b.winRate).length;
+    const bestDelta = rows.length > 0 ? Math.max(...rows.map(r => r.delta)) : 0;
+    return {
+      baselineRate: b.winRate, baselineCi: b.ci95, rows,
+      winnersCount: winners, losersCount: losers, tiesCount: rows.length - winners - losers,
+      bestDelta,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function loadVariantsSummary(): VariantsSummary | null {
   try {
     const p = path.join(OUT_DIR, 'variants-data.json');
@@ -869,6 +919,8 @@ function renderIndex(
   const addendum = loadAddendumSummary();
   const variants = loadVariantsSummary();
   const acesSignal = loadAcesSignalSummary();
+  const acesFull = loadAcesFullSummary();
+  const leadDeclarer = loadLeadDeclarerSummary();
   const winRowsHtml = sweep.map(r => {
     const pct = (r.winRate * 100).toFixed(1);
     const ci = (r.ci95 * 100).toFixed(2);
@@ -901,8 +953,12 @@ function renderIndex(
     'Bidding: hand_power signal threshold (sig=7-20)',
     'Bidding: min_stoppers guard (compound predicate)',
     'Bidding: bid-3 "both directions" rule',
-    'Bidding: bid-3 as "2+ aces" re-interpretation',
+    'Bidding: bid-3 as "2+ aces" re-interpretation (thresholds 2, 3, 4)',
     'Bidding: bid-3 placement (before vs after long-suit rules)',
+    'Bidding: bid-3 receiver seat-3 push rule',
+    'Bidding: bid-3 receiver dealer-take rule',
+    'Bidding: bid-4 direct on hand_power + length (4+, 5+ suit)',
+    'Bidding: sig-17-aware receiver boost (bid 1/2 = 3+ winners)',
     'Bidding: dealer default open bid',
     'Bidding: no-bid-5-via-length rule',
     'Bidding: seat-3 opposite-direction pass',
@@ -910,6 +966,7 @@ function renderIndex(
     'Bidding: seat-3 contested-signal push',
     'Bidding: seat-3 minimum bid',
     'Play leading: pull-trump threshold',
+    'Play leading: strongest vs weakest non-trump',
     'Play following: overtake threshold',
     'Play void: always-trump vs signal-first',
     'Play void: weakest vs strongest trump',
@@ -1025,17 +1082,25 @@ ${variants ? `      <tr>
       </tr>`}
 ${acesSignal ? `      <tr>
         <td>7</td>
-        <td>Bid 3 as "2+ aces" (re-introduction)</td>
-        <td>Bid 3 re-interpreted as <code>ace_count() >= 2</code>, placed after long-suit rules, with receiver trump rules and smart discard</td>
+        <td>Bid 3 as "2+ aces" (first pass)</td>
+        <td>Bid 3 re-interpreted as <code>ace_count() >= 2</code>, placed after long-suit rules, with receiver trump rules + smart discard</td>
         <td class="${acesSignal.winnersCount > 0 ? 'good' : 'muted'}">${acesSignal.winnersCount} beat baseline, ${acesSignal.losersCount} worse, ${acesSignal.tiesCount} tied</td>
-        <td>See <a href="aces-signal.html">Aces Signal page</a> for full results.</td>
-      </tr>` : `      <tr>
-        <td>7</td>
-        <td>Bid 3 as "2+ aces" (re-introduction)</td>
-        <td>Bid 3 re-interpreted with receiver trump rules and smart discard</td>
-        <td class="muted">See <a href="aces-signal.html">Aces Signal page</a></td>
-        <td></td>
-      </tr>`}
+        <td>See <a href="aces-signal.html">Aces Signal</a> — partial receiver wiring.</td>
+      </tr>` : ''}
+${acesFull ? `      <tr>
+        <td>8</td>
+        <td>Full receiver wiring + bid4/play variants</td>
+        <td>Fixes aces-signal feedback: wires <code>partner_bid == 3</code> into seat-3 push + dealer take. Also tests bid-4 on strength+length, sig-17 receiver boost, and lead-strongest-nontrump play variant.</td>
+        <td class="${acesFull.winnersCount > 0 ? 'good' : 'muted'}">${acesFull.winnersCount} beat baseline, ${acesFull.losersCount} worse, ${acesFull.tiesCount} tied</td>
+        <td>See <a href="aces-full.html">Full Receiver</a>.</td>
+      </tr>` : ''}
+${leadDeclarer ? `      <tr>
+        <td>9</td>
+        <td>Role-aware lead rule (<code>partner_is_declarer</code>)</td>
+        <td>Added <code>am_declarer</code> and <code>partner_is_declarer</code> DSL variables so the "lead strongest non-trump" rule can be gated correctly — humans only do this when their partner is declarer, not always.</td>
+        <td class="${leadDeclarer.winnersCount > 0 ? 'good' : 'muted'}">${leadDeclarer.winnersCount} beat baseline, ${leadDeclarer.losersCount} worse, ${leadDeclarer.tiesCount} tied (best Δ: ${(leadDeclarer.bestDelta * 100 >= 0 ? '+' : '') + (leadDeclarer.bestDelta * 100).toFixed(2)}pp)</td>
+        <td>See <a href="lead-declarer.html">Lead Role-Aware</a>.</td>
+      </tr>` : ''}
     </tbody>
   </table>
   <details>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Full Receiver — hand_power signaling report</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a><a href="variants.html">Variants</a><a href="bid3-analysis.html">Bid 3 Deep-dive</a><a href="aces-signal.html">Aces Signal</a><a href="aces-full.html" class="active">Full Receiver</a><a href="lead-declarer.html">Lead Role-Aware</a></nav>
+</header>
+<main>
+
+<section>
+  <h2>Addressing the earlier aces-signal critique</h2>
+  <p>
+    The <a href="aces-signal.html">previous aces-signal page</a> noted:
+    "<em>The signal informs partner more than declarer — and partner mostly reacts in seat-3
+    (push to 5) or as dealer (take). The current strategy doesn't use the aces signal in
+    those places, so the receiver-side gain here is partially wasted.</em>"
+  </p>
+  <p>
+    This page fixes that: the new <code>bid3ReceiverSeat3</code> and
+    <code>bid3ReceiverDealer</code> flags wire <code>partner_bid == 3</code> into the seat-3
+    push rules and dealer-take rules, in addition to the trump selection rules. Tested at
+    three ace-count thresholds (2, 3, 4) to isolate the "rare but highly specific" sweet spot.
+  </p>
+  <p>
+    Three orthogonal ideas are also on this page:
+  </p>
+  <ul>
+    <li>
+      <strong>Sig-17 receiver boost</strong> — at sig=17, partner's bid 1 or bid 2 represents
+      "3+ winners in the signaled direction". The receiver rules were tuned for Family's
+      weaker <code>king_ace_count() ≥ 3</code> semantics; this variant adds stronger push /
+      take rules that exploit the higher-information signal.
+    </li>
+    <li>
+      <strong>Bid 4 on hand_power + length</strong> — if I have a sig-strong hand AND a 4 or
+      5-card suit, skip the bid 2/bid 1 signal and commit directly to bid 4. Tests whether
+      some of those "signal 2 → partner pushes to 4" flows would be better served by a
+      pre-committed bid 4.
+    </li>
+    <li>
+      <strong>Leading strongest non-trump</strong> — flip the final lead rule from
+      <code>hand.nontrump.weakest</code> to <code>hand.nontrump.strongest</code>, per the
+      "partner-of-declarer, on control, plays strongest-to-weakest excluding trump" heuristic
+      some players use.
+    </li>
+  </ul>
+</section>
+
+<section>
+  <h2>Results (N = 20,000 games per config vs Family)</h2>
+  <div class="kpi">
+    <div class="box"><div class="value">0</div><div class="label">Beat baseline</div></div>
+    <div class="box"><div class="value">3</div><div class="label">Worse than baseline</div></div>
+    <div class="box"><div class="value">50.87%</div><div class="label">Best point estimate</div></div>
+    <div class="box"><div class="value">+0.00pp</div><div class="label">Best Δ from baseline</div></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Variant</th>
+        <th>Description</th>
+        <th>Win rate</th>
+        <th>Δ baseline</th>
+        <th>vs baseline</th>
+        <th>vs Family</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight-row">
+        <td><code>baseline</code></td>
+        <td>sig=17, bid3 disabled (proven best)</td>
+        <td class="num">50.87% ±0.69%</td>
+        <td class="num">—</td>
+        <td>—</td>
+        <td><span class="tag made">beats Family</span></td>
+      </tr>
+<tr>
+<td><code>F2_aces_full_2</code></td>
+<td>Aces full-receiver, threshold ≥ 2</td>
+<td class="num">47.33% ±0.70%</td>
+<td class="num bad">-3.54pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag failed">loses to Family</span></td>
+</tr>
+<tr>
+<td><code>F3_aces_full_3</code></td>
+<td>Aces full-receiver, threshold ≥ 3</td>
+<td class="num">50.20% ±0.70%</td>
+<td class="num bad">-0.67pp</td>
+<td><span class="tag family">tied</span></td>
+<td><span class="tag family">tied</span></td>
+</tr>
+<tr>
+<td><code>F4_aces_full_4</code></td>
+<td>Aces full-receiver, threshold ≥ 4</td>
+<td class="num">50.87% ±0.69%</td>
+<td class="num ">+0.00pp</td>
+<td><span class="tag family">tied</span></td>
+<td><span class="tag made">beats Family</span></td>
+</tr>
+<tr>
+<td><code>G_sig17_boost</code></td>
+<td>Sig-17 receiver boost (bid 1/2 → &quot;3+ winners&quot;)</td>
+<td class="num">50.52% ±0.70%</td>
+<td class="num bad">-0.35pp</td>
+<td><span class="tag family">tied</span></td>
+<td><span class="tag family">tied</span></td>
+</tr>
+<tr>
+<td><code>H4_bid4_sig_4</code></td>
+<td>Bid 4 on hand_power &gt;= sig AND 4+ suit</td>
+<td class="num">50.22% ±0.69%</td>
+<td class="num bad">-0.65pp</td>
+<td><span class="tag family">tied</span></td>
+<td><span class="tag family">tied</span></td>
+</tr>
+<tr>
+<td><code>H5_bid4_sig_5</code></td>
+<td>Bid 4 on hand_power &gt;= sig AND 5+ suit</td>
+<td class="num">50.75% ±0.70%</td>
+<td class="num ">-0.13pp</td>
+<td><span class="tag family">tied</span></td>
+<td><span class="tag made">beats Family</span></td>
+</tr>
+<tr>
+<td><code>I_lead_strongest</code></td>
+<td>Leading: strongest non-trump (not weakest)</td>
+<td class="num">47.30% ±0.70%</td>
+<td class="num bad">-3.57pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag failed">loses to Family</span></td>
+</tr>
+<tr>
+<td><code>J_aces3_sig17</code></td>
+<td>Aces (≥3) full-receiver + sig17 receiver boost</td>
+<td class="num">50.02% ±0.70%</td>
+<td class="num bad">-0.85pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag family">tied</span></td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+
+
+<section>
+  <h2>Per-variant rationales</h2>
+  <table>
+    <thead><tr><th>Key</th><th>Rationale</th></tr></thead>
+    <tbody>
+      <tr><td><code>F2_aces_full_2</code></td><td>Full receiver wiring: trump rules + seat-3 push + dealer take, all for partner_bid==3. Threshold 2 — signal fires on ~20% of hands.</td></tr>
+      <tr><td><code>F3_aces_full_3</code></td><td>Same but tightened to 3 aces (~1.5% fire rate). Rarer, more specific signal.</td></tr>
+      <tr><td><code>F4_aces_full_4</code></td><td>Extremely rare (~0.25%) — essentially &quot;4 aces in one hand&quot;. Sanity check.</td></tr>
+      <tr><td><code>G_sig17_boost</code></td><td>Adds seat-3 push + dealer take rules that fire on `hand_power(matching_direction) &gt;= 8` when partner_bid ∈ {1,2}. Exploits the fact that at sig=17, partner&#39;s signal implies real strength.</td></tr>
+      <tr><td><code>H4_bid4_sig_4</code></td><td>Direct bid 4 on sig-strong hand with 4-card suit. Commits to contract 10 without going through bid 2/bid 1 signal phase.</td></tr>
+      <tr><td><code>H5_bid4_sig_5</code></td><td>More conservative than H4 — requires 5-card suit before committing to bid 4 via strength.</td></tr>
+      <tr><td><code>I_lead_strongest</code></td><td>Change the final &quot;when hand.nontrump.count &gt; 0&quot; lead rule from `hand.nontrump.weakest` to `hand.nontrump.strongest`. Tests the &quot;partner-of-declarer, having control, plays strong-to-weak (excluding trump)&quot; idea.</td></tr>
+      <tr><td><code>J_aces3_sig17</code></td><td>Combines the strongest aces-signal variant (threshold 3) with the sig17 receiver boost — tests whether the two are orthogonal.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Reproduce</h2>
+  <pre>node scripts/aces-full-sweep.js
+# html-only regen:
+node scripts/aces-full-sweep.js -- --html-only</pre>
+</section>
+
+</main>
+<footer>
+  Generated from <code>scripts/aces-full-sweep.js</code>. Source:
+  <code>src/simulation/runAcesFullSweep.ts</code>.
+</footer>
+</body>
+</html>

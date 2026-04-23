@@ -196,6 +196,8 @@ function navBar(active: string): string {
     ['variants.html', 'Variants'],
     ['bid3-analysis.html', 'Bid 3 Deep-dive'],
     ['aces-signal.html', 'Aces Signal'],
+    ['aces-full.html', 'Full Receiver'],
+    ['lead-declarer.html', 'Lead Role-Aware'],
   ];
   return `<nav>${pages.map(([href, label]) => {
     const cls = href === active ? ' class="active"' : '';

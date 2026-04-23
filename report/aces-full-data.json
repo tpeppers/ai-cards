@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "timestamp": "2026-04-23T23:29:00.597Z"
+  },
+  "baseline": {
+    "wins": 10118,
+    "losses": 9770,
+    "games": 19888,
+    "winRate": 0.5087489943684634,
+    "ci95": 0.006948067417912784
+  },
+  "rows": [
+    {
+      "variantKey": "F2_aces_full_2",
+      "wins": 9220,
+      "losses": 10260,
+      "games": 19480,
+      "winRate": 0.473305954825462,
+      "ci95": 0.0070115136435712645
+    },
+    {
+      "variantKey": "F3_aces_full_3",
+      "wins": 9936,
+      "losses": 9856,
+      "games": 19792,
+      "winRate": 0.502021018593371,
+      "ci95": 0.0069659072365246735
+    },
+    {
+      "variantKey": "F4_aces_full_4",
+      "wins": 10118,
+      "losses": 9770,
+      "games": 19888,
+      "winRate": 0.5087489943684634,
+      "ci95": 0.006948067417912784
+    },
+    {
+      "variantKey": "G_sig17_boost",
+      "wins": 10020,
+      "losses": 9812,
+      "games": 19832,
+      "winRate": 0.5052440500201695,
+      "ci95": 0.006958552869372947
+    },
+    {
+      "variantKey": "H4_bid4_sig_4",
+      "wins": 10048,
+      "losses": 9960,
+      "games": 20008,
+      "winRate": 0.5021991203518592,
+      "ci95": 0.006928193929707562
+    },
+    {
+      "variantKey": "H5_bid4_sig_5",
+      "wins": 10072,
+      "losses": 9776,
+      "games": 19848,
+      "winRate": 0.5074566706972995,
+      "ci95": 0.006955356573625407
+    },
+    {
+      "variantKey": "I_lead_strongest",
+      "wins": 9150,
+      "losses": 10194,
+      "games": 19344,
+      "winRate": 0.47301488833746896,
+      "ci95": 0.007035897561174372
+    },
+    {
+      "variantKey": "J_aces3_sig17",
+      "wins": 9900,
+      "losses": 9892,
+      "games": 19792,
+      "winRate": 0.5002021018593371,
+      "ci95": 0.006965963572891363
+    }
+  ]
+}

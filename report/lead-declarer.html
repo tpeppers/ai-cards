@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lead Role-Aware — hand_power signaling report</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a><a href="variants.html">Variants</a><a href="bid3-analysis.html">Bid 3 Deep-dive</a><a href="aces-signal.html">Aces Signal</a><a href="aces-full.html">Full Receiver</a><a href="lead-declarer.html" class="active">Lead Role-Aware</a></nav>
+</header>
+<main>
+
+<section>
+  <h2>Role-aware lead variants</h2>
+  <p>
+    The <a href="aces-full.html">Full Receiver page</a> tested a <strong>blanket</strong> "lead
+    strongest non-trump" rule and it lost 3.6pp to baseline. The feedback:
+    "<em>this is done by humans ONLY when their partner is the declarer — the assumption is
+    that partner will support your winners</em>". The previous implementation didn't make that
+    distinction.
+  </p>
+  <p>
+    To test the nuanced form cleanly, two new DSL variables were added:
+  </p>
+  <ul>
+    <li><code>am_declarer</code> — true only when <code>playerId == declarer</code>.</li>
+    <li><code>partner_is_declarer</code> — true when my partner (but not me) is the declarer.
+      Implies <code>on_declarer_team</code>.</li>
+  </ul>
+  <p>
+    The four variants below all differ only in how they gate the "lead strongest non-trump"
+    rule. Baseline is unchanged from the rest of the report.
+  </p>
+</section>
+
+<section>
+  <h2>Results (N = 20,000 games per config vs Family)</h2>
+  <div class="kpi">
+    <div class="box"><div class="value">0</div><div class="label">Beat baseline</div></div>
+    <div class="box"><div class="value">4</div><div class="label">Worse than baseline</div></div>
+    <div class="box"><div class="value">0</div><div class="label">Tied with baseline</div></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Variant</th>
+        <th>Description</th>
+        <th>Win rate</th>
+        <th>Δ baseline</th>
+        <th>vs baseline</th>
+        <th>vs Family</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight-row">
+        <td><code>baseline</code></td>
+        <td>sig=17, bid3 disabled (proven best)</td>
+        <td class="num">50.87% ±0.69%</td>
+        <td class="num">—</td>
+        <td>—</td>
+        <td><span class="tag made">beats Family</span></td>
+      </tr>
+<tr>
+<td><code>I_blanket</code></td>
+<td>Blanket: always lead strongest non-trump</td>
+<td class="num">47.30% ±0.70%</td>
+<td class="num bad">-3.57pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag failed">loses to Family</span></td>
+</tr>
+<tr>
+<td><code>I_partner_declarer</code></td>
+<td>Nuanced: lead strongest only when partner_is_declarer</td>
+<td class="num">49.78% ±0.70%</td>
+<td class="num bad">-1.10pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag family">tied</span></td>
+</tr>
+<tr>
+<td><code>I_on_team_not_me</code></td>
+<td>Equivalent formulation (on_declarer_team and not am_declarer)</td>
+<td class="num">49.78% ±0.70%</td>
+<td class="num bad">-1.10pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag family">tied</span></td>
+</tr>
+<tr>
+<td><code>I_dual_role</code></td>
+<td>Dual-role: strongest when partner declares, weakest when I do</td>
+<td class="num">49.78% ±0.70%</td>
+<td class="num bad">-1.10pp</td>
+<td><span class="tag failed">worse than baseline</span></td>
+<td><span class="tag family">tied</span></td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Interpretation</h2>
+  
+    <p>
+      The blanket variant costs <strong>-3.57pp</strong> versus baseline.
+      The nuanced variant (partner_is_declarer only) still loses <strong>-1.10pp</strong>.
+      The DSL-sanity variant (<code>on_declarer_team and not am_declarer</code>) lands at the same point estimate within noise, confirming the new <code>partner_is_declarer</code> boolean matches the derived expression.
+    </p>
+    <p>
+      Even the nuanced gating doesn't recover baseline performance. The heuristic might be wrong as stated — or it interacts with other play rules in ways that the isolated change can't fix.
+    </p>
+</section>
+
+<section>
+  <h2>Variant rationales</h2>
+  <table>
+    <thead><tr><th>Key</th><th>Rationale</th></tr></thead>
+    <tbody>
+      <tr><td><code>I_blanket</code></td><td>The previous implementation — a single string transform that affects ALL leading situations, regardless of declarer role. Included as a comparison baseline for the nuanced variants.</td></tr>
+      <tr><td><code>I_partner_declarer</code></td><td>The INTENDED heuristic: when my partner is the declarer and I have control, cash my winners top-to-bottom — partner called trump with the expectation of supporting my side suits. Uses the new `partner_is_declarer` DSL variable.</td></tr>
+      <tr><td><code>I_on_team_not_me</code></td><td>Same behavior as partner_is_declarer expressed via the older variables. Included to sanity-check the new DSL variable matches the derived expression exactly.</td></tr>
+      <tr><td><code>I_dual_role</code></td><td>Explicit role-split: partner-of-declarer cashes, I-as-declarer ducks. Functionally identical to partner_is_declarer variant (the am_declarer rule just preserves existing behavior) but serves as scaffolding for role-specific future rules.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Reproduce</h2>
+  <pre>node scripts/lead-declarer-sweep.js
+# with custom N:
+REPORT_HANDS=40000 node scripts/lead-declarer-sweep.js</pre>
+</section>
+
+</main>
+<footer>
+  Generated from <code>scripts/lead-declarer-sweep.js</code>. Source:
+  <code>src/simulation/runLeadDeclarerSweep.ts</code>.
+</footer>
+</body>
+</html>
