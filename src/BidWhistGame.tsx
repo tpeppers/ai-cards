@@ -160,14 +160,27 @@ Card Rankings:
   }, [game, getEffectiveStrategy]);
 
   // Fire a deviation banner if the human's choice differs from the
-  // selected strategy. The DecisionRecord carries the comparison already.
-  const maybeNotifyDeviation = (rec: { phase: string; humanChoice: string; selectedChoice: string; selectedName: string; divergedFromSelected: boolean }) => {
+  // selected strategy. Pass the full DecisionRecord so the dialog +
+  // console log have full hand/trick context, not just the one-liner.
+  const maybeNotifyDeviation = (rec: any) => {
     if (rec.divergedFromSelected) {
       notifyDeviation({
         phase: rec.phase,
         selectedName: rec.selectedName,
         human: rec.humanChoice,
         selectedChoice: rec.selectedChoice,
+        handId: rec.handId,
+        bidCount: rec.bidCount,
+        currentBid: rec.currentBid,
+        trumpSuit: rec.trumpSuit,
+        direction: rec.direction,
+        trickNumber: rec.trickNumber,
+        leadSuit: rec.leadSuit,
+        currentTrickSoFar: rec.currentTrickSoFar,
+        familyChoice: rec.familyChoice,
+        claudeFamChoice: rec.claudeFamChoice,
+        divergedFromFamily: rec.divergedFromFamily,
+        divergedFromClaudeFam: rec.divergedFromClaudeFam,
       });
     }
   };
