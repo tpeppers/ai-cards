@@ -1,0 +1,58 @@
+# Dockerfile for the Node backend that hosts Game Mode uploads.
+#
+# Build:
+#   docker build -f docker/Dockerfile.server -t ai-cards-server:latest .
+#
+# Run:
+#   docker run -d --name ai-cards \
+#     -p 3001:3001 \
+#     -v /path/to/long-term-storage:/data \
+#     ai-cards-server:latest
+#
+# The container writes reconstructed-deck zips to /data (mount that to
+# persistent storage on the host). Card detection is stubbed unless
+# ML_SERVICE_URL points at a reachable YOLO service; Game Mode itself
+# works without ML only if the frontend submits already-detected card
+# lists — the current integration calls /api/recognize which requires
+# ML.
+
+FROM node:20-alpine AS build
+
+WORKDIR /app
+COPY package*.json ./
+# Install EVERYTHING including devDeps (needed for esbuild + react-scripts
+# to build the standalone bundle).
+RUN npm ci --no-audit --no-fund
+
+COPY . .
+
+# Produce the full React build (all routes, including /upload which is
+# what Game Mode actually needs). react-scripts production build lands
+# in /app/build.
+RUN DISABLE_ESLINT_PLUGIN=true CI=false npm run build
+
+
+FROM node:20-alpine AS runtime
+
+WORKDIR /app
+
+# Copy only the server code + built frontend + runtime deps.
+COPY package*.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
+
+COPY --from=build /app/server ./server
+COPY --from=build /app/build ./build
+
+# Game Mode storage: mount a host directory here for long-term archive.
+VOLUME ["/data"]
+ENV GAME_MODE_STORAGE=/data/games
+ENV PORT=3001
+
+# Card detection ML service — optional. Set via --env ML_SERVICE_URL=...
+# when running. Without it, /api/recognize will fail but /api/game-mode/upload
+# will fall back to... actually, it still calls the ML service, so ML is
+# required for the full flow. Document this.
+ENV ML_SERVICE_URL=http://localhost:3002
+
+EXPOSE 3001
+CMD ["node", "server/server.js"]

@@ -4,6 +4,26 @@
 
 A full-featured trick-taking card game platform with AI opponents, multiplayer support, game analysis tools, and ML-powered card recognition from photos.
 
+## Game Mode (self-hosted)
+
+When Settings → Game Mode is on, the Upload page turns into a multi-player hand-capture flow:
+each of 4 players uploads their photo tagged with their seat (Dealer / 1st / 2nd / 3rd bidder)
+and a shared 6-character session code. When all 4 uploads arrive within a 10-minute window, the
+server dedups the detected cards, verifies 48 unique across the four hands, reconstructs a
+52-character deck URL (`dealer → positions 0,4,8,…,44`, bidders 1–3 → offsets 1/2/3), and
+writes a zip archive named by the URL to the storage volume.
+
+Self-host the backend with the provided Docker image:
+
+```bash
+# From repo root:
+docker compose up --build
+# → backend at http://localhost:3001, zips land in ./game-mode-storage/
+```
+
+ML-based card detection is a separate service (`ml/server/inference_server.py`). Set
+`ML_SERVICE_URL` in `docker-compose.yml` to point at it.
+
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Lucide React icons

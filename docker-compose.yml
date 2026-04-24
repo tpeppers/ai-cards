@@ -1,0 +1,37 @@
+# Example docker-compose for self-hosting the Game Mode backend.
+#
+# Usage:
+#   1. Create the storage directory on your host:
+#        mkdir -p ./game-mode-storage
+#   2. Build and run:
+#        docker compose up --build
+#   3. Point a browser at http://localhost:3001 (the standalone frontend
+#      is served by the same container; toggle Settings → Enable Game
+#      Mode, then use the Upload page).
+#
+# ML note: Game Mode currently requires the Python YOLO recognizer at
+# ML_SERVICE_URL for card detection. If you're running it locally, set
+# the env var to http://host.docker.internal:3002 (Docker Desktop on
+# Mac/Windows) or to the host IP on Linux.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.server
+    image: ai-cards-server:latest
+    container_name: ai-cards
+    ports:
+      - "3001:3001"
+    environment:
+      # Where inside the container Game Mode zips are written.
+      GAME_MODE_STORAGE: /data/games
+      # Point this at your running ML recognizer (see ml/server/
+      # inference_server.py). Commented out by default — uncomment and
+      # edit to match your setup.
+      # ML_SERVICE_URL: http://host.docker.internal:3002
+    volumes:
+      # Host directory for persistent storage. Change the left side to
+      # wherever you want long-term storage on your host machine.
+      - ./game-mode-storage:/data
+    restart: unless-stopped

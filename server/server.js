@@ -10,6 +10,7 @@ const sharp = require('sharp');
 const http = require('http');
 const labelStudio = require('./labelStudio');
 const { initMultiplayer } = require('./multiplayer');
+const gameMode = require('./gameMode');
 
 // ML service configuration
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:3002';
@@ -19,6 +20,17 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+// Serve the built React frontend from /build when it exists. Populated
+// by `npm run build` in the Docker image. In dev (react-scripts on 3000)
+// this directory is absent and the handler is skipped. SPA fallback
+// (sendFile on unmatched GETs) is registered AFTER api routes at the
+// bottom of this file.
+const buildDir = path.join(__dirname, '../build');
+const hasBuild = fs.existsSync(buildDir);
+if (hasBuild) {
+  app.use(express.static(buildDir));
+}
 
 const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -209,6 +221,87 @@ app.post('/api/hands', (req, res) => {
     console.error('Error saving hands:', error);
     res.status(500).json({ error: 'Failed to save hands' });
   }
+});
+
+// ── Game Mode upload ─────────────────────────────────────────────────
+// Session-aware upload: 4 players each post their hand photo tagged
+// with a seat (dealer|bid1|bid2|bid3) and a shared session code.
+// Runs ML detection on the image, then defers session coordination to
+// gameMode.registerUpload. When 4 seats complete within the 10-minute
+// window, the reconstructed deck URL is returned and a zip is written
+// to GAME_MODE_STORAGE.
+app.post('/api/game-mode/upload', upload.single('image'), async (req, res) => {
+  let tempImagePath = null;
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No image file provided' });
+    }
+    const seat = req.body.seat;
+    const sessionCode = req.body.session || null;
+    if (!seat) {
+      return res.status(400).json({ success: false, error: 'seat is required (dealer|bid1|bid2|bid3)' });
+    }
+
+    tempImagePath = path.join(uploadDir, req.file.filename);
+    const imageBuffer = fs.readFileSync(tempImagePath);
+    const imageExt = path.extname(req.file.originalname).replace('.', '') || 'png';
+
+    // Forward to ML service for card detection
+    const formData = new FormData();
+    formData.append('image', imageBuffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+    const confidence = parseFloat(req.query.confidence) || 0.5;
+    const mlResponse = await fetch(
+      `${ML_SERVICE_URL}/recognize?confidence=${confidence}`,
+      { method: 'POST', body: formData, headers: formData.getHeaders() },
+    );
+    if (!mlResponse.ok) {
+      const errorText = await mlResponse.text();
+      return res.status(mlResponse.status).json({
+        success: false,
+        error: `ML service error: ${mlResponse.statusText}`,
+        details: errorText,
+      });
+    }
+    const mlJson = await mlResponse.json();
+    const cards = mlJson.cards || [];
+
+    const result = gameMode.registerUpload({
+      sessionCode,
+      seat,
+      cards,
+      imageBuffer,
+      imageExt,
+    });
+
+    res.json({
+      success: result.status !== 'error',
+      status: result.status,
+      session: result.session,
+      seat,
+      detectedCards: cards,
+      seatsFilled: result.seatsFilled,
+      seatsMissing: result.seatsMissing,
+      url: result.url,
+      zipPath: result.zipPath,
+      errors: result.errors,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e && e.message || e) });
+  } finally {
+    if (tempImagePath) {
+      fs.unlink(tempImagePath, () => {});
+    }
+  }
+});
+
+// Status lookup for a session
+app.get('/api/game-mode/session/:code', (req, res) => {
+  const status = gameMode.getSessionStatus(req.params.code);
+  if (!status) return res.status(404).json({ success: false, error: 'session not found or expired' });
+  res.json({ success: true, ...status });
 });
 
 // Card recognition endpoint - forwards to ML service
@@ -591,8 +684,17 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: error.message || 'Internal server error' });
 });
 
+// SPA fallback: any non-/api GET that hasn't matched serves index.html
+// so React Router can handle client-side routes (/settings, /upload, etc.)
+if (hasBuild) {
+  app.get(/^(?!\/api\b|\/socket\.io\b|\/ios\b).*$/, (req, res) => {
+    res.sendFile(path.join(buildDir, 'index.html'));
+  });
+}
+
 const server = http.createServer(app);
 initMultiplayer(server);
+gameMode.startCleanupTimer();
 
 server.listen(PORT, () => {
   console.log(`Hearts Card Capture API server running on port ${PORT}`);
@@ -600,4 +702,5 @@ server.listen(PORT, () => {
   console.log(`iOS app download: http://localhost:${PORT}/ios/download`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Multiplayer: socket.io enabled`);
+  console.log(`Game Mode storage: ${gameMode.STORAGE_DIR}`);
 });

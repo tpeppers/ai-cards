@@ -37,6 +37,9 @@ const SettingsPage: React.FC = () => {
   );
   const [devAlertMode, setDevAlertModeState] = useState<DeviationAlertMode>(() => getDeviationAlertMode());
   const [journalCount, setJournalCount] = useState<number>(() => journalSize());
+  const [gameModeEnabled, setGameModeEnabled] = useState<boolean>(() =>
+    localStorage.getItem('gameModeEnabled') === '1'
+  );
 
   const handleBackingChange = (id: string) => {
     setSelectedBacking(id);
@@ -92,6 +95,12 @@ const SettingsPage: React.FC = () => {
     if (!window.confirm(`Clear ${journalCount} journal entries? This cannot be undone.`)) return;
     clearJournal();
     setJournalCount(0);
+  };
+
+  const handleGameModeToggle = (enabled: boolean) => {
+    setGameModeEnabled(enabled);
+    if (enabled) localStorage.setItem('gameModeEnabled', '1');
+    else localStorage.removeItem('gameModeEnabled');
   };
 
   const selectedBackingData = allBackings.find(b => b.id === selectedBacking);
@@ -358,6 +367,40 @@ const SettingsPage: React.FC = () => {
               </p>
             </div>
           </div>
+        </section>
+
+        {/* Game Mode */}
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold mb-3">Game Mode</h2>
+          <p className="text-sm text-gray-400 mb-4">
+            When enabled, the <a href="/upload" className="text-blue-400 underline">Upload</a> page
+            shows a seat selector (Dealer / 1st, 2nd, 3rd bidder) and a session code field. Four
+            uploads sharing a session code (one per seat, within 10 minutes) reconstruct the full
+            52-character deck URL server-side and archive a zip containing the original images.
+          </p>
+          <p className="text-sm text-gray-400 mb-4">
+            Requires the backend to be reachable (<code className="bg-gray-800 px-1 rounded">npm run server</code> locally,
+            or the <code className="bg-gray-800 px-1 rounded">docker/Dockerfile.server</code> image running with a
+            <code className="bg-gray-800 px-1 rounded"> GAME_MODE_STORAGE</code> volume mounted). Game Mode is a no-op on
+            the GitHub Pages standalone build.
+          </p>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={gameModeEnabled}
+              onChange={(e) => handleGameModeToggle(e.target.checked)}
+              className="rounded"
+            />
+            <span>Enable Game Mode uploads</span>
+          </label>
+          {gameModeEnabled && (
+            <p className="text-xs text-gray-500 mt-2">
+              Session codes are 6-character alphanumeric (ABCDEFGHJKLMNPQRSTUVWXYZ23456789).
+              First uploader can leave it blank and the server will generate one — share that
+              code with the other three players for the remaining uploads.
+            </p>
+          )}
         </section>
       </div>
     </div>

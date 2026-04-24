@@ -46,6 +46,31 @@ const Upload: React.FC = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [autoSave, setAutoSave] = useState(true);
 
+  // ── Game Mode ──
+  // Gated by a localStorage toggle set in Settings. When on, uploads
+  // are routed through /api/game-mode/upload and require a seat
+  // (dealer|bid1|bid2|bid3). Four uploads within 10 minutes that share
+  // a session code reconstruct the full deck URL server-side.
+  const [gameModeEnabled, setGameModeEnabled] = useState<boolean>(() =>
+    localStorage.getItem('gameModeEnabled') === '1'
+  );
+  const [gmSeat, setGmSeat] = useState<string>('dealer');
+  const [gmSession, setGmSession] = useState<string>(() => localStorage.getItem('gameModeSession') || '');
+  const [gmResult, setGmResult] = useState<{
+    status?: string; session?: string; detectedCards?: string[];
+    seatsFilled?: string[]; seatsMissing?: string[]; url?: string;
+    errors?: string[];
+  } | null>(null);
+  const [gmLoading, setGmLoading] = useState(false);
+
+  useEffect(() => {
+    const onStorage = () => {
+      setGameModeEnabled(localStorage.getItem('gameModeEnabled') === '1');
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   useEffect(() => {
     fetch('/api/settings/auto-save')
       .then(res => res.json())
@@ -141,6 +166,48 @@ const Upload: React.FC = () => {
     setError(null);
     setLabelStudioUrl(null);
     setReportError(null);
+    setGmResult(null);
+  };
+
+  const handleGameModeUpload = async () => {
+    if (!selectedFile) return;
+    setGmLoading(true);
+    setError(null);
+    setResult(null);
+    setGmResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+      formData.append('seat', gmSeat);
+      if (gmSession.trim()) formData.append('session', gmSession.trim().toUpperCase());
+
+      const response = await fetch('/api/game-mode/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Upload failed');
+      }
+      // If the server generated a session code, persist it so the next
+      // uploader (same browser) doesn't have to retype it.
+      if (data.session) {
+        setGmSession(data.session);
+        localStorage.setItem('gameModeSession', data.session);
+      }
+      setGmResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Game Mode upload failed');
+    } finally {
+      setGmLoading(false);
+    }
+  };
+
+  const handleGmClearSession = () => {
+    setGmSession('');
+    setGmResult(null);
+    localStorage.removeItem('gameModeSession');
   };
 
   const handleReportIncorrect = async () => {
@@ -254,14 +321,60 @@ const Upload: React.FC = () => {
 
           {selectedFile && (
             <>
+              {gameModeEnabled && (
+                <div className="bg-purple-900/30 border border-purple-700 p-3 rounded mb-3 space-y-2">
+                  <div className="text-sm font-semibold text-purple-200">Game Mode upload</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Seat</label>
+                      <select
+                        value={gmSeat}
+                        onChange={e => setGmSeat(e.target.value)}
+                        className="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm"
+                      >
+                        <option value="dealer">Dealer</option>
+                        <option value="bid1">1st bidder</option>
+                        <option value="bid2">2nd bidder</option>
+                        <option value="bid3">3rd bidder</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Session code (blank → new)</label>
+                      <input
+                        type="text"
+                        value={gmSession}
+                        onChange={e => setGmSession(e.target.value.toUpperCase())}
+                        placeholder="ABCDEF"
+                        maxLength={6}
+                        className="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm uppercase font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    4 uploads (one per seat) within 10 minutes will reconstruct the deck URL and
+                    archive a zip to the server's storage directory.
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-4 mb-4">
-                <button
-                  onClick={handleUpload}
-                  disabled={loading}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  {loading ? 'Detecting...' : 'Detect Cards'}
-                </button>
+                {gameModeEnabled ? (
+                  <button
+                    onClick={handleGameModeUpload}
+                    disabled={gmLoading}
+                    className="flex-1 bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {gmLoading ? 'Uploading…' : 'Upload Game Mode image'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleUpload}
+                    disabled={loading}
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {loading ? 'Detecting...' : 'Detect Cards'}
+                  </button>
+                )}
                 <button
                   onClick={handleClear}
                   className="bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 transition-colors"
@@ -269,6 +382,53 @@ const Upload: React.FC = () => {
                   Clear
                 </button>
               </div>
+
+              {gmResult && (
+                <div className="p-4 rounded mb-4 bg-gray-800 border border-gray-700">
+                  <div className="text-sm text-gray-300 mb-2">
+                    Session <code className="font-mono text-purple-300">{gmResult.session}</code>
+                    {' '}— <span className="font-semibold text-white">{gmResult.status}</span>
+                  </div>
+                  {gmResult.status === 'accepted' && (
+                    <>
+                      <div className="text-sm text-gray-400">
+                        Seats filled: {(gmResult.seatsFilled ?? []).join(', ') || '(none)'}
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        Seats missing: {(gmResult.seatsMissing ?? []).join(', ') || '(none)'}
+                      </div>
+                    </>
+                  )}
+                  {gmResult.status === 'completed' && gmResult.url && (
+                    <>
+                      <div className="text-sm text-gray-400 mb-1">Reconstructed deck URL:</div>
+                      <div className="font-mono text-xs text-green-300 break-all bg-gray-900 p-2 rounded">
+                        {gmResult.url}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        Zip archived server-side at the reconstructed URL's filename.
+                      </div>
+                    </>
+                  )}
+                  {gmResult.errors && gmResult.errors.length > 0 && (
+                    <ul className="text-sm text-red-400 mt-2 list-disc list-inside">
+                      {gmResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  )}
+                  {gmResult.detectedCards && gmResult.detectedCards.length > 0 && (
+                    <div className="text-xs text-gray-500 mt-2">
+                      Detected {gmResult.detectedCards.length} cards:
+                      {' '}{gmResult.detectedCards.join(', ')}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleGmClearSession}
+                    className="mt-2 text-xs text-gray-400 hover:text-gray-200 underline"
+                  >
+                    Forget session code
+                  </button>
+                </div>
+              )}
 
               {error && (
                 <div className="p-4 bg-red-100 text-red-700 rounded mb-4">
