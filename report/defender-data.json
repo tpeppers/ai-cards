@@ -1,0 +1,85 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "timestamp": "2026-04-24T06:57:55.247Z"
+  },
+  "baselineVsFamily": {
+    "wins": 10118,
+    "losses": 9770,
+    "games": 19888,
+    "winRate": 0.5087489943684634,
+    "ci95": 0.006948067417912784
+  },
+  "results": [
+    {
+      "variantKey": "DF1_defender_unconditional",
+      "vsBaseline": {
+        "wins": 9884,
+        "losses": 10492,
+        "games": 20376,
+        "winRate": 0.4850804868472713,
+        "ci95": 0.0068623550274280205
+      },
+      "vsFamily": {
+        "wins": 9648,
+        "losses": 10192,
+        "games": 19840,
+        "winRate": 0.48629032258064514,
+        "ci95": 0.006954916568183527
+      }
+    },
+    {
+      "variantKey": "DF2_weak_defender_only",
+      "vsBaseline": {
+        "wins": 10196,
+        "losses": 10484,
+        "games": 20680,
+        "winRate": 0.493036750483559,
+        "ci95": 0.006814102926396519
+      },
+      "vsFamily": {
+        "wins": 9582,
+        "losses": 10002,
+        "games": 19584,
+        "winRate": 0.4892769607843137,
+        "ci95": 0.007001248280672004
+      }
+    },
+    {
+      "variantKey": "DF3_defender_replace_signal",
+      "vsBaseline": {
+        "wins": 9884,
+        "losses": 10492,
+        "games": 20376,
+        "winRate": 0.4850804868472713,
+        "ci95": 0.0068623550274280205
+      },
+      "vsFamily": {
+        "wins": 9648,
+        "losses": 10192,
+        "games": 19840,
+        "winRate": 0.48629032258064514,
+        "ci95": 0.006954916568183527
+      }
+    },
+    {
+      "variantKey": "DF4_universal",
+      "vsBaseline": {
+        "wins": 9834,
+        "losses": 10430,
+        "games": 20264,
+        "winRate": 0.4852941176470588,
+        "ci95": 0.006881380340344839
+      },
+      "vsFamily": {
+        "wins": 9510,
+        "losses": 10298,
+        "games": 19808,
+        "winRate": 0.4801090468497577,
+        "ci95": 0.0069576380566274704
+      }
+    }
+  ]
+}

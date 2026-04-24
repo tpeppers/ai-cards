@@ -343,6 +343,51 @@ function trumpPower(ctx: StrategyContext, direction: string): number {
   return suitPower(ctx, ctx.trumpSuit, direction);
 }
 
+/**
+ * Sluff-candidate filter: returns the non-trump cards that are "safe to
+ * discard" in a void-play situation, specifically for defensive play.
+ *
+ * For each non-trump suit in my hand:
+ *   - If I hold only 1 card in the suit: it IS a sluff candidate (there's
+ *     no backing card to preserve; the single card is expendable).
+ *   - If I hold 2+ cards in the suit AND my highest card is already boss:
+ *     all cards in the suit are sluff candidates (no backing needed).
+ *   - If I hold 2+ cards AND my highest has at least one higher card still
+ *     outstanding: the highest card is a "potential winner" (becomes boss
+ *     after the outstanding higher cards are played) and the LOWEST card
+ *     is its "backing card" (protects the potential winner when its
+ *     higher card is led against us). Cards in the MIDDLE of that suit
+ *     are sluff candidates.
+ *
+ * The idea: when on defense against a likely-whisting hand, preserving
+ * the K+2 of a non-trump suit (with A outstanding) gives your team a
+ * single guaranteed book — preventing the whisting.
+ */
+function computeSluffCandidates(ctx: StrategyContext): CardSet {
+  const protectedIds = new Set<string>();
+  const bySuit: Record<string, Card[]> = {};
+  for (const c of ctx.hand) {
+    if (c.suit === ctx.trumpSuit) continue; // trump not sluff-able here
+    if (!bySuit[c.suit]) bySuit[c.suit] = [];
+    bySuit[c.suit].push(c);
+  }
+
+  for (const suit of Object.keys(bySuit)) {
+    const cards = bySuit[suit].slice()
+      .sort((a, b) => ctx.getCardValue(b) - ctx.getCardValue(a)); // high → low
+    if (cards.length < 2) continue; // singleton — no backing to protect
+    const highest = cards[0];
+    if (cardsAbove(highest, ctx) === 0) continue; // already boss
+    // Protect both the potential winner and the backing card
+    protectedIds.add(highest.id);
+    protectedIds.add(cards[cards.length - 1].id);
+  }
+
+  return {
+    cards: ctx.hand.filter(c => c.suit !== ctx.trumpSuit && !protectedIds.has(c.id)),
+  };
+}
+
 // ── Expression Evaluator ────────────────────────────────────────────
 
 function evalExpr(expr: Expression, ctx: StrategyContext): any {
@@ -484,6 +529,8 @@ function evalCall(name: string, args: any[], ctx: StrategyContext): any {
         ? suitPower(ctx, args[0], args[1]) : 0; break;
     case 'trump_power':
       result = typeof args[0] === 'string' ? trumpPower(ctx, args[0]) : 0; break;
+    case 'sluff_candidates':
+      result = computeSluffCandidates(ctx); break;
     default:
       result = undefined;
   }

@@ -229,6 +229,127 @@ bid:
   });
 });
 
+describe('sluff_candidates primitive', () => {
+  // Play a rule that picks a card from sluff_candidates; inspect via evalPlay.
+  // The existing test harness uses bid-phase so we test via a minimal
+  // context-level check: confirm the function exists and returns a
+  // CardSet, and spot-check membership.
+  const { evaluatePlay } = require('./evaluator.ts');
+  const { buildBidWhistContext } = require('./context.ts');
+  // Construct a context directly with a fixed hand.
+  const mkCtx = (hand: Card[], trumpSuit: string | null, played: Card[] = []): StrategyContext => ({
+    hand,
+    currentTrick: [],
+    leadSuit: null,
+    trumpSuit,
+    playerId: 0,
+    declarer: 1,
+    dealer: 0,
+    isDealer: false,
+    onDeclarerTeam: false,
+    amDeclarer: false,
+    partnerIsDeclarer: false,
+    hasTrump: trumpSuit !== null && hand.some(c => c.suit === trumpSuit),
+    partnerWinning: false,
+    partnerLed: false,
+    isFirstTrick: true,
+    heartsBroken: false,
+    bidDirection: 'uptown',
+    currentHighBid: 2,
+    bids: [],
+    bidCount: 0,
+    partnerBid: 0,
+    enemyBid: 0,
+    haveSignaled: false,
+    partnerSignal: '',
+    enemySignal1: '',
+    enemySignal2: '',
+    enemyHasTrump: true,
+    partnerHasTrump: true,
+    partnerVoidSuits: [],
+    getCardValue: (c: Card) => (c.rank === 1 ? 14 : c.rank),
+    compareCards: () => 0,
+    evaluateCurrentWinner: () => -1,
+    playedCards: played,
+  });
+
+  const STRAT = `strategy "sluff"
+game: bidwhist
+
+play:
+  leading:
+    default:
+      play sluff_candidates().weakest
+  following:
+    default:
+      play hand.weakest
+  void:
+    default:
+      play hand.weakest
+`;
+
+  it('returns empty when all non-trump cards are protected', () => {
+    // Hand: K+2 hearts only (trump=spades). Hearts: K is potential winner,
+    // 2 is backing → both protected → no sluff candidates.
+    const h: Card[] = [
+      { suit: 'hearts', rank: 13, id: 'hearts_13' },
+      { suit: 'hearts', rank: 2, id: 'hearts_2' },
+    ];
+    const ast = parseStrategy(STRAT);
+    const ctx = mkCtx(h, 'spades');
+    const result = evaluatePlay(ast, ctx);
+    // With empty sluff_candidates, picking weakest gives null → play rule returns null
+    expect(result).toBeNull();
+  });
+
+  it('returns middle cards as sluff candidates, protects high + low', () => {
+    // Hand: K+Q+2 hearts. K is potential winner, 2 is backing; Q is middle.
+    const h: Card[] = [
+      { suit: 'hearts', rank: 13, id: 'hearts_13' },
+      { suit: 'hearts', rank: 12, id: 'hearts_12' },
+      { suit: 'hearts', rank: 2, id: 'hearts_2' },
+    ];
+    const ast = parseStrategy(STRAT);
+    const ctx = mkCtx(h, 'spades');
+    const result = evaluatePlay(ast, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('hearts_12'); // Q is the only sluff candidate
+  });
+
+  it('singletons are sluff candidates (no backing to preserve)', () => {
+    // Hand: singleton 2H + K+Q+2 clubs. Hearts 2H has no partner in hand
+    // so it's always sluff-able. Clubs: K=potential winner, 2=backing, Q=middle.
+    const h: Card[] = [
+      { suit: 'hearts', rank: 2, id: 'hearts_2' },
+      { suit: 'clubs', rank: 13, id: 'clubs_13' },
+      { suit: 'clubs', rank: 12, id: 'clubs_12' },
+      { suit: 'clubs', rank: 2, id: 'clubs_2' },
+    ];
+    const ast = parseStrategy(STRAT);
+    const ctx = mkCtx(h, 'spades');
+    const result = evaluatePlay(ast, ctx);
+    // Weakest of {2H, QC}. Under this test's value function, 2H = 2, QC = 12.
+    // So weakest = 2H.
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('hearts_2');
+  });
+
+  it('already-boss cards do not need backing (all sluff-able)', () => {
+    // Hand: A+K+2 hearts; trump=spades. A is already boss (nothing above),
+    // so no backing is protected; all three are sluff candidates.
+    const h: Card[] = [
+      { suit: 'hearts', rank: 1, id: 'hearts_1' },
+      { suit: 'hearts', rank: 13, id: 'hearts_13' },
+      { suit: 'hearts', rank: 2, id: 'hearts_2' },
+    ];
+    const ast = parseStrategy(STRAT);
+    const ctx = mkCtx(h, 'spades');
+    const result = evaluatePlay(ast, ctx);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('hearts_2');
+  });
+});
+
 describe('am_declarer / partner_is_declarer DSL variables', () => {
   const h = hand('amlk' + 'bcdefghi'); // AKQJ hearts + 8 low hearts
 
