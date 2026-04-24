@@ -1,0 +1,90 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "timestamp": "2026-04-24T00:27:25.994Z"
+  },
+  "results": [
+    {
+      "opponent": "Standard (Ignore Signals)",
+      "claudeFamWins": 14190,
+      "opponentWins": 4858,
+      "games": 19048,
+      "winRate": 0.744960100797984,
+      "ci95": 0.006190161085308504
+    },
+    {
+      "opponent": "Standard (Partner Signals)",
+      "claudeFamWins": 15188,
+      "opponentWins": 4092,
+      "games": 19280,
+      "winRate": 0.787759336099585,
+      "ci95": 0.005771831363542622
+    },
+    {
+      "opponent": "Standard (All Signals)",
+      "claudeFamWins": 14380,
+      "opponentWins": 4948,
+      "games": 19328,
+      "winRate": 0.7439983443708609,
+      "ci95": 0.006152760134635138
+    },
+    {
+      "opponent": "Conservative (Ignore Signals)",
+      "claudeFamWins": 13780,
+      "opponentWins": 3508,
+      "games": 17288,
+      "winRate": 0.7970846830171217,
+      "ci95": 0.0059950573454159795
+    },
+    {
+      "opponent": "Conservative (Partner Signals)",
+      "claudeFamWins": 14770,
+      "opponentWins": 3062,
+      "games": 17832,
+      "winRate": 0.8282862270076268,
+      "ci95": 0.005535397700367006
+    },
+    {
+      "opponent": "Conservative (All Signals)",
+      "claudeFamWins": 13428,
+      "opponentWins": 3964,
+      "games": 17392,
+      "winRate": 0.7720791168353266,
+      "ci95": 0.006234537915248707
+    },
+    {
+      "opponent": "Family",
+      "claudeFamWins": 10118,
+      "opponentWins": 9770,
+      "games": 19888,
+      "winRate": 0.5087489943684634,
+      "ci95": 0.006948067417912784
+    },
+    {
+      "opponent": "Family (Constants)",
+      "claudeFamWins": 10118,
+      "opponentWins": 9770,
+      "games": 19888,
+      "winRate": 0.5087489943684634,
+      "ci95": 0.006948067417912784
+    },
+    {
+      "opponent": "Family (Powered)",
+      "claudeFamWins": 10250,
+      "opponentWins": 8862,
+      "games": 19112,
+      "winRate": 0.536312264545835,
+      "ci95": 0.007070085596800355
+    },
+    {
+      "opponent": "Claude",
+      "claudeFamWins": 10302,
+      "opponentWins": 9378,
+      "games": 19680,
+      "winRate": 0.5234756097560975,
+      "ci95": 0.00697805385946923
+    }
+  ]
+}

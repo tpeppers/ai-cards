@@ -588,6 +588,7 @@ function navBar(active: string): string {
     ['aces-signal.html', 'Aces Signal'],
     ['aces-full.html', 'Full Receiver'],
     ['lead-declarer.html', 'Lead Role-Aware'],
+    ['claudefam.html', 'ClaudeFam'],
   ];
   return `<nav>${pages.map(([href, label]) => {
     const cls = href === active ? ' class="active"' : '';
@@ -1013,6 +1014,9 @@ function renderIndex(
     <li><strong><a href="variants.html">Variants</a></strong> — Targeted single-rule modifications to bidding, play (leading/following/void), and discard sections.</li>
     <li><strong><a href="bid3-analysis.html">Bid 3 Deep-dive</a></strong> — Why disabling bid 3 helps, with side-by-side trick-by-trick case studies on specific decks.</li>
     <li><strong><a href="aces-signal.html">Aces Signal</a></strong> — Can bid 3 be resurrected by redefining it as "I have 2+ aces" with matching receiver logic?</li>
+    <li><strong><a href="aces-full.html">Full Receiver</a></strong> — Fuller aces-signal experiment wiring the signal into seat-3 push + dealer take.</li>
+    <li><strong><a href="lead-declarer.html">Lead Role-Aware</a></strong> — Test of the "partner-of-declarer cashes winners" heuristic using the new <code>partner_is_declarer</code> DSL variable.</li>
+    <li><strong><a href="claudefam.html">ClaudeFam</a></strong> — The consolidated best strategy, benchmarked against every registered Bid Whist strategy.</li>
   </ul>
 </section>
 
@@ -1101,6 +1105,13 @@ ${leadDeclarer ? `      <tr>
         <td class="${leadDeclarer.winnersCount > 0 ? 'good' : 'muted'}">${leadDeclarer.winnersCount} beat baseline, ${leadDeclarer.losersCount} worse, ${leadDeclarer.tiesCount} tied (best Δ: ${(leadDeclarer.bestDelta * 100 >= 0 ? '+' : '') + (leadDeclarer.bestDelta * 100).toFixed(2)}pp)</td>
         <td>See <a href="lead-declarer.html">Lead Role-Aware</a>.</td>
       </tr>` : ''}
+      <tr>
+        <td><strong>Final</strong></td>
+        <td><strong>ClaudeFam: consolidated strategy</strong></td>
+        <td>The minimal-justified-delta strategy — Family + two proven changes (sig=17 signals, bid 3 removed). Benchmarked against every registered Bid Whist strategy.</td>
+        <td class="good">Beats Family at p&lt;0.05; dominates Standard/Conservative variants</td>
+        <td>See <a href="claudefam.html">ClaudeFam</a>.</td>
+      </tr>
     </tbody>
   </table>
   <details>

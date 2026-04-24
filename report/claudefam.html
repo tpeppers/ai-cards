@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ClaudeFam — consolidated best strategy</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>hand_power signaling: finding the optimal threshold</h1>
+  <nav><a href="index.html">Overview</a><a href="sweep.html">Sweep Data</a><a href="cases.html">Case Studies</a><a href="playable.html">Playable Hands</a><a href="addendum.html">Addendum</a><a href="variants.html">Variants</a><a href="bid3-analysis.html">Bid 3 Deep-dive</a><a href="aces-signal.html">Aces Signal</a><a href="aces-full.html">Full Receiver</a><a href="lead-declarer.html">Lead Role-Aware</a><a href="claudefam.html" class="active">ClaudeFam</a></nav>
+</header>
+<main>
+
+<section>
+  <h2>ClaudeFam: the consolidated best strategy</h2>
+  <p>
+    ClaudeFam is the end-state of the research project documented in this report.
+    It takes the Family strategy as a starting point and adopts <em>only</em> the
+    modifications that beat baseline at 95% confidence in the 20k-game head-to-head
+    sweeps. Everything else — 22+ tested ideas — ties or hurts, and was rejected.
+  </p>
+
+  <h3>What changed from Family</h3>
+  <ol>
+    <li>
+      <strong>Bid 1 and bid 2 signals</strong> use <code>hand_power(direction) &gt;= 17</code>
+      instead of Family's <code>deuce_trey_count() &gt;= 3</code> / <code>king_ace_count() &gt;= 3</code>.
+      (<a href="sweep.html">Sweep</a> shows sig=17 peaks at +0.87pp over Family across all tested thresholds.)
+    </li>
+    <li>
+      <strong>Bid 3 is removed entirely.</strong> At sig=17 it fires on &lt;1% of hands, and in
+      those rare firings the declarer team does worse than if they'd bid 4 via length or bid
+      2 via strength. (<a href="bid3-analysis.html">Bid 3 Deep-dive</a> walks through both
+      mechanisms.)
+    </li>
+  </ol>
+
+  <h3>What stayed the same</h3>
+  <p>
+    Everything else in Family — leading / following / void play rules, trump-selection with
+    the +3 partner-trust bonus, discard rules, seat-3 hot-seat behavior, dealer rules — is
+    unchanged. Across the full project, <strong>every other tested modification either tied
+    with baseline or lost</strong>. Family's rules are well-tuned for their roles.
+  </p>
+
+  <h3>Notable null / negative results (NOT included)</h3>
+  <ul>
+    <li>Bid 3 as "2+ aces" signal (any threshold, with or without full receiver wiring)</li>
+    <li>Opponent-signal defensive take / seat-3 contested push</li>
+    <li>Sig-17 receiver boost for bid 1/2 (stronger partner-signal interpretation)</li>
+    <li>Bid 4 on hand_power + suit length</li>
+    <li>Lead strongest non-trump, gated OR blanket</li>
+    <li>Pull-trump threshold &gt;= 2 or &gt;= 3</li>
+    <li>Seat-3 bid 3 instead of bid 4 (cost 12pp!)</li>
+    <li>Discard suit_keepers(2), smart-discard opposite direction</li>
+    <li>min_stoppers compound guard on hand_power signals</li>
+    <li>Dealer opens with bid 2 instead of bid 1</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Benchmark: ClaudeFam vs every registered Bid Whist strategy</h2>
+  <p>
+    N = <strong>20,000</strong> head-to-head games per matchup. Same seeded
+    deck pool for all opponents, round-robin assignment (each pair plays both team positions).
+    Win rate is ClaudeFam's share of wins; &gt; 50% means ClaudeFam is stronger.
+  </p>
+  <div class="kpi">
+    <div class="box"><div class="value">10</div><div class="label">Opponents faced</div></div>
+    <div class="box"><div class="value">10</div><div class="label">Beat at p&lt;0.05</div></div>
+    <div class="box"><div class="value">0</div><div class="label">Tied</div></div>
+    <div class="box"><div class="value">0</div><div class="label">Lost</div></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Opponent</th>
+        <th>ClaudeFam W</th>
+        <th>Opponent W</th>
+        <th>Games</th>
+        <th>ClaudeFam win rate</th>
+        <th>Verdict</th>
+      </tr>
+    </thead>
+    <tbody>
+<tr class="highlight-row">
+<td>Family</td>
+<td class="num">10118</td>
+<td class="num">9770</td>
+<td class="num">19888</td>
+<td class="num ">50.87% ±0.69%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+<tr>
+<td>Family (Constants)</td>
+<td class="num">10118</td>
+<td class="num">9770</td>
+<td class="num">19888</td>
+<td class="num ">50.87% ±0.69%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+<tr>
+<td>Claude</td>
+<td class="num">10302</td>
+<td class="num">9378</td>
+<td class="num">19680</td>
+<td class="num good">52.35% ±0.70%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+<tr>
+<td>Family (Powered)</td>
+<td class="num">10250</td>
+<td class="num">8862</td>
+<td class="num">19112</td>
+<td class="num good">53.63% ±0.71%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+<tr>
+<td>Standard (All Signals)</td>
+<td class="num">14380</td>
+<td class="num">4948</td>
+<td class="num">19328</td>
+<td class="num good">74.40% ±0.62%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+<tr>
+<td>Standard (Ignore Signals)</td>
+<td class="num">14190</td>
+<td class="num">4858</td>
+<td class="num">19048</td>
+<td class="num good">74.50% ±0.62%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+<tr>
+<td>Conservative (All Signals)</td>
+<td class="num">13428</td>
+<td class="num">3964</td>
+<td class="num">17392</td>
+<td class="num good">77.21% ±0.62%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+<tr>
+<td>Standard (Partner Signals)</td>
+<td class="num">15188</td>
+<td class="num">4092</td>
+<td class="num">19280</td>
+<td class="num good">78.78% ±0.58%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+<tr>
+<td>Conservative (Ignore Signals)</td>
+<td class="num">13780</td>
+<td class="num">3508</td>
+<td class="num">17288</td>
+<td class="num good">79.71% ±0.60%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+<tr>
+<td>Conservative (Partner Signals)</td>
+<td class="num">14770</td>
+<td class="num">3062</td>
+<td class="num">17832</td>
+<td class="num good">82.83% ±0.55%</td>
+<td><span class="tag made">beats</span></td>
+</tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Against Family specifically (the starting baseline)</h2>
+  <p>
+    ClaudeFam wins <strong>10,118</strong> of
+    <strong>19,888</strong> head-to-head games against Family:
+    <strong>50.87% ± 0.69%</strong>.
+    CI lower bound <strong>50.18%</strong>.
+  </p>
+  <p>
+    The full CI lies above 0.50 — ClaudeFam beats Family at 95% confidence by at least
+         <strong>0.18pp</strong>.
+  </p>
+</section>
+
+<section>
+  <h2>Against Family (Powered) — the old-named experimental sibling</h2>
+  <p>
+    Family (Powered) is the registered version of the original hand_power experiment with
+    sig=9 (the wrong threshold, before the main sweep corrected it). ClaudeFam wins this
+    matchup by <strong>3.63pp</strong> (point
+    estimate). This is the magnitude of the "finding the right threshold" contribution.
+  </p>
+</section>
+
+<section>
+  <h2>Interpretation</h2>
+  <p>
+    ClaudeFam is a minimal, justified delta from Family — not a union of every idea that
+    didn't hurt. That's on purpose: the report has 24 areas tested, most tied or
+    lost, and a union-of-everything-tied strategy would be overfitted in ways a single
+    head-to-head sweep can't detect. The two changes that make it in are each individually
+    supported by large-N CIs clear of 0.50.
+  </p>
+  <p>
+    The practical improvement over Family is small (~0.9pp). The big win of the project
+    isn't raw performance but <em>structural</em>: the DSL now has <code>hand_power</code>,
+    <code>let</code> constants, <code>am_declarer</code>, and <code>partner_is_declarer</code>
+    as reusable primitives. Future strategies can be parameterized and optimized through
+    the existing sweep infrastructure without reparsing DSL source on every change.
+  </p>
+</section>
+
+<section>
+  <h2>How to use ClaudeFam</h2>
+  <p>
+    It's in the strategy registry as <code>ClaudeFam</code>. Select it via the
+    <code>StrategyConfigModal</code> in the app, or load the text directly from
+    <code>src/strategies/claudeFam.ts</code>. That file has extensive inline comments
+    documenting every rule's provenance with references to this report.
+  </p>
+  <h3>Reproduce</h3>
+  <pre>node scripts/claudefam-benchmark.js
+# or with custom N:
+REPORT_HANDS=40000 node scripts/claudefam-benchmark.js</pre>
+</section>
+
+</main>
+<footer>
+  Generated from <code>scripts/claudefam-benchmark.js</code>. Source:
+  <code>src/simulation/runClaudeFamBenchmark.ts</code>. Strategy:
+  <code>src/strategies/claudeFam.ts</code>.
+</footer>
+</body>
+</html>

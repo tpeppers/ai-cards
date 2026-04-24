@@ -808,6 +808,13 @@ export const BIDWHIST_FAMILY_POWERED =
 
 export const BIDWHIST_CLAUDE = buildStrategy('Claude', CLAUDE_PLAY, CLAUDE_BID, CLAUDE_TRUMP, CLAUDE_DISCARD);
 
+// ── ClaudeFam ────────────────────────────────────────────────────────
+// See src/strategies/claudeFam.ts for the fully-annotated text and
+// the design rationale referencing the research pages under report/.
+
+import { BIDWHIST_CLAUDEFAM } from './claudeFam.ts';
+export { BIDWHIST_CLAUDEFAM };
+
 // Backward-compatible aliases (point to Partner Signals variants)
 export const BIDWHIST_STANDARD = BIDWHIST_STANDARD_PARTNER;
 export const BIDWHIST_CONSERVATIVE = BIDWHIST_CONSERVATIVE_PARTNER;
@@ -936,5 +943,6 @@ export const STRATEGY_REGISTRY: StrategyRegistryEntry[] = [
   { name: 'Family (Constants)', game: 'bidwhist', text: BIDWHIST_FAMILY_CONSTANTS },
   { name: 'Family (Powered)', game: 'bidwhist', text: BIDWHIST_FAMILY_POWERED },
   { name: 'Claude', game: 'bidwhist', text: BIDWHIST_CLAUDE },
+  { name: 'ClaudeFam', game: 'bidwhist', text: BIDWHIST_CLAUDEFAM },
   { name: 'Standard', game: 'hearts', text: HEARTS_STANDARD },
 ];
