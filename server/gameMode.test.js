@@ -32,7 +32,7 @@ test('STORAGE_DIR honors env var', () => {
   assert.strictEqual(STORAGE_DIR, path.resolve(tmpDir));
 });
 
-test('first upload creates a session and returns code', () => {
+test('first upload creates a session (single-session default routes to DEFAULT)', () => {
   _sessions.clear();
   const r = registerUpload({
     sessionCode: null,
@@ -42,7 +42,10 @@ test('first upload creates a session and returns code', () => {
     imageExt: 'png',
   });
   assert.strictEqual(r.status, 'accepted');
-  assert.ok(r.session && r.session.length === 6);
+  // In the default single-session mode, sessions are keyed by the fixed
+  // code 'DEFAULT'. Multi-session behavior (6-char random code) is
+  // covered by tests that exercise the MULTI_SESSION env var path.
+  assert.strictEqual(r.session, 'DEFAULT');
   assert.deepStrictEqual(r.seatsFilled, ['dealer']);
   assert.ok(r.seatsMissing.includes('bid1'));
 });
@@ -120,6 +123,69 @@ test('complete session writes zip and returns URL', () => {
 
   // Session is cleared
   assert.strictEqual(getSessionStatus(code), null);
+});
+
+test('single-session mode: ignores provided code, uses DEFAULT', () => {
+  _sessions.clear();
+  // In the default (single-session) environment, the client sends a
+  // code but the server should route to DEFAULT regardless.
+  const r1 = registerUpload({
+    sessionCode: 'IGNORED',
+    seat: 'dealer',
+    cards: ['Ah','Kh','Qh','Jh','10h','9h','8h','7h','6h','5h','4h','3h'],
+    imageBuffer: Buffer.from('a'), imageExt: 'png',
+  });
+  assert.strictEqual(r1.session, 'DEFAULT');
+  const r2 = registerUpload({
+    sessionCode: 'ALSO_IGNORED',
+    seat: 'bid1',
+    cards: ['As','Ks','Qs','Js','10s','9s','8s','7s','6s','5s','4s','3s'],
+    imageBuffer: Buffer.from('b'), imageExt: 'png',
+  });
+  assert.strictEqual(r2.session, 'DEFAULT');
+  assert.deepStrictEqual(r2.seatsFilled.sort(), ['bid1', 'dealer']);
+});
+
+test('newHand archives partial zip when 2+ seats filled', () => {
+  _sessions.clear();
+  const rank = r => r === 1 ? 'A' : r === 11 ? 'J' : r === 12 ? 'Q' : r === 13 ? 'K' : String(r);
+  const build = (s) => Array.from({length: 12}, (_, i) => `${rank(i+1)}${s}`);
+  const { newHand } = require('./gameMode');
+
+  registerUpload({ sessionCode: null, seat: 'dealer', cards: build('h'), imageBuffer: Buffer.from('a'), imageExt: 'png' });
+  registerUpload({ sessionCode: null, seat: 'bid1',   cards: build('s'), imageBuffer: Buffer.from('b'), imageExt: 'png' });
+
+  const r = newHand(null);
+  assert.strictEqual(r.status, 'archived');
+  assert.ok(r.url);
+  assert.strictEqual(r.url.length, 52);
+  // 2 missing seats × 12 positions + 4 kitty = 28 underscores
+  let u = 0;
+  for (const c of r.url) if (c === '_') u++;
+  assert.strictEqual(u, 28);
+  assert.ok(fs.existsSync(r.zipPath));
+  // Session is cleared
+  assert.strictEqual(getSessionStatus(null), null);
+});
+
+test('newHand with 0 uploads returns empty', () => {
+  _sessions.clear();
+  const { newHand } = require('./gameMode');
+  const r = newHand(null);
+  assert.strictEqual(r.status, 'empty');
+});
+
+test('newHand with 1 upload discards (too little to archive)', () => {
+  _sessions.clear();
+  const { newHand } = require('./gameMode');
+  registerUpload({
+    sessionCode: null, seat: 'dealer',
+    cards: ['Ah','Kh','Qh','Jh','10h','9h','8h','7h','6h','5h','4h','3h'],
+    imageBuffer: Buffer.from('a'), imageExt: 'png',
+  });
+  const r = newHand(null);
+  assert.strictEqual(r.status, 'discarded');
+  assert.strictEqual(getSessionStatus(null), null);
 });
 
 test('session expires cross-seat duplicate card with clear error', () => {

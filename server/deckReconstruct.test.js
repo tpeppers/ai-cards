@@ -137,6 +137,47 @@ test('dedup within-image handles rotated-card double detections', () => {
   assert.ok(letters.has('b'));
 });
 
+test('allowPartial: 2 seats → underscores for missing 2 seats (24 + 4 kitty = 28 underscores)', () => {
+  const hands = splitDeck();
+  // Only dealer + bid1 submit
+  const r = reconstructDeck(
+    { dealer: hands.dealer, bid1: hands.bid1 },
+    { allowPartial: true },
+  );
+  assert.deepStrictEqual(r.errors, []);
+  assert.strictEqual(r.url.length, 52);
+  assert.strictEqual(r.url.slice(48), '____'); // kitty
+  // Positions 2, 6, 10, ..., 46 (bid2 slots) and 3, 7, 11, ..., 47 (bid3 slots) should be underscores
+  let underscoreCount = 0;
+  for (let i = 0; i < 52; i++) if (r.url[i] === '_') underscoreCount++;
+  assert.strictEqual(underscoreCount, 12 + 12 + 4); // bid2 + bid3 + kitty
+  assert.deepStrictEqual(r.seatsProvided.sort(), ['bid1', 'dealer']);
+});
+
+test('allowPartial: 3 seats → underscores only for 1 missing seat + kitty', () => {
+  const hands = splitDeck();
+  const r = reconstructDeck(
+    { dealer: hands.dealer, bid1: hands.bid1, bid2: hands.bid2 },
+    { allowPartial: true },
+  );
+  assert.deepStrictEqual(r.errors, []);
+  assert.strictEqual(r.url.length, 52);
+  let underscoreCount = 0;
+  for (let i = 0; i < 52; i++) if (r.url[i] === '_') underscoreCount++;
+  assert.strictEqual(underscoreCount, 12 + 4); // bid3 + kitty
+});
+
+test('allowPartial still rejects cross-seat duplicates', () => {
+  const hands = splitDeck();
+  hands.bid1[0] = 'Ah'; // duplicate Ah in dealer and bid1
+  const r = reconstructDeck(
+    { dealer: hands.dealer, bid1: hands.bid1 },
+    { allowPartial: true },
+  );
+  assert.strictEqual(r.url, null);
+  assert(r.errors.some(e => /appears in both/i.test(e)));
+});
+
 test('accepts "T" as alternate for 10 via ML output quirks', () => {
   // Some recognizers emit "T" for 10. Make sure our canonical card
   // strings handle it — currently we don't (we expect "10"), so this

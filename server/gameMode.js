@@ -34,6 +34,18 @@ const STORAGE_DIR = process.env.GAME_MODE_STORAGE
   ? path.resolve(process.env.GAME_MODE_STORAGE)
   : path.resolve(__dirname, '..', 'game-mode-storage');
 
+// Multi-session mode — when disabled (default), all uploads from all
+// users share a single session keyed by DEFAULT_SESSION_CODE, and any
+// session code the client sends is ignored. Admin opts in via env var.
+const MULTI_SESSION =
+  process.env.GAME_MODE_MULTI_SESSION === '1' ||
+  process.env.GAME_MODE_MULTI_SESSION === 'true';
+const DEFAULT_SESSION_CODE = 'DEFAULT';
+
+function isMultiSession() {
+  return MULTI_SESSION;
+}
+
 function ensureStorageDir() {
   fs.mkdirSync(STORAGE_DIR, { recursive: true });
 }
@@ -68,6 +80,23 @@ function startCleanupTimer() {
 }
 
 function getOrCreateSession(sessionCode) {
+  // Single-session mode: always use the default code, ignore whatever
+  // the client sent. Avoids accidental fragmentation across users who
+  // forget the convention.
+  if (!MULTI_SESSION) {
+    const existing = sessions.get(DEFAULT_SESSION_CODE);
+    if (existing) {
+      // Single-session sessions have a 10-min TTL only in the sense
+      // that getCleanupTimer will purge it; here we always return it
+      // if it exists (expired ones were swept).
+      return { code: DEFAULT_SESSION_CODE, session: existing, created: false };
+    }
+    const fresh = { createdAt: Date.now(), uploads: {} };
+    sessions.set(DEFAULT_SESSION_CODE, fresh);
+    return { code: DEFAULT_SESSION_CODE, session: fresh, created: true };
+  }
+
+  // Multi-session: explicit code lookup / create-on-first-use.
   if (sessionCode) {
     const existing = sessions.get(sessionCode);
     if (existing) {
@@ -77,7 +106,6 @@ function getOrCreateSession(sessionCode) {
       }
       return { code: sessionCode, session: existing, created: false };
     }
-    // Unknown code — treat as attempting to create with a specific code
     const fresh = { createdAt: Date.now(), uploads: {} };
     sessions.set(sessionCode, fresh);
     return { code: sessionCode, session: fresh, created: true };
@@ -305,16 +333,93 @@ function registerUpload({ sessionCode, seat, cards, imageBuffer, imageExt }) {
 }
 
 function getSessionStatus(sessionCode) {
-  const session = sessions.get(sessionCode);
+  const code = MULTI_SESSION ? sessionCode : DEFAULT_SESSION_CODE;
+  const session = sessions.get(code);
   if (!session) return null;
-  return { session: sessionCode, ...listSessionStatus(session) };
+  return { session: code, ...listSessionStatus(session) };
+}
+
+/**
+ * "New hand" — clear the current session. If the session has 2+ seats
+ * filled, first write a partial zip with `_` filling the missing seat
+ * positions (and kitty), named by the resulting partial URL.
+ *
+ * Returns:
+ *   { status: 'archived',  session, url, zipPath }  — partial saved + cleared
+ *   { status: 'discarded', session }                — had 0 or 1 uploads, cleared without saving
+ *   { status: 'empty',     session }                — no session existed
+ *   { status: 'error',     errors }                 — partial reconstruction failed
+ */
+function newHand(sessionCode) {
+  const code = MULTI_SESSION ? (sessionCode || null) : DEFAULT_SESSION_CODE;
+  if (!code) {
+    return { status: 'error', errors: ['Session code required when multi-session mode is enabled'] };
+  }
+  const session = sessions.get(code);
+  if (!session) {
+    return { status: 'empty', session: code };
+  }
+
+  const filled = Object.keys(session.uploads);
+  if (filled.length < 2) {
+    // 0 or 1 uploads — nothing worth archiving, just clear.
+    sessions.delete(code);
+    return { status: 'discarded', session: code, seatsFilled: filled };
+  }
+
+  const seatSubmissions = {};
+  for (const s of filled) seatSubmissions[s] = session.uploads[s].cards;
+  const { url, errors } = require('./deckReconstruct').reconstructDeck(
+    seatSubmissions,
+    { allowPartial: true },
+  );
+  if (!url) {
+    return { status: 'error', session: code, errors };
+  }
+
+  ensureStorageDir();
+  const zipPath = path.join(STORAGE_DIR, `${url}.zip`);
+  const files = [];
+  for (const s of filled) {
+    const u = session.uploads[s];
+    files.push({ name: `seat-${s}.${u.imageExt}`, buffer: u.imageBuffer });
+  }
+  files.push({ name: 'url.txt', buffer: Buffer.from(url + '\n', 'utf8') });
+  files.push({
+    name: 'metadata.json',
+    buffer: Buffer.from(JSON.stringify({
+      session: code,
+      url,
+      partial: true,
+      createdAt: new Date(session.createdAt).toISOString(),
+      archivedAt: new Date().toISOString(),
+      seats: Object.fromEntries(filled.map(s => [s, {
+        uploadedAt: new Date(session.uploads[s].uploadedAt).toISOString(),
+        cards: session.uploads[s].cards,
+      }])),
+      missingSeats: VALID_SEATS.filter(s => !filled.includes(s)),
+    }, null, 2), 'utf8'),
+  });
+
+  try {
+    writeZip(zipPath, files);
+  } catch (e) {
+    return { status: 'error', session: code, errors: [`Failed to write zip: ${e.message}`] };
+  }
+
+  sessions.delete(code);
+  return { status: 'archived', session: code, url, zipPath, seatsFilled: filled };
 }
 
 module.exports = {
   registerUpload,
   getSessionStatus,
+  newHand,
   startCleanupTimer,
+  isMultiSession,
   STORAGE_DIR,
+  MULTI_SESSION,
+  DEFAULT_SESSION_CODE,
   // Exposed for tests
   _sessions: sessions,
   _generateSessionCode: generateSessionCode,

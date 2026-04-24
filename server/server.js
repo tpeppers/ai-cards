@@ -304,6 +304,33 @@ app.get('/api/game-mode/session/:code', (req, res) => {
   res.json({ success: true, ...status });
 });
 
+// Frontend config probe — tells the UI whether to show the session-code
+// field. Single-session mode (default) hides it; multi-session shows it.
+app.get('/api/game-mode/config', (req, res) => {
+  res.json({
+    success: true,
+    multiSession: gameMode.isMultiSession(),
+    storageDir: gameMode.STORAGE_DIR,
+  });
+});
+
+// New hand — archive the current session's uploads as a partial zip
+// (if 2+ seats filled) and clear the session. Missing seats' positions
+// and the kitty all fill with '_'.
+app.post('/api/game-mode/new-hand', (req, res) => {
+  const sessionCode = (req.body && req.body.session) || null;
+  const result = gameMode.newHand(sessionCode);
+  res.json({
+    success: result.status !== 'error',
+    status: result.status,
+    session: result.session,
+    seatsFilled: result.seatsFilled,
+    url: result.url,
+    zipPath: result.zipPath,
+    errors: result.errors,
+  });
+});
+
 // Card recognition endpoint - forwards to ML service
 app.post('/api/recognize', upload.single('image'), async (req, res) => {
   const startTime = Date.now();

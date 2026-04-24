@@ -56,12 +56,14 @@ const Upload: React.FC = () => {
   );
   const [gmSeat, setGmSeat] = useState<string>('dealer');
   const [gmSession, setGmSession] = useState<string>(() => localStorage.getItem('gameModeSession') || '');
+  const [gmMultiSession, setGmMultiSession] = useState<boolean>(false); // server-reported; false hides session code field
   const [gmResult, setGmResult] = useState<{
     status?: string; session?: string; detectedCards?: string[];
     seatsFilled?: string[]; seatsMissing?: string[]; url?: string;
     errors?: string[];
   } | null>(null);
   const [gmLoading, setGmLoading] = useState(false);
+  const [gmNewHandLoading, setGmNewHandLoading] = useState(false);
 
   useEffect(() => {
     const onStorage = () => {
@@ -70,6 +72,21 @@ const Upload: React.FC = () => {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  // Fetch game-mode server config so we know whether to show the
+  // session-code field. Fails silently if the backend isn't reachable
+  // (e.g. GitHub Pages standalone build).
+  useEffect(() => {
+    if (!gameModeEnabled) return;
+    fetch('/api/game-mode/config')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d && typeof d.multiSession === 'boolean') {
+          setGmMultiSession(d.multiSession);
+        }
+      })
+      .catch(() => {});
+  }, [gameModeEnabled]);
 
   useEffect(() => {
     fetch('/api/settings/auto-save')
@@ -210,6 +227,40 @@ const Upload: React.FC = () => {
     localStorage.removeItem('gameModeSession');
   };
 
+  const handleNewHand = async () => {
+    const uploadedSeats = (gmResult?.seatsFilled ?? []).length;
+    const confirmMsg = uploadedSeats >= 2
+      ? `Archive the current ${uploadedSeats}-seat partial hand (missing seats filled with "_") and start a new hand?`
+      : uploadedSeats === 1
+        ? 'Discard the current 1-seat upload and start a new hand?'
+        : 'Start a new hand?';
+    if (!window.confirm(confirmMsg)) return;
+
+    setGmNewHandLoading(true);
+    setError(null);
+    try {
+      const body: { session?: string } = {};
+      if (gmMultiSession && gmSession.trim()) body.session = gmSession.trim().toUpperCase();
+      const response = await fetch('/api/game-mode/new-hand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'New hand failed');
+      }
+      setGmResult(data);
+      setSelectedFile(null);
+      setPreview(null);
+      setResult(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'New hand failed');
+    } finally {
+      setGmNewHandLoading(false);
+    }
+  };
+
   const handleReportIncorrect = async () => {
     if (!result?.detectionId) return;
 
@@ -313,6 +364,20 @@ const Upload: React.FC = () => {
 
         {/* Right column - Controls and Results */}
         <div className="flex-1 min-w-0">
+          {gameModeEnabled && (
+            <div className="flex items-center justify-between bg-purple-950/40 border border-purple-800 rounded px-3 py-2 mb-3">
+              <div className="text-xs text-purple-200">
+                Game Mode {gmMultiSession ? '(multi-session)' : '(single session)'}
+              </div>
+              <button
+                onClick={handleNewHand}
+                disabled={gmNewHandLoading}
+                className="text-xs bg-purple-700 hover:bg-purple-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-1 px-3 rounded"
+              >
+                {gmNewHandLoading ? 'Archiving…' : 'New Hand'}
+              </button>
+            </div>
+          )}
           {!selectedFile && (
             <div className="text-gray-400 text-center p-8">
               Select an image to detect cards
@@ -324,7 +389,7 @@ const Upload: React.FC = () => {
               {gameModeEnabled && (
                 <div className="bg-purple-900/30 border border-purple-700 p-3 rounded mb-3 space-y-2">
                   <div className="text-sm font-semibold text-purple-200">Game Mode upload</div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={gmMultiSession ? 'grid grid-cols-2 gap-2' : ''}>
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">Seat</label>
                       <select
@@ -338,21 +403,23 @@ const Upload: React.FC = () => {
                         <option value="bid3">3rd bidder</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1">Session code (blank → new)</label>
-                      <input
-                        type="text"
-                        value={gmSession}
-                        onChange={e => setGmSession(e.target.value.toUpperCase())}
-                        placeholder="ABCDEF"
-                        maxLength={6}
-                        className="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm uppercase font-mono"
-                      />
-                    </div>
+                    {gmMultiSession && (
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Session code (blank → new)</label>
+                        <input
+                          type="text"
+                          value={gmSession}
+                          onChange={e => setGmSession(e.target.value.toUpperCase())}
+                          placeholder="ABCDEF"
+                          maxLength={6}
+                          className="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm uppercase font-mono"
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="text-xs text-gray-400">
-                    4 uploads (one per seat) within 10 minutes will reconstruct the deck URL and
-                    archive a zip to the server's storage directory.
+                    4 uploads (one per seat) within 10 minutes reconstruct the full deck URL and
+                    archive a zip server-side. Use "New Hand" to archive a partial hand or start fresh.
                   </div>
                 </div>
               )}
@@ -399,9 +466,13 @@ const Upload: React.FC = () => {
                       </div>
                     </>
                   )}
-                  {gmResult.status === 'completed' && gmResult.url && (
+                  {(gmResult.status === 'completed' || gmResult.status === 'archived') && gmResult.url && (
                     <>
-                      <div className="text-sm text-gray-400 mb-1">Reconstructed deck URL:</div>
+                      <div className="text-sm text-gray-400 mb-1">
+                        {gmResult.status === 'archived'
+                          ? 'Partial deck URL (missing seats filled with _):'
+                          : 'Reconstructed deck URL:'}
+                      </div>
                       <div className="font-mono text-xs text-green-300 break-all bg-gray-900 p-2 rounded">
                         {gmResult.url}
                       </div>
@@ -409,6 +480,16 @@ const Upload: React.FC = () => {
                         Zip archived server-side at the reconstructed URL's filename.
                       </div>
                     </>
+                  )}
+                  {gmResult.status === 'discarded' && (
+                    <div className="text-xs text-gray-400">
+                      Only one seat had been uploaded — nothing to archive. Session cleared.
+                    </div>
+                  )}
+                  {gmResult.status === 'empty' && (
+                    <div className="text-xs text-gray-400">
+                      No uploads to archive. Ready for a fresh hand.
+                    </div>
                   )}
                   {gmResult.errors && gmResult.errors.length > 0 && (
                     <ul className="text-sm text-red-400 mt-2 list-disc list-inside">

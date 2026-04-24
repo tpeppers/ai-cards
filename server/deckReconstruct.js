@@ -80,42 +80,54 @@ function dedupAndValidateSeat(seat, detectedCards) {
 }
 
 /**
- * Reconstruct the 52-character deck URL from 4 seat submissions.
- * Returns an object with { url, errors } — url is the 52-char string
- * on success (48 dealt chars + "____" kitty), or null if reconstruction
- * failed; errors is a list of validation error messages.
+ * Reconstruct the 52-character deck URL from seat submissions.
+ *
+ * Options:
+ *   allowPartial: when true, missing seats fill their positions with '_'
+ *                 instead of returning a "Missing seat" error. Used by
+ *                 the New Hand button to archive incomplete rounds.
+ *
+ * Returns { url, errors, seatsProvided }. On success url is the 52-char
+ * string; on failure url is null and errors is populated.
  */
-function reconstructDeck(seatSubmissions) {
+function reconstructDeck(seatSubmissions, options = {}) {
+  const { allowPartial = false } = options;
   const errors = [];
 
-  // Require exactly 4 seats, one of each
   const seatsProvided = Object.keys(seatSubmissions);
-  for (const seat of VALID_SEATS) {
-    if (!seatsProvided.includes(seat)) {
-      errors.push(`Missing seat: ${seat}`);
-    }
-  }
   for (const seat of seatsProvided) {
     if (!VALID_SEATS.includes(seat)) {
       errors.push(`Unknown seat: ${seat}`);
     }
   }
-  if (errors.length > 0) return { url: null, errors };
+  if (!allowPartial) {
+    for (const seat of VALID_SEATS) {
+      if (!seatsProvided.includes(seat)) {
+        errors.push(`Missing seat: ${seat}`);
+      }
+    }
+  }
+  if (errors.length > 0) return { url: null, errors, seatsProvided: [] };
 
-  // Dedup per seat
+  // Dedup per provided seat. Missing seats in partial mode are skipped.
   const perSeatLetters = {};
+  const seatsActuallyFilled = [];
   for (const seat of VALID_SEATS) {
+    if (!seatSubmissions[seat]) {
+      if (allowPartial) continue;
+    }
     try {
       perSeatLetters[seat] = dedupAndValidateSeat(seat, seatSubmissions[seat]);
+      seatsActuallyFilled.push(seat);
     } catch (e) {
       errors.push(e.message);
     }
   }
-  if (errors.length > 0) return { url: null, errors };
+  if (errors.length > 0) return { url: null, errors, seatsProvided: seatsActuallyFilled };
 
-  // Check for cross-seat duplicates — a card can only be in one hand
+  // Check for cross-seat duplicates among the seats we DO have
   const seen = new Map(); // letter → seat
-  for (const seat of VALID_SEATS) {
+  for (const seat of seatsActuallyFilled) {
     for (const letter of perSeatLetters[seat]) {
       if (seen.has(letter)) {
         errors.push(
@@ -126,38 +138,35 @@ function reconstructDeck(seatSubmissions) {
       }
     }
   }
-  // Total count check
-  if (seen.size !== 48 && errors.length === 0) {
+  if (!allowPartial && seen.size !== 48 && errors.length === 0) {
     errors.push(`Total unique cards across 4 seats = ${seen.size}; expected 48`);
   }
-  if (errors.length > 0) return { url: null, errors };
+  if (errors.length > 0) return { url: null, errors, seatsProvided: seatsActuallyFilled };
 
-  // Build URL: position i → player i%4 → seat with player index (i%4)
-  // Convert each seat's set to a sorted list so placement is deterministic
-  // (the sort uses URL-letter ascending; any stable order works since the
-  // engine re-sorts cards per player by rank on deal).
-  const perSeatSorted = {};
-  for (const seat of VALID_SEATS) {
-    perSeatSorted[seat] = Array.from(perSeatLetters[seat]).sort();
-  }
-  // Consumers per seat — we'll pop from the sorted list as positions fill
+  // Consumers per seat (sorted for deterministic placement).
   const consumers = {};
-  for (const seat of VALID_SEATS) consumers[seat] = [...perSeatSorted[seat]];
+  for (const seat of seatsActuallyFilled) {
+    consumers[seat] = Array.from(perSeatLetters[seat]).sort();
+  }
 
+  // Fill the 48 dealt positions. Missing seats leave '_' wherever their
+  // player-index slots fall. Kitty (positions 48-51) is always '_'.
   const chars = new Array(52);
   for (let i = 0; i < 48; i++) {
     const playerIdx = i % 4;
     const seat = VALID_SEATS.find(s => SEAT_TO_PLAYER_INDEX[s] === playerIdx);
-    chars[i] = consumers[seat].shift();
+    if (seatsActuallyFilled.includes(seat)) {
+      chars[i] = consumers[seat].shift();
+    } else {
+      chars[i] = '_';
+    }
   }
-  // Kitty = 4 random placeholders (the 4 cards not detected from anyone's
-  // hand). The URL decoder treats `_` as "random, picked at deal time".
   chars[48] = '_';
   chars[49] = '_';
   chars[50] = '_';
   chars[51] = '_';
 
-  return { url: chars.join(''), errors: [] };
+  return { url: chars.join(''), errors: [], seatsProvided: seatsActuallyFilled };
 }
 
 module.exports = {
