@@ -4,6 +4,7 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const FormData = require('form-data');
 const { spawn } = require('child_process');
 const sharp = require('sharp');
@@ -312,6 +313,40 @@ app.get('/api/game-mode/config', (req, res) => {
     multiSession: gameMode.isMultiSession(),
     storageDir: gameMode.STORAGE_DIR,
   });
+});
+
+// Returns a URL that phones on the local LAN can scan (via QR code) to
+// reach the Upload page. Prefers GAME_MODE_HOST_URL env override; falls
+// back to the server's first external IPv4 interface on PORT.
+app.get('/api/game-mode/host-url', (req, res) => {
+  if (process.env.GAME_MODE_HOST_URL) {
+    return res.json({ success: true, url: process.env.GAME_MODE_HOST_URL });
+  }
+  let lanIp = null;
+  const ifaces = os.networkInterfaces();
+  for (const list of Object.values(ifaces)) {
+    for (const iface of list || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        lanIp = iface.address;
+        break;
+      }
+    }
+    if (lanIp) break;
+  }
+  res.json({
+    success: true,
+    url: `http://${lanIp || 'localhost'}:${PORT}/upload`,
+    lanIp,
+  });
+});
+
+// Replace the cards for an already-uploaded seat with a corrected list
+// from the Hand Creator. Server preserves the original detection so the
+// final zip can emit detection_mods.txt.
+app.post('/api/game-mode/correct', (req, res) => {
+  const { session = null, seat, cards } = req.body || {};
+  const result = gameMode.correctSeat({ sessionCode: session, seat, cards });
+  res.json({ success: result.status !== 'error', ...result });
 });
 
 // New hand — archive the current session's uploads as a partial zip

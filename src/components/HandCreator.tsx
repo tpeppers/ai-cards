@@ -72,8 +72,18 @@ const CardImage: React.FC<{ suit: string; rank: number; className?: string }> = 
   );
 };
 
-const HandCreator: React.FC = () => {
-  const [selectedCards, setSelectedCards] = useState<Card[]>([]);
+interface HandCreatorProps {
+  /** Preload these cards when mounting (used by the Upload-page EDIT flow). */
+  initialCards?: Card[];
+  /** When provided, renders a compact 1-shot edit view with ACCEPT/CANCEL
+   *  buttons. Omits the stored-hands, disk-import/export, and clipboard UI. */
+  onAccept?: (cards: Card[]) => void;
+  onCancel?: () => void;
+}
+
+const HandCreator: React.FC<HandCreatorProps> = ({ initialCards, onAccept, onCancel }) => {
+  const editMode = typeof onAccept === 'function';
+  const [selectedCards, setSelectedCards] = useState<Card[]>(initialCards ?? []);
   const [handSize, setHandSize] = useState<number>(12);
   const [storedHands, setStoredHands] = useState<string[]>([]);
   const [selectedStoredHand, setSelectedStoredHand] = useState<string>('');
@@ -371,27 +381,31 @@ const HandCreator: React.FC = () => {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6 text-center">Hand Creator</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">
+        {editMode ? 'Edit Detected Hand' : 'Hand Creator'}
+      </h1>
 
       <div className="mb-6">
-        <div className="mb-4">
-          <label htmlFor="storedHands" className="block text-lg font-semibold mb-2">
-            Load Stored Hand
-          </label>
-          <select
-            id="storedHands"
-            value={selectedStoredHand}
-            onChange={(e) => loadSelectedHand(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-lg text-base"
-          >
-            <option value="">Select a stored hand...</option>
-            {storedHands.map((hand, index) => (
-              <option key={index} value={hand}>
-                Hand {index + 1}: {hand}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!editMode && (
+          <div className="mb-4">
+            <label htmlFor="storedHands" className="block text-lg font-semibold mb-2">
+              Load Stored Hand
+            </label>
+            <select
+              id="storedHands"
+              value={selectedStoredHand}
+              onChange={(e) => loadSelectedHand(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-lg text-base"
+            >
+              <option value="">Select a stored hand...</option>
+              {storedHands.map((hand, index) => (
+                <option key={index} value={hand}>
+                  Hand {index + 1}: {hand}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="mb-4">
           <label htmlFor="handSize" className="block text-lg font-semibold mb-2">
             Hand Size: {handSize} cards
@@ -568,49 +582,78 @@ const HandCreator: React.FC = () => {
               : sortMode === 'downtown' ? 'Downtown'
               : 'No Aces'})` : ''}
           </button>
-          <button
-            onClick={exportHand}
-            disabled={selectedCards.length !== handSize}
-            className={`
-              px-8 py-3 font-semibold rounded-lg text-lg
-              ${selectedCards.length === handSize
-                ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }
-              transition-colors duration-200
-            `}
-          >
-            Export Hand
-          </button>
+          {editMode ? (
+            <>
+              <button
+                onClick={() => onAccept!(selectedCards)}
+                disabled={selectedCards.length !== handSize}
+                className={`
+                  px-8 py-3 font-semibold rounded-lg text-lg
+                  ${selectedCards.length === handSize
+                    ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }
+                  transition-colors duration-200
+                `}
+              >
+                ACCEPT
+              </button>
+              {onCancel && (
+                <button
+                  onClick={onCancel}
+                  className="px-6 py-3 font-semibold rounded-lg text-lg bg-gray-500 hover:bg-gray-600 text-white cursor-pointer transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+              )}
+            </>
+          ) : (
+            <button
+              onClick={exportHand}
+              disabled={selectedCards.length !== handSize}
+              className={`
+                px-8 py-3 font-semibold rounded-lg text-lg
+                ${selectedCards.length === handSize
+                  ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }
+                transition-colors duration-200
+              `}
+            >
+              Export Hand
+            </button>
+          )}
         </div>
-        <div className="flex justify-center gap-4 flex-wrap">
-          <button
-            onClick={exportHandToDisk}
-            disabled={selectedCards.length === 0}
-            className={`
-              px-6 py-2 font-semibold rounded-lg text-base
-              ${selectedCards.length > 0
-                ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }
-              transition-colors duration-200
-            `}
-          >
-            Export to Disk
-          </button>
-          <button
-            onClick={importHandsFromDisk}
-            className="px-6 py-2 font-semibold rounded-lg text-base bg-purple-600 hover:bg-purple-700 text-white cursor-pointer transition-colors duration-200"
-          >
-            Import from Disk
-          </button>
-          <button
-            onClick={importFromClipboard}
-            className="px-6 py-2 font-semibold rounded-lg text-base bg-teal-600 hover:bg-teal-700 text-white cursor-pointer transition-colors duration-200"
-          >
-            Import from Clipboard
-          </button>
-        </div>
+        {!editMode && (
+          <div className="flex justify-center gap-4 flex-wrap">
+            <button
+              onClick={exportHandToDisk}
+              disabled={selectedCards.length === 0}
+              className={`
+                px-6 py-2 font-semibold rounded-lg text-base
+                ${selectedCards.length > 0
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }
+                transition-colors duration-200
+              `}
+            >
+              Export to Disk
+            </button>
+            <button
+              onClick={importHandsFromDisk}
+              className="px-6 py-2 font-semibold rounded-lg text-base bg-purple-600 hover:bg-purple-700 text-white cursor-pointer transition-colors duration-200"
+            >
+              Import from Disk
+            </button>
+            <button
+              onClick={importFromClipboard}
+              className="px-6 py-2 font-semibold rounded-lg text-base bg-teal-600 hover:bg-teal-700 text-white cursor-pointer transition-colors duration-200"
+            >
+              Import from Clipboard
+            </button>
+          </div>
+        )}
         {selectedCards.length === handSize && (
           <p className="text-sm text-gray-600">
             Hand will be copied to clipboard

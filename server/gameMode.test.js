@@ -12,7 +12,7 @@ const assert = require('assert');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gamemode-test-'));
 process.env.GAME_MODE_STORAGE = tmpDir;
 
-const { registerUpload, getSessionStatus, STORAGE_DIR, _sessions } = require('./gameMode');
+const { registerUpload, correctSeat, getSessionStatus, STORAGE_DIR, _sessions, _buildDetectionModsText } = require('./gameMode');
 
 let tests = 0, failed = 0;
 function test(name, fn) {
@@ -202,6 +202,87 @@ test('session expires cross-seat duplicate card with clear error', () => {
   const r4 = registerUpload({ sessionCode: code, seat: 'bid3', cards: bad, imageBuffer: Buffer.from('d'), imageExt: 'png' });
   assert.strictEqual(r4.status, 'error');
   assert.ok(r4.errors.some(e => /appears in both/i.test(e)), r4.errors.join('; '));
+});
+
+test('correctSeat replaces cards and preserves originalCards', () => {
+  _sessions.clear();
+  // Single-session mode: sessions keyed by DEFAULT regardless of code arg.
+  const rank = r => r === 1 ? 'A' : r === 11 ? 'J' : r === 12 ? 'Q' : r === 13 ? 'K' : String(r);
+  const build = (s) => Array.from({length: 12}, (_, i) => `${rank(i+1)}${s}`);
+  registerUpload({ sessionCode: null, seat: 'dealer', cards: build('h'), imageBuffer: Buffer.from('a'), imageExt: 'png' });
+  const corrected = build('c');
+  const r = correctSeat({ sessionCode: null, seat: 'dealer', cards: corrected });
+  assert.strictEqual(r.status, 'corrected');
+  const u = _sessions.get('DEFAULT').uploads.dealer;
+  assert.deepStrictEqual(u.cards, corrected);
+  assert.deepStrictEqual(u.originalCards, build('h'));
+});
+
+test('correctSeat rejects wrong card count', () => {
+  _sessions.clear();
+  const code = 'CORR02';
+  const rank = r => r === 1 ? 'A' : r === 11 ? 'J' : r === 12 ? 'Q' : r === 13 ? 'K' : String(r);
+  const build = (s) => Array.from({length: 12}, (_, i) => `${rank(i+1)}${s}`);
+  registerUpload({ sessionCode: code, seat: 'dealer', cards: build('h'), imageBuffer: Buffer.from('a'), imageExt: 'png' });
+  const r = correctSeat({ sessionCode: code, seat: 'dealer', cards: ['Ah','Kh','Qh'] });
+  assert.strictEqual(r.status, 'error');
+  assert.ok(r.errors[0].match(/12/));
+});
+
+test('correctSeat fails when seat never uploaded', () => {
+  _sessions.clear();
+  const r = correctSeat({ sessionCode: null, seat: 'dealer', cards: ['Ah'] });
+  assert.strictEqual(r.status, 'error');
+});
+
+test('buildDetectionModsText returns null when no seat modified', () => {
+  const uploads = {
+    dealer: { originalCards: ['Ah','Kh'], cards: ['Ah','Kh'] },
+    bid1: { originalCards: ['As'], cards: ['As'] },
+  };
+  assert.strictEqual(_buildDetectionModsText(uploads), null);
+});
+
+test('buildDetectionModsText emits P#: orig -> mod lines', () => {
+  // Only dealer modified; bid1 untouched; bid2/bid3 not uploaded.
+  const rank = r => r === 1 ? 'A' : r === 11 ? 'J' : r === 12 ? 'Q' : r === 13 ? 'K' : String(r);
+  const build = (s) => Array.from({length: 12}, (_, i) => `${rank(i+1)}${s}`);
+  const uploads = {
+    dealer: { originalCards: build('h'), cards: build('c') },
+    bid1: { originalCards: build('s'), cards: build('s') },
+  };
+  const buf = _buildDetectionModsText(uploads);
+  assert.ok(buf);
+  const text = buf.toString('utf8');
+  assert.ok(text.includes('P#: DETECTED -> MODIFIED'));
+  assert.ok(text.match(/^0: [a-z]{12} -> [A-Z]{12}$/m), text);
+  assert.ok(text.match(/^1:$/m));
+  assert.ok(text.match(/^2:$/m));
+  assert.ok(text.match(/^3:$/m));
+});
+
+test('zip includes detection_mods.txt when a seat was corrected', () => {
+  _sessions.clear();
+  const code = 'MODZIP';
+  const rank = r => r === 1 ? 'A' : r === 11 ? 'J' : r === 12 ? 'Q' : r === 13 ? 'K' : String(r);
+  const build = (s) => Array.from({length: 12}, (_, i) => `${rank(i+1)}${s}`);
+  registerUpload({ sessionCode: code, seat: 'dealer', cards: build('h'), imageBuffer: Buffer.from('a'), imageExt: 'png' });
+  registerUpload({ sessionCode: code, seat: 'bid1',   cards: build('s'), imageBuffer: Buffer.from('b'), imageExt: 'png' });
+  // Correct bid1 — swap the sort ordering so originalCards differs from cards
+  // (cards at registration were hearts; "correcting" to diamonds triggers dup check,
+  // so pick a brand-new suit for the correction). Use clubs to avoid conflict.
+  // Actually we need a non-overlapping 12-card set that won't collide.
+  // Free suits still available: c, d. Use 'c' for correction.
+  // But dealer already filled hearts. bid1 filled spades. So clubs is free.
+  correctSeat({ sessionCode: code, seat: 'bid1', cards: build('c') });
+  registerUpload({ sessionCode: code, seat: 'bid2',   cards: build('d'), imageBuffer: Buffer.from('c'), imageExt: 'png' });
+  // Session still needs seat bid3; use the remaining alignment.
+  // bid1 now has clubs, bid2 has diamonds, dealer hearts — so bid3 must have spades.
+  const r4 = registerUpload({ sessionCode: code, seat: 'bid3',   cards: build('s'), imageBuffer: Buffer.from('d'), imageExt: 'png' });
+  assert.strictEqual(r4.status, 'completed');
+  // Extract ZIP entries by scanning for the detection_mods.txt name.
+  const zipBuf = fs.readFileSync(r4.zipPath);
+  assert.ok(zipBuf.includes(Buffer.from('detection_mods.txt')), 'detection_mods.txt missing from zip');
 });
 
 console.log(`\n${tests - failed}/${tests} passed`);

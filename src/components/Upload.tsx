@@ -1,4 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+// eslint-disable-next-line import/no-useless-path-segments
+import HandCreator from './HandCreator.tsx';
+import { Card } from '../types/CardGame';
 
 interface DetectionResult {
   cards: string[];
@@ -9,6 +13,36 @@ interface DetectionResult {
   imageHeight?: number;
   autoSaved?: boolean;
 }
+
+const SUIT_CHAR_TO_NAME: Record<string, string> = {
+  h: 'hearts', s: 'spades', c: 'clubs', d: 'diamonds',
+};
+const SUIT_NAME_TO_CHAR: Record<string, string> = {
+  hearts: 'h', spades: 's', clubs: 'c', diamonds: 'd',
+};
+
+const detectedStringToCard = (s: string): Card | null => {
+  const suitChar = s.slice(-1).toLowerCase();
+  const rankStr = s.slice(0, -1).toUpperCase();
+  const suit = SUIT_CHAR_TO_NAME[suitChar];
+  if (!suit) return null;
+  const rank = rankStr === 'A' ? 1
+    : rankStr === 'J' ? 11
+    : rankStr === 'Q' ? 12
+    : rankStr === 'K' ? 13
+    : parseInt(rankStr, 10);
+  if (!Number.isFinite(rank) || rank < 1 || rank > 13) return null;
+  return { suit, rank, id: `${suit}_${rank}` };
+};
+
+const cardToDetectedString = (card: Card): string => {
+  const rankStr = card.rank === 1 ? 'A'
+    : card.rank === 11 ? 'J'
+    : card.rank === 12 ? 'Q'
+    : card.rank === 13 ? 'K'
+    : String(card.rank);
+  return rankStr + (SUIT_NAME_TO_CHAR[card.suit] ?? '?');
+};
 
 const suitInfo: Record<string, { symbol: string; color: string }> = {
   d: { symbol: '♦', color: '#f97316' }, // orange
@@ -64,6 +98,14 @@ const Upload: React.FC = () => {
   } | null>(null);
   const [gmLoading, setGmLoading] = useState(false);
   const [gmNewHandLoading, setGmNewHandLoading] = useState(false);
+  const [gmHostUrl, setGmHostUrl] = useState<string | null>(null);
+  const [showQR, setShowQR] = useState<boolean>(true);
+
+  // Edit/Hand-Creator modal state. editingCards is the seat whose
+  // detected cards are being reviewed; when the user ACCEPTs, we POST
+  // to /api/game-mode/correct so the final zip reflects the fix.
+  const [editingCards, setEditingCards] = useState<Card[] | null>(null);
+  const [editCorrectLoading, setEditCorrectLoading] = useState(false);
 
   useEffect(() => {
     const onStorage = () => {
@@ -84,6 +126,12 @@ const Upload: React.FC = () => {
         if (d && typeof d.multiSession === 'boolean') {
           setGmMultiSession(d.multiSession);
         }
+      })
+      .catch(() => {});
+    fetch('/api/game-mode/host-url')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d && typeof d.url === 'string') setGmHostUrl(d.url);
       })
       .catch(() => {});
   }, [gameModeEnabled]);
@@ -227,6 +275,59 @@ const Upload: React.FC = () => {
     localStorage.removeItem('gameModeSession');
   };
 
+  const handleOpenEditor = () => {
+    // Prefer whichever card list the user last saw for this upload —
+    // the game-mode detected list if present, otherwise the generic
+    // detection result.
+    const detected = gmResult?.detectedCards ?? result?.cards ?? [];
+    const cards = detected
+      .map(detectedStringToCard)
+      .filter((c): c is Card => c !== null);
+    setEditingCards(cards);
+  };
+
+  const handleCancelEdit = () => setEditingCards(null);
+
+  const handleAcceptEdit = async (cards: Card[]) => {
+    if (cards.length !== 12) {
+      setError('Corrected hand must have exactly 12 cards.');
+      return;
+    }
+    // In Game Mode, POST the correction so the server replaces this
+    // seat's detected-card list while preserving originalCards for the
+    // zip's detection_mods.txt. Outside Game Mode there's no session to
+    // correct against — we just update the displayed result locally.
+    const newCards = cards.map(cardToDetectedString);
+    if (gameModeEnabled && gmResult?.session) {
+      setEditCorrectLoading(true);
+      try {
+        const response = await fetch('/api/game-mode/correct', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session: gmMultiSession ? gmResult.session : undefined,
+            seat: gmSeat,
+            cards: newCards,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.status === 'error') {
+          throw new Error((data.errors && data.errors[0]) || data.error || 'Correction failed');
+        }
+        setGmResult({ ...gmResult, detectedCards: newCards });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Correction failed');
+        setEditCorrectLoading(false);
+        return;
+      } finally {
+        setEditCorrectLoading(false);
+      }
+    } else if (result) {
+      setResult({ ...result, cards: newCards, count: newCards.length });
+    }
+    setEditingCards(null);
+  };
+
   const handleNewHand = async () => {
     const uploadedSeats = (gmResult?.seatsFilled ?? []).length;
     const confirmMsg = uploadedSeats >= 2
@@ -296,7 +397,44 @@ const Upload: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Card Detection</h1>
+      <h1 className="text-3xl font-bold mb-4">Card Detection</h1>
+
+      {/* Big green pass-the-phone reset — clears the preview, detection
+          result, and any game-mode result so nothing about the previous
+          player's hand is visible on screen. */}
+      <button
+        onClick={handleClear}
+        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg mb-6 text-xl shadow-md active:scale-[0.99] transition"
+      >
+        ACCEPT / CLEAR — Hide my hand before passing the phone
+      </button>
+
+      {gameModeEnabled && gmHostUrl && (
+        <div className="mb-6 bg-white border-2 border-purple-600 rounded-lg p-4 flex items-start gap-4 flex-wrap">
+          <div className="flex-shrink-0 bg-white p-2 rounded">
+            {showQR && (
+              <QRCodeSVG value={gmHostUrl} size={160} includeMargin={false} />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-purple-900 mb-1">
+              Scan to open the Upload page on your phone
+            </div>
+            <div className="text-sm text-gray-700 mb-2 break-all">
+              <code>{gmHostUrl}</code>
+            </div>
+            <div className="text-xs text-gray-500 mb-2">
+              Display this on the TV so every player can grab the URL without typing.
+            </div>
+            <button
+              onClick={() => setShowQR(v => !v)}
+              className="text-xs text-purple-700 hover:text-purple-900 underline"
+            >
+              {showQR ? 'Hide QR' : 'Show QR'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-3 mb-6">
         <button
@@ -502,6 +640,15 @@ const Upload: React.FC = () => {
                       {' '}{gmResult.detectedCards.join(', ')}
                     </div>
                   )}
+                  {gmResult.status === 'accepted' && (gmResult.detectedCards?.length ?? 0) > 0 && (
+                    <button
+                      onClick={handleOpenEditor}
+                      disabled={editCorrectLoading}
+                      className="mt-3 mr-2 text-sm bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-600 text-white py-1.5 px-4 rounded font-semibold"
+                    >
+                      {editCorrectLoading ? 'Saving…' : 'EDIT'}
+                    </button>
+                  )}
                   <button
                     onClick={handleGmClearSession}
                     className="mt-2 text-xs text-gray-400 hover:text-gray-200 underline"
@@ -531,6 +678,12 @@ const Upload: React.FC = () => {
                         </span>
                       ))}
                     </p>
+                    <button
+                      onClick={handleOpenEditor}
+                      className="mt-3 text-sm bg-yellow-500 hover:bg-yellow-600 text-white py-1.5 px-4 rounded font-semibold"
+                    >
+                      EDIT
+                    </button>
                   </div>
 
                   <div className="bg-gray-100 p-4 rounded mb-4">
@@ -595,6 +748,18 @@ const Upload: React.FC = () => {
           )}
         </div>
       </div>
+
+      {editingCards !== null && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-start justify-center z-[80] overflow-y-auto">
+          <div className="bg-white rounded-lg my-8 w-full max-w-4xl mx-4">
+            <HandCreator
+              initialCards={editingCards}
+              onAccept={handleAcceptEdit}
+              onCancel={handleCancelEdit}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

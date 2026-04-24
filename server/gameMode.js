@@ -25,7 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { reconstructDeck, VALID_SEATS } = require('./deckReconstruct');
+const { reconstructDeck, VALID_SEATS, SEAT_TO_PLAYER_INDEX, cardStringToLetter } = require('./deckReconstruct');
 
 const SESSION_TTL_MS = 10 * 60 * 1000;           // 10 minutes
 const SESSION_CLEANUP_INTERVAL_MS = 60 * 1000;   // sweep every minute
@@ -264,6 +264,7 @@ function registerUpload({ sessionCode, seat, cards, imageBuffer, imageExt }) {
 
   session.uploads[seat] = {
     cards,
+    originalCards: cards.slice(),
     imageBuffer,
     imageExt: imageExt || 'png',
     uploadedAt: Date.now(),
@@ -316,9 +317,12 @@ function registerUpload({ sessionCode, seat, cards, imageBuffer, imageExt }) {
       seats: Object.fromEntries(VALID_SEATS.map(s => [s, {
         uploadedAt: new Date(session.uploads[s].uploadedAt).toISOString(),
         cards: session.uploads[s].cards,
+        originalCards: session.uploads[s].originalCards,
       }])),
     }, null, 2), 'utf8'),
   });
+  const modsBuf = buildDetectionModsText(session.uploads);
+  if (modsBuf) files.push({ name: 'detection_mods.txt', buffer: modsBuf });
 
   try {
     writeZip(zipPath, files);
@@ -330,6 +334,94 @@ function registerUpload({ sessionCode, seat, cards, imageBuffer, imageExt }) {
   sessions.delete(code);
 
   return { status: 'completed', session: code, url, zipPath };
+}
+
+/**
+ * Build a detection_mods.txt buffer describing which seats had their
+ * detected cards edited via the Hand Creator. One line per player index
+ * (0-3). Empty after the colon when the seat wasn't submitted or wasn't
+ * modified. Returns null when no seat was modified (caller then skips
+ * adding the file to the zip).
+ */
+function buildDetectionModsText(uploads) {
+  const seatToCardsStr = (cards) => {
+    if (!cards) return '';
+    try {
+      return cards.map(cardStringToLetter).sort().join('');
+    } catch (_e) {
+      // Non-canonical card in input — fall back to raw list so we still
+      // record something useful, rather than dropping the info.
+      return cards.join(',');
+    }
+  };
+
+  let anyModified = false;
+  const lines = [];
+  lines.push('P#: DETECTED -> MODIFIED');
+  for (let p = 0; p < 4; p++) {
+    const seat = VALID_SEATS.find(s => SEAT_TO_PLAYER_INDEX[s] === p);
+    const u = uploads[seat];
+    if (!u) {
+      lines.push(`${p}:`);
+      continue;
+    }
+    const orig = seatToCardsStr(u.originalCards);
+    const mod = seatToCardsStr(u.cards);
+    if (orig === mod) {
+      lines.push(`${p}:`);
+    } else {
+      anyModified = true;
+      lines.push(`${p}: ${orig} -> ${mod}`);
+    }
+  }
+  if (!anyModified) return null;
+  return Buffer.from(lines.join('\n') + '\n', 'utf8');
+}
+
+/**
+ * Replace the cards for an already-uploaded seat with a corrected list
+ * (typically from the Hand Creator EDIT flow). Preserves originalCards
+ * so the session-final zip can emit detection_mods.txt.
+ *
+ * Returns:
+ *   { status: 'corrected', session, seat, cards }
+ *   { status: 'error',     session?, errors }
+ */
+function correctSeat({ sessionCode, seat, cards }) {
+  if (!VALID_SEATS.includes(seat)) {
+    return { status: 'error', errors: [`Invalid seat: ${seat}`] };
+  }
+  if (!Array.isArray(cards) || cards.length === 0) {
+    return { status: 'error', errors: ['No cards provided'] };
+  }
+  const code = MULTI_SESSION ? (sessionCode || null) : DEFAULT_SESSION_CODE;
+  if (!code) {
+    return { status: 'error', errors: ['Session code required'] };
+  }
+  const session = sessions.get(code);
+  if (!session) {
+    return { status: 'error', session: code, errors: [`Session ${code} not found`] };
+  }
+  const upload = session.uploads[seat];
+  if (!upload) {
+    return { status: 'error', session: code, errors: [`Seat ${seat} has no prior upload to correct`] };
+  }
+  // Validate that the corrected cards dedup to exactly 12 canonical letters
+  // (same rule as a fresh upload). If the user selected fewer, reject.
+  try {
+    const letters = new Set();
+    for (const c of cards) letters.add(cardStringToLetter(c));
+    if (letters.size !== 12) {
+      return {
+        status: 'error', session: code,
+        errors: [`Corrected hand must have exactly 12 unique cards (got ${letters.size})`],
+      };
+    }
+  } catch (e) {
+    return { status: 'error', session: code, errors: [e.message] };
+  }
+  upload.cards = cards.slice();
+  return { status: 'corrected', session: code, seat, cards: upload.cards };
 }
 
 function getSessionStatus(sessionCode) {
@@ -396,10 +488,13 @@ function newHand(sessionCode) {
       seats: Object.fromEntries(filled.map(s => [s, {
         uploadedAt: new Date(session.uploads[s].uploadedAt).toISOString(),
         cards: session.uploads[s].cards,
+        originalCards: session.uploads[s].originalCards,
       }])),
       missingSeats: VALID_SEATS.filter(s => !filled.includes(s)),
     }, null, 2), 'utf8'),
   });
+  const modsBuf = buildDetectionModsText(session.uploads);
+  if (modsBuf) files.push({ name: 'detection_mods.txt', buffer: modsBuf });
 
   try {
     writeZip(zipPath, files);
@@ -413,6 +508,7 @@ function newHand(sessionCode) {
 
 module.exports = {
   registerUpload,
+  correctSeat,
   getSessionStatus,
   newHand,
   startCleanupTimer,
@@ -423,4 +519,5 @@ module.exports = {
   // Exposed for tests
   _sessions: sessions,
   _generateSessionCode: generateSessionCode,
+  _buildDetectionModsText: buildDetectionModsText,
 };
