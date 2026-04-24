@@ -13,6 +13,7 @@ import { useDraggable } from './hooks/useDraggable.ts';
 import { useResponsiveLayout, PlayAreaLayoutProvider } from './hooks/useResponsiveLayout.ts';
 import { playWhistingFanfare, stopWhistingFanfare } from './utils/whistingSound.ts';
 import DeviationAlert, { notifyDeviation } from './components/DeviationAlert.tsx';
+import JournalSettingsPanel from './components/JournalSettingsPanel.tsx';
 import {
   recordBidDecision, recordTrumpDecision, recordDiscardDecision,
   recordPlayDecision, finalizeHand,
@@ -75,6 +76,7 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const [tableStrategy, setTableStrategy] = useState<string | null>(familyStrategyText);
   const [playerStrategyOverrides, setPlayerStrategyOverrides] = useState<(string | null)[]>([null, null, null, null]);
   const [showStrategyModal, setShowStrategyModal] = useState(false);
+  const [showJournalPanel, setShowJournalPanel] = useState(false);
 
   const game = gameRef.current;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -436,6 +438,30 @@ Card Rankings:
   return (
     <div ref={rootRef} className="relative w-full h-full">
       <DeviationAlert />
+      {/* Journal settings trigger — small gear icon in the bottom-left
+          corner so it doesn't collide with the top menu bar or the
+          cards at the bottom. Absolute-positioned on the game root,
+          so it's present in both the main app and the standalone. */}
+      <button
+        onClick={() => setShowJournalPanel(true)}
+        title="Strategy journal & deviation alerts"
+        style={{
+          position: 'absolute', bottom: 8, left: 8, zIndex: 50,
+          background: 'rgba(17,24,39,0.7)',
+          color: '#9ca3af',
+          border: '1px solid #374151',
+          borderRadius: '50%',
+          width: 32, height: 32,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+          fontSize: 14,
+        }}
+      >
+        ⚙
+      </button>
+      {showJournalPanel && (
+        <JournalSettingsPanel onClose={() => setShowJournalPanel(false)} />
+      )}
       <PlayAreaLayoutProvider elementRef={rootRef}>
       <GameEngine
         game={game}
