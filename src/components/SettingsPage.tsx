@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { playWhistingFanfare, stopWhistingFanfare, FINALE_OPTIONS, FinaleStyle } from '../utils/whistingSound.ts';
 import { simpleBackings, themedBackings, allBackings } from '../utils/cardBackings.ts';
+import {
+  getDeviationAlertMode, setDeviationAlertMode, DeviationAlertMode,
+  exportJournal, clearJournal, journalSize,
+} from '../utils/deviationJournal.ts';
 
 const DEFAULT_SUIT_COLORS: { [key: string]: string } = {
   spades: '#000000',
@@ -31,6 +35,8 @@ const SettingsPage: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(() =>
     (localStorage.getItem('whistingSound') || 'enabled') !== 'disabled'
   );
+  const [devAlertMode, setDevAlertModeState] = useState<DeviationAlertMode>(() => getDeviationAlertMode());
+  const [journalCount, setJournalCount] = useState<number>(() => journalSize());
 
   const handleBackingChange = (id: string) => {
     setSelectedBacking(id);
@@ -61,6 +67,31 @@ const SettingsPage: React.FC = () => {
   const handleSoundToggle = (enabled: boolean) => {
     setSoundEnabled(enabled);
     localStorage.setItem('whistingSound', enabled ? 'enabled' : 'disabled');
+  };
+
+  const handleDevAlertChange = (mode: DeviationAlertMode) => {
+    setDevAlertModeState(mode);
+    setDeviationAlertMode(mode);
+  };
+
+  const handleDownloadJournal = () => {
+    const data = exportJournal();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    a.download = `deviation-journal-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClearJournal = () => {
+    if (!window.confirm(`Clear ${journalCount} journal entries? This cannot be undone.`)) return;
+    clearJournal();
+    setJournalCount(0);
   };
 
   const selectedBackingData = allBackings.find(b => b.id === selectedBacking);
@@ -258,6 +289,75 @@ const SettingsPage: React.FC = () => {
               </p>
             </div>
           )}
+        </section>
+
+        {/* Deviation alerts / Journal */}
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold mb-3">Strategy journal</h2>
+          <p className="text-sm text-gray-400 mb-4">
+            When enabled, every human decision is compared to the currently-selected Auto Play strategy's
+            recommendation. Divergences briefly flash an on-screen banner and are recorded to a
+            journal you can export for offline review.
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Deviation alert mode</label>
+              <select
+                value={devAlertMode}
+                onChange={(e) => handleDevAlertChange(e.target.value as DeviationAlertMode)}
+                className="bg-gray-800 text-white border border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="off">Off (default)</option>
+                <option value="deviation">On — show "DEVIATION DETECTED"</option>
+                <option value="blunder">On — show "BLUNDER!"</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                The journal is recorded regardless of this setting — the toggle only controls
+                whether a banner is shown during play.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="text-sm font-medium">Journal contents</div>
+                  <div className="text-xs text-gray-500">
+                    {journalCount === 0
+                      ? 'No decisions recorded yet — play a hand to start logging.'
+                      : `${journalCount} entries (decisions + hand outcomes).`}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDownloadJournal}
+                  disabled={journalCount === 0}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm px-4 py-2 rounded"
+                >
+                  Download JSON
+                </button>
+                <button
+                  onClick={() => setJournalCount(journalSize())}
+                  className="bg-gray-700 hover:bg-gray-600 text-white text-sm px-4 py-2 rounded"
+                >
+                  Refresh count
+                </button>
+                <button
+                  onClick={handleClearJournal}
+                  disabled={journalCount === 0}
+                  className="bg-red-700 hover:bg-red-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm px-4 py-2 rounded"
+                >
+                  Clear journal
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                The JSON file pairs with <code className="bg-gray-800 px-1 rounded">scripts/journal-to-brief.js</code> which
+                emits a markdown brief suitable for pasting into a fresh Claude Code conversation
+                for strategy analysis.
+              </p>
+            </div>
+          </div>
         </section>
       </div>
     </div>

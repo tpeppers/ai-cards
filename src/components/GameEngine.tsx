@@ -35,6 +35,11 @@ interface GameEngineProps {
   hideDeal?: boolean;
   previewCardId?: string | null;
   onBeforeAIMove?: (playerId: number) => void;
+  /**
+   * Called when the human (player 0) is about to play a card, BEFORE
+   * the card is committed. Use for journaling or deviation-alert logic.
+   */
+  onHumanPlay?: (card: any) => void;
   playerDisplayNames?: string[];
   extraControls?: React.ReactNode;
   showAllCards?: boolean;
@@ -60,6 +65,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   hideDeal = false,
   previewCardId = null,
   onBeforeAIMove,
+  onHumanPlay,
   playerDisplayNames,
   extraControls,
   showAllCards: showAllCardsProp,
@@ -222,6 +228,10 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
     if (!currentPlayer || currentPlayer.id !== 0 || currentGameState.currentTrick.some(play => play.playerId === 0)) {
       return;
     }
+
+    // Journal hook — fires BEFORE the card is committed so the context
+    // reflects the pre-play state the strategy would have evaluated.
+    if (onHumanPlay) onHumanPlay(card);
 
     const move = game.playCard(0, card);
     if (!move.isValid && move.errorMessage) {

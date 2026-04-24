@@ -1,6 +1,12 @@
 // Strategy file contents exported as string constants.
 // Built from composable sections: play (varies by signal mode) + bid + trump.
 
+// ClaudeFam lives in its own file (fully-annotated final strategy). Imported
+// at top-level so the registry below can reference it, and re-exported so
+// external callers can use `import { BIDWHIST_CLAUDEFAM } from './strategies'`.
+import { BIDWHIST_CLAUDEFAM } from './claudeFam.ts';
+export { BIDWHIST_CLAUDEFAM };
+
 // ── Trump section: Ignore Signals (reads own hand only) ──
 
 const TRUMP_SECTION_NOSIGNAL = `\
@@ -809,11 +815,8 @@ export const BIDWHIST_FAMILY_POWERED =
 export const BIDWHIST_CLAUDE = buildStrategy('Claude', CLAUDE_PLAY, CLAUDE_BID, CLAUDE_TRUMP, CLAUDE_DISCARD);
 
 // ── ClaudeFam ────────────────────────────────────────────────────────
-// See src/strategies/claudeFam.ts for the fully-annotated text and
-// the design rationale referencing the research pages under report/.
-
-import { BIDWHIST_CLAUDEFAM } from './claudeFam.ts';
-export { BIDWHIST_CLAUDEFAM };
+// See src/strategies/claudeFam.ts. Imported at top of file (top-level
+// imports required by ESLint); registry entry below picks it up.
 
 // Backward-compatible aliases (point to Partner Signals variants)
 export const BIDWHIST_STANDARD = BIDWHIST_STANDARD_PARTNER;

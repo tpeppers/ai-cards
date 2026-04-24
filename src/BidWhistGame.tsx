@@ -12,6 +12,12 @@ import { getGameStateFromUrl } from './urlGameState.js';
 import { useDraggable } from './hooks/useDraggable.ts';
 import { useResponsiveLayout, PlayAreaLayoutProvider } from './hooks/useResponsiveLayout.ts';
 import { playWhistingFanfare, stopWhistingFanfare } from './utils/whistingSound.ts';
+import DeviationAlert, { notifyDeviation } from './components/DeviationAlert.tsx';
+import {
+  recordBidDecision, recordTrumpDecision, recordDiscardDecision,
+  recordPlayDecision, finalizeHand,
+  RecordContext,
+} from './utils/deviationJournal.ts';
 
 const SUIT_SYMBOLS: { [key: string]: string } = {
   spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣'
@@ -135,8 +141,41 @@ Card Rankings:
     }
   }, [getEffectiveStrategy, game]);
 
+  // Journal helper: the handId is the current deckUrl, and the
+  // selected-strategy info comes from whatever Auto Play would use
+  // for player 0. Uses `getEffectiveStrategy(0)` directly (not
+  // `player0EffectiveStrategy` which is declared later in render).
+  const recordCtx = useCallback((): RecordContext => {
+    const effective = getEffectiveStrategy(0);
+    const name = effective === null
+      ? 'Default AI'
+      : (STRATEGY_REGISTRY.find(s => s.text === effective)?.name || 'Custom');
+    return {
+      handId: game.getLastDealtDeckUrl() || getGameStateFromUrl() || '',
+      selectedStrategyText: effective,
+      selectedStrategyName: name,
+    };
+  }, [game, getEffectiveStrategy]);
+
+  // Fire a deviation banner if the human's choice differs from the
+  // selected strategy. The DecisionRecord carries the comparison already.
+  const maybeNotifyDeviation = (rec: { phase: string; humanChoice: string; selectedChoice: string; selectedName: string; divergedFromSelected: boolean }) => {
+    if (rec.divergedFromSelected) {
+      notifyDeviation({
+        phase: rec.phase,
+        selectedName: rec.selectedName,
+        human: rec.humanChoice,
+        selectedChoice: rec.selectedChoice,
+      });
+    }
+  };
+
   // Handle human bid
   const handleBid = (amount: number) => {
+    // Record BEFORE placing (so the context reflects the pre-bid state
+    // the strategy would have seen).
+    const rec = recordBidDecision(game as any, amount, recordCtx());
+    maybeNotifyDeviation(rec);
     if (game.placeBid(0, amount)) {
       updateStates();
     }
@@ -144,6 +183,8 @@ Card Rankings:
 
   // Handle human trump selection
   const handleTrumpSelection = (suit: string, direction: 'uptown' | 'downtown' | 'downtown-noaces') => {
+    const rec = recordTrumpDecision(game as any, suit, direction, recordCtx());
+    maybeNotifyDeviation(rec);
     if (game.setTrumpSuit(suit, direction)) {
       updateStates();
     }
@@ -151,6 +192,8 @@ Card Rankings:
 
   // Handle human discard selection
   const handleDiscard = (cardIds: string[]) => {
+    const rec = recordDiscardDecision(game as any, cardIds, recordCtx());
+    maybeNotifyDeviation(rec);
     if (game.discardCards(cardIds)) {
       updateStates();
       // Signal GameEngine to refresh its state for play phase
@@ -309,6 +352,32 @@ Card Rankings:
       return;
     }
 
+    // Journal: when a hand just completed (scoring phase reached),
+    // record the outcome so the brief tool can line decisions up with
+    // the contract result.
+    if (newState.gameStage === 'scoring' && currentStage !== 'scoring') {
+      const declarer = game.getDeclarer();
+      if (declarer !== null) {
+        const declTeam = declarer % 2;
+        const books = game.getBooksWon();
+        const declarerTeamBooks = books[declTeam] + 1; // +1 for kitty
+        const bidAmount = game.getCurrentHighBid();
+        const contract = bidAmount + 6;
+        finalizeHand({
+          t: Date.now(),
+          handId: game.getLastDealtDeckUrl() || '',
+          declarer,
+          bidAmount,
+          trumpSuit: game.getTrumpSuit() || '',
+          direction: game.getBidDirection(),
+          booksWon: [books[0], books[1]],
+          contract,
+          declarerTeamBooks,
+          made: declarerTeamBooks >= contract,
+        });
+      }
+    }
+
     // Update both states together to keep them in sync
     const newBiddingState = game.getBiddingState();
 
@@ -366,6 +435,7 @@ Card Rankings:
 
   return (
     <div ref={rootRef} className="relative w-full h-full">
+      <DeviationAlert />
       <PlayAreaLayoutProvider elementRef={rootRef}>
       <GameEngine
         game={game}
@@ -380,6 +450,10 @@ Card Rankings:
         hideDeal={true}
         previewCardId={previewCardId}
         onBeforeAIMove={handleBeforeAIMove}
+        onHumanPlay={(card) => {
+          const rec = recordPlayDecision(game as any, card, recordCtx());
+          maybeNotifyDeviation(rec);
+        }}
         playerDisplayNames={playerDisplayNames}
         showAllCards={showAllCards}
         onToggleShowAllCards={() => setShowAllCards(prev => !prev)}
