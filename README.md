@@ -24,6 +24,27 @@ docker compose up --build
 ML-based card detection is a separate service (`ml/server/inference_server.py`). Set
 `ML_SERVICE_URL` in `docker-compose.yml` to point at it.
 
+### Offline / ad-hoc WiFi (Steam Deck host)
+
+For card-table sessions with no internet, run the host (e.g. a Steam Deck in Desktop Mode)
+as the WiFi access point:
+
+```bash
+# Custom SSID + password, and start the server in the same shell:
+./scripts/start-hotspot.sh bidwhist-table hunter2 --serve
+
+# Or random password, just bring up the network:
+./scripts/start-hotspot.sh
+# (then in another shell: HOTSPOT_SSID=… HOTSPOT_PASSWORD=… npm run server)
+```
+
+The script uses NetworkManager (`nmcli`) to host a WPA2 hotspot. With `HOTSPOT_SSID` and
+`HOTSPOT_PASSWORD` set in the server's environment, the Upload page renders **two QR
+codes**: Step 1 to join the WiFi (standard `WIFI:` URI), Step 2 to open the upload URL on
+the host's hotspot IP. Phones scan both, hand-photo upload works with no internet involved.
+
+Stop the hotspot with `nmcli connection down Hotspot && nmcli connection delete Hotspot`.
+
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Lucide React icons

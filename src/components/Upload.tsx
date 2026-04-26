@@ -100,6 +100,7 @@ const Upload: React.FC = () => {
   const [gmNewHandLoading, setGmNewHandLoading] = useState(false);
   const [gmHostUrl, setGmHostUrl] = useState<string | null>(null);
   const [showQR, setShowQR] = useState<boolean>(true);
+  const [gmWifi, setGmWifi] = useState<{ ssid: string; password: string; qrPayload: string } | null>(null);
 
   // Edit/Hand-Creator modal state. editingCards is the seat whose
   // detected cards are being reviewed; when the user ACCEPTs, we POST
@@ -132,6 +133,14 @@ const Upload: React.FC = () => {
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d && typeof d.url === 'string') setGmHostUrl(d.url);
+      })
+      .catch(() => {});
+    fetch('/api/game-mode/wifi')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d && d.configured && d.qrPayload) {
+          setGmWifi({ ssid: d.ssid, password: d.password, qrPayload: d.qrPayload });
+        }
       })
       .catch(() => {});
   }, [gameModeEnabled]);
@@ -409,22 +418,11 @@ const Upload: React.FC = () => {
         ACCEPT / CLEAR — Hide my hand before passing the phone
       </button>
 
-      {gameModeEnabled && gmHostUrl && (
-        <div className="mb-6 bg-white border-2 border-purple-600 rounded-lg p-4 flex items-start gap-4 flex-wrap">
-          <div className="flex-shrink-0 bg-white p-2 rounded">
-            {showQR && (
-              <QRCodeSVG value={gmHostUrl} size={160} includeMargin={false} />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-semibold text-purple-900 mb-1">
-              Scan to open the Upload page on your phone
-            </div>
-            <div className="text-sm text-gray-700 mb-2 break-all">
-              <code>{gmHostUrl}</code>
-            </div>
-            <div className="text-xs text-gray-500 mb-2">
-              Display this on the TV so every player can grab the URL without typing.
+      {gameModeEnabled && (gmHostUrl || gmWifi) && (
+        <div className="mb-6 bg-white border-2 border-purple-600 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm text-purple-900 font-semibold">
+              Phones — scan to join {gmWifi ? 'and upload' : 'the upload page'}
             </div>
             <button
               onClick={() => setShowQR(v => !v)}
@@ -432,6 +430,46 @@ const Upload: React.FC = () => {
             >
               {showQR ? 'Hide QR' : 'Show QR'}
             </button>
+          </div>
+          {showQR && (
+            <div className="flex gap-6 flex-wrap items-start">
+              {gmWifi && (
+                <div className="flex flex-col items-center">
+                  <div className="text-xs font-semibold text-purple-800 mb-1">
+                    Step 1: Join WiFi
+                  </div>
+                  <div className="bg-white p-2 rounded border border-gray-200">
+                    <QRCodeSVG value={gmWifi.qrPayload} size={160} includeMargin={false} />
+                  </div>
+                  <div className="text-xs text-gray-700 mt-2 text-center">
+                    SSID: <code>{gmWifi.ssid}</code>
+                    {gmWifi.password && (
+                      <>
+                        <br />pw: <code>{gmWifi.password}</code>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+              {gmHostUrl && (
+                <div className="flex flex-col items-center">
+                  <div className="text-xs font-semibold text-purple-800 mb-1">
+                    {gmWifi ? 'Step 2: Open Upload Page' : 'Open Upload Page'}
+                  </div>
+                  <div className="bg-white p-2 rounded border border-gray-200">
+                    <QRCodeSVG value={gmHostUrl} size={160} includeMargin={false} />
+                  </div>
+                  <div className="text-xs text-gray-700 mt-2 break-all max-w-[200px] text-center">
+                    <code>{gmHostUrl}</code>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="text-xs text-gray-500 mt-3">
+            {gmWifi
+              ? 'Offline mode: phones join the host\'s ad-hoc WiFi (Step 1), then open the Upload page (Step 2). No internet needed.'
+              : 'Display this on the TV so every player can grab the URL without typing.'}
           </div>
         </div>
       )}

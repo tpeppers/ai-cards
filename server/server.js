@@ -340,6 +340,34 @@ app.get('/api/game-mode/host-url', (req, res) => {
   });
 });
 
+// WiFi credentials for the offline / ad-hoc hotspot setup. Returns the
+// SSID and password (set via env vars HOTSPOT_SSID/HOTSPOT_PASSWORD —
+// typically by scripts/start-hotspot.sh) plus a qrPayload formatted
+// per the standard WIFI: URI so phones offer to join on scan. When
+// either var is unset, configured=false and the client hides the
+// "join WiFi" QR.
+app.get('/api/game-mode/wifi', (req, res) => {
+  const ssid = process.env.HOTSPOT_SSID;
+  const password = process.env.HOTSPOT_PASSWORD;
+  const auth = process.env.HOTSPOT_AUTH || 'WPA';
+  if (!ssid) {
+    return res.json({ success: true, configured: false });
+  }
+  // WIFI URI escapes: \;,":
+  const esc = (s) => String(s).replace(/([\\;,":])/g, '\\$1');
+  const passPart = password ? `;P:${esc(password)}` : '';
+  const authPart = password ? `T:${esc(auth)};` : 'T:nopass;';
+  const qrPayload = `WIFI:${authPart}S:${esc(ssid)}${passPart};;`;
+  res.json({
+    success: true,
+    configured: true,
+    ssid,
+    password: password || '',
+    auth,
+    qrPayload,
+  });
+});
+
 // Replace the cards for an already-uploaded seat with a corrected list
 // from the Hand Creator. Server preserves the original detection so the
 // final zip can emit detection_mods.txt.
