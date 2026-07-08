@@ -188,6 +188,11 @@ export interface StrategyContext {
   // All cards that have been played (for cards_above tracking)
   playedCards: Card[];
 
+  // Cards this player personally discarded face-down (Bid Whist: the
+  // declarer's 4 kitty discards). Known-dead to THIS player only — other
+  // seats never see them here and must keep treating them as outstanding.
+  myDiscards: Card[];
+
   // Strategy-declared numeric constants (`let name = value`). Populated by
   // the evaluate* entry points from ast.constants; consulted by
   // resolveVariable when a name doesn't match a built-in.

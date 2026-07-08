@@ -43,6 +43,7 @@ function ctxFromHand(cards: Card[], partial: Partial<StrategyContext> = {}): Str
     compareCards: () => 0,
     evaluateCurrentWinner: () => -1,
     playedCards: [],
+    myDiscards: [],
     ...partial,
   };
 }
@@ -271,6 +272,7 @@ describe('sluff_candidates primitive', () => {
     compareCards: () => 0,
     evaluateCurrentWinner: () => -1,
     playedCards: played,
+    myDiscards: [],
   });
 
   const STRAT = `strategy "sluff"
@@ -347,6 +349,338 @@ play:
     const result = evaluatePlay(ast, ctx);
     expect(result).not.toBeNull();
     expect(result!.id).toBe('hearts_2');
+  });
+});
+
+describe('suit-role primitives (boss / backed / backing / spare / holes)', () => {
+  const { evaluatePlay, evaluateDiscard } = require('./evaluator.ts');
+
+  // Read any numeric DSL expression through a bid action.
+  function evalNum(expr: string, ctx: StrategyContext): number {
+    const ast = parseStrategy(`strategy "t"\ngame: bidwhist\n\nbid:\n  default:\n    bid ${expr}\n`);
+    const result = evaluateBid(ast, ctx);
+    return typeof result === 'number' ? result : NaN;
+  }
+
+  // Read a card-valued DSL expression through a leading play action.
+  function evalCard(expr: string, ctx: StrategyContext): string | null {
+    const ast = parseStrategy(
+      `strategy "t"\ngame: bidwhist\n\nplay:\n  leading:\n    default:\n      play ${expr}\n`);
+    const result = evaluatePlay(ast, ctx);
+    return result ? result.id : null;
+  }
+
+  function mk(suit: string, rank: number): Card {
+    return { suit, rank, id: `${suit}_${rank}` };
+  }
+
+  // The canonical human example: A/K/10/9/5/3 of hearts, Q/J outstanding.
+  // "2 winners (A/K), a 2-hole (Q/J), 2-with-backing (10/9), backing (5/3)."
+  const canonical = [
+    mk('hearts', 1), mk('hearts', 13), mk('hearts', 10),
+    mk('hearts', 9), mk('hearts', 5), mk('hearts', 3),
+  ];
+
+  it('partitions the canonical A/K/10/9/5/3 holding', () => {
+    const ctx = ctxFromHand(canonical);
+    expect(evalNum('hand.suit("hearts").boss.count', ctx)).toBe(2);
+    expect(evalNum('hand.suit("hearts").backed.count', ctx)).toBe(2);
+    expect(evalNum('hand.suit("hearts").backing.count', ctx)).toBe(2);
+    expect(evalNum('hand.suit("hearts").spare.count', ctx)).toBe(0);
+    expect(evalNum('hand.suit("hearts").working.count', ctx)).toBe(6);
+    // The backed winners are exactly the 10 and 9
+    expect(evalCard('hand.suit("hearts").backed.strongest', ctx)).toBe('hearts_10');
+    expect(evalCard('hand.suit("hearts").backed.weakest', ctx)).toBe('hearts_9');
+    // The backing feeds are exactly the 5 and 3
+    expect(evalCard('hand.suit("hearts").backing.strongest', ctx)).toBe('hearts_5');
+    expect(evalCard('hand.suit("hearts").backing.weakest', ctx)).toBe('hearts_3');
+    // The hole is the missing Q/J
+    expect(evalNum('hole_count("hearts")', ctx)).toBe(2);
+    expect(evalNum('suit_makeable_tricks("hearts")', ctx)).toBe(4);
+  });
+
+  it('cards below the needed backing are spare', () => {
+    // A/K/10/9/7/5/3: same structure plus one extra low card. The two
+    // HIGHEST cards below the backed run (7, 5) are reserved as feeds —
+    // holding bigger feeds shrinks the opponents' duck space — and the
+    // bottom card (3) is released as the spare/discard.
+    const ctx = ctxFromHand([...canonical, mk('hearts', 7)]);
+    expect(evalNum('hand.suit("hearts").backed.count', ctx)).toBe(2);
+    expect(evalNum('hand.suit("hearts").backing.count', ctx)).toBe(2);
+    expect(evalNum('hand.suit("hearts").spare.count', ctx)).toBe(1);
+    expect(evalCard('hand.suit("hearts").spare.strongest', ctx)).toBe('hearts_3');
+    expect(evalCard('hand.suit("hearts").backing.strongest', ctx)).toBe('hearts_7');
+    expect(evalCard('hand.suit("hearts").backing.weakest', ctx)).toBe('hearts_5');
+  });
+
+  it('a half-stopper (Q/5 vs A,K out) is not backed', () => {
+    const ctx = ctxFromHand([mk('hearts', 12), mk('hearts', 5)]);
+    expect(evalNum('hand.suit("hearts").boss.count', ctx)).toBe(0);
+    expect(evalNum('hand.suit("hearts").backed.count', ctx)).toBe(0);
+    expect(evalNum('hand.suit("hearts").spare.count', ctx)).toBe(2);
+    expect(evalNum('hole_count("hearts")', ctx)).toBe(2);
+  });
+
+  it('one feed can promote a whole run (K/Q/2 vs A out)', () => {
+    const ctx = ctxFromHand([mk('hearts', 13), mk('hearts', 12), mk('hearts', 2)]);
+    expect(evalNum('hand.suit("hearts").backed.count', ctx)).toBe(2);
+    expect(evalNum('hand.suit("hearts").backing.count', ctx)).toBe(1);
+    expect(evalCard('hand.suit("hearts").backing.weakest', ctx)).toBe('hearts_2');
+    expect(evalNum('suit_makeable_tricks("hearts")', ctx)).toBe(2);
+  });
+
+  it('long weak suits earn backed winners (10..5 vs A,K,Q,J out)', () => {
+    const ctx = ctxFromHand([10, 9, 8, 7, 6, 5].map(r => mk('hearts', r)));
+    expect(evalNum('hand.suit("hearts").backed.count', ctx)).toBe(2); // 10, 9
+    expect(evalNum('hand.suit("hearts").backing.count', ctx)).toBe(4); // 8,7,6,5
+    expect(evalNum('hole_count("hearts")', ctx)).toBe(4);
+  });
+
+  it('hole_count is 0 for void suits and all-boss suits', () => {
+    const ctx = ctxFromHand([mk('hearts', 1), mk('hearts', 13)]);
+    expect(evalNum('hole_count("hearts")', ctx)).toBe(0); // A/K are boss
+    expect(evalNum('hole_count("clubs")', ctx)).toBe(0);  // void
+  });
+
+  it('roles honor played cards: J promotes to boss once A/K/Q fall', () => {
+    const played = [mk('hearts', 1), mk('hearts', 13), mk('hearts', 12)];
+    const ctx = ctxFromHand([mk('hearts', 11), mk('hearts', 2)], { playedCards: played });
+    expect(evalNum('hand.suit("hearts").boss.count', ctx)).toBe(1);
+    // hole_count reports the gap above the highest NON-boss card — here the
+    // junk 2, which sits under the 8 outstanding cards 10..3. A large hole
+    // means "my next card is nowhere near promotion", not "no holes".
+    expect(evalNum('hole_count("hearts")', ctx)).toBe(8);
+  });
+
+  it('roles honor my own kitty discards (declarer knowledge)', () => {
+    // K/5 of hearts. With the A outstanding, K is only backed…
+    const noInfo = ctxFromHand([mk('hearts', 13), mk('hearts', 5)]);
+    expect(evalNum('hand.suit("hearts").boss.count', noInfo)).toBe(0);
+    expect(evalNum('hand.suit("hearts").backed.count', noInfo)).toBe(1);
+    // …but if I discarded the A myself, my K is boss.
+    const discarded = ctxFromHand(
+      [mk('hearts', 13), mk('hearts', 5)],
+      { myDiscards: [mk('hearts', 1)] });
+    expect(evalNum('hand.suit("hearts").boss.count', discarded)).toBe(1);
+    // The K is boss now; the hole is what blocks the 5 (Q..6 outstanding).
+    expect(evalNum('hole_count("hearts")', discarded)).toBe(7);
+  });
+
+  it('direction arguments analyze hypothetical calls at bid time', () => {
+    // A/2/3 of hearts under an uptown-valued context.
+    const ctx = ctxFromHand([mk('hearts', 1), mk('hearts', 2), mk('hearts', 3)]);
+    // Uptown (context default): only the A is boss; 2/3 are spare.
+    expect(evalNum('hand.suit("hearts").boss.count', ctx)).toBe(1);
+    // Downtown: A stays highest, then 2, 3 — all three are boss.
+    expect(evalNum('hand.suit("hearts").boss(downtown).count', ctx)).toBe(3);
+    // Downtown-noaces: 2/3 are boss, the A is the worst card in the suit.
+    expect(evalNum('hand.suit("hearts").boss(downtown-noaces).count', ctx)).toBe(2);
+    expect(evalNum('makeable_trick_count(downtown)', ctx)).toBe(3);
+  });
+
+  it('downtown-noaces: the ace can serve as backing below the King', () => {
+    // K/A of hearts, only the Q still outstanding (2..J played).
+    // Noaces order: 2 best … K second-worst, A worst. The Q outranks my K,
+    // but feeding the A to the Q's trick promotes the K.
+    // Regression: A and K used to tie at value 1, misclassifying both as spare.
+    const played = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(r => mk('hearts', r));
+    const ctx = ctxFromHand(
+      [mk('hearts', 13), mk('hearts', 1)], { playedCards: played });
+    expect(evalNum('hand.suit("hearts").backed(downtown-noaces).count', ctx)).toBe(1);
+    expect(evalNum('hand.suit("hearts").backing(downtown-noaces).count', ctx)).toBe(1);
+    expect(evalNum('suit_makeable_tricks("hearts", downtown-noaces)', ctx)).toBe(1);
+  });
+
+  it('sure_trick_count sums boss + backed across suits', () => {
+    // Hearts canonical (4) + spades A,K,Q (3 boss; no backing for more).
+    const h = [...canonical, mk('spades', 1), mk('spades', 13), mk('spades', 12)];
+    const ctx = ctxFromHand(h);
+    expect(evalNum('makeable_trick_count()', ctx)).toBe(7);
+    expect(evalNum('suit_makeable_tricks("spades")', ctx)).toBe(3);
+  });
+
+  it('best_suit_by_tricks picks the suit with the most makeable tricks', () => {
+    const h = [...canonical, mk('spades', 1), mk('spades', 13), mk('spades', 12)];
+    const ctx = ctxFromHand(h);
+    const STRAT = `strategy "t"
+game: bidwhist
+
+trump:
+  default:
+    choose suit: best_suit_by_tricks(uptown) direction: uptown
+`;
+    const { evaluateTrump } = require('./evaluator.ts');
+    const result = evaluateTrump(parseStrategy(STRAT), ctx);
+    expect(result).toEqual({ suit: 'hearts', direction: 'uptown' });
+  });
+
+  it('role sets intersect with chained filters (hand.nontrump.working)', () => {
+    const h = [...canonical, mk('spades', 1), mk('spades', 4)];
+    const ctx = ctxFromHand(h, { trumpSuit: 'spades' });
+    // Hearts working = 6; the spades are excluded by .nontrump.
+    expect(evalNum('hand.nontrump.working.count', ctx)).toBe(6);
+    // Trump is ALWAYS working: the structurally-jobless 4 of trump still
+    // has a ruffing job, so it is working (and never spare).
+    expect(evalNum('hand.trump.working.count', ctx)).toBe(2);
+    expect(evalNum('hand.spare.count', ctx)).toBe(0);
+  });
+
+  it('keep working / drop spare protects backing cards in the discard', () => {
+    // Declarer with 16 cards, trump = spades:
+    //   spades  A,K,Q,2,3 — trump
+    //   hearts  A,K,10,9,5,3 — canonical: ALL working (backing = 5,3)
+    //   diamonds 8,7,2 — spare (A,K,Q,J,10,9 outstanding)
+    //   clubs   J,4 — spare (A,K,Q outstanding, one card below)
+    const h = [
+      mk('spades', 1), mk('spades', 13), mk('spades', 12), mk('spades', 2), mk('spades', 3),
+      ...canonical,
+      mk('diamonds', 8), mk('diamonds', 7), mk('diamonds', 2),
+      mk('clubs', 11), mk('clubs', 4),
+    ];
+    const ctx = ctxFromHand(h, { trumpSuit: 'spades', amDeclarer: true, declarer: 0 });
+    const STRAT = `strategy "t"
+game: bidwhist
+
+discard:
+  default:
+    keep hand.working
+  when hand.spare.count > 0:
+    drop hand.spare
+`;
+    const discards = evaluateDiscard(parseStrategy(STRAT), ctx);
+    // The naive lowest-value discard would toss 2d, 3h, 4c, 5h — destroying
+    // the hearts backing. Role-aware discard keeps 3h/5h and sheds spares.
+    expect(discards).toEqual(
+      expect.arrayContaining(['diamonds_2', 'clubs_4', 'diamonds_7', 'diamonds_8']));
+    expect(discards).not.toContain('hearts_3');
+    expect(discards).not.toContain('hearts_5');
+    // Low trump is never spare, so `drop hand.spare` cannot shed it.
+    expect(discards).not.toContain('spades_2');
+    expect(discards).not.toContain('spades_3');
+  });
+});
+
+describe('signal-aware trump selection primitives', () => {
+  const { evaluateTrump } = require('./evaluator.ts');
+
+  function mk(suit: string, rank: number): Card {
+    return { suit, rank, id: `${suit}_${rank}` };
+  }
+
+  function trumpChoice(ctx: StrategyContext, suitExpr: string, dirExpr: string) {
+    const STRAT = `strategy "t"
+game: bidwhist
+
+trump:
+  default:
+    choose suit: ${suitExpr} direction: ${dirExpr}
+`;
+    return evaluateTrump(parseStrategy(STRAT), ctx);
+  }
+
+  it('best_suit_by_power picks honor density over length', () => {
+    // 6 low hearts vs A/K/Q of spades: best_suit (length-biased) would take
+    // hearts; power picks spades.
+    const h = [
+      ...[2, 3, 4, 5, 6, 7].map(r => mk('hearts', r)),
+      mk('spades', 1), mk('spades', 13), mk('spades', 12),
+    ];
+    const ctx = ctxFromHand(h);
+    const result = trumpChoice(ctx, 'best_suit_by_power(uptown)', 'uptown');
+    expect(result).toEqual({ suit: 'spades', direction: 'uptown' });
+  });
+
+  // A roughly direction-symmetric hand: high tops in hearts, low tops in
+  // spades, junk elsewhere. The signals should tip the call.
+  const symmetric = [
+    mk('hearts', 1), mk('hearts', 13), mk('hearts', 9), mk('hearts', 8),
+    mk('spades', 2), mk('spades', 3), mk('spades', 9), mk('spades', 8),
+    mk('diamonds', 13), mk('diamonds', 7), mk('clubs', 3), mk('clubs', 7),
+  ];
+
+  it('partner signal steers the direction on a balanced hand', () => {
+    const high = trumpChoice(ctxFromHand(symmetric, { partnerBid: 2 }),
+      'signal_aware_suit()', 'signal_aware_direction()');
+    expect(high!.direction).toBe('uptown');
+
+    const low = trumpChoice(ctxFromHand(symmetric, { partnerBid: 1 }),
+      'signal_aware_suit()', 'signal_aware_direction()');
+    expect(low!.direction).not.toBe('uptown');
+  });
+
+  it('enemy signal counterpicks the direction on a balanced hand', () => {
+    const result = trumpChoice(ctxFromHand(symmetric, { partnerBid: 0, enemyBid: 2 }),
+      'signal_aware_suit()', 'signal_aware_direction()');
+    expect(result!.direction).not.toBe('uptown');
+  });
+
+  it('exclusion steers the suit: own tops beat outstanding tops (the motivating hand)', () => {
+    // Dealer's 16 cards: 6 low spades, strong-high diamonds, K/Q side suits.
+    // Partner signaled high (2), enemy signaled low (1). Under uptown the
+    // spades are LONGER (6 vs 5) but A/K/Q of spades are all outstanding —
+    // gambling the trump suit on cards 2-of-3 opponents may hold. Diamonds'
+    // tops are mostly in-hand, so the model must pick diamonds.
+    const h = [
+      ...[2, 3, 4, 7, 9, 11].map(r => mk('spades', r)),
+      mk('diamonds', 1), mk('diamonds', 12), mk('diamonds', 10), mk('diamonds', 3), mk('diamonds', 2),
+      mk('hearts', 13), mk('hearts', 5),
+      mk('clubs', 12), mk('clubs', 8), mk('clubs', 6),
+    ];
+    const ctx = ctxFromHand(h, { partnerBid: 2, enemyBid: 1, declarer: 0, amDeclarer: true });
+    const result = trumpChoice(ctx, 'signal_aware_suit(uptown)', 'uptown');
+    expect(result).toEqual({ suit: 'diamonds', direction: 'uptown' });
+  });
+
+  it('partner_cover / enemy_cover expose the direction lean as scalars', () => {
+    const { evaluateBid: evalBid } = require('./evaluator.ts');
+    const num = (expr: string, ctx: StrategyContext): number => {
+      const ast = parseStrategy(`strategy "t"\ngame: bidwhist\n\nbid:\n  default:\n    bid ${expr}\n`);
+      const r = evalBid(ast, ctx);
+      return typeof r === 'number' ? r : NaN;
+    };
+    const junk = [8, 7, 6].map(r => mk('hearts', r));
+
+    // Partner signaled high: their expected uptown tops concentrate to >= 4
+    // (12 tops outstanding), and their downtown cover is depressed.
+    const pHigh = ctxFromHand(junk, { partnerBid: 2 });
+    expect(num('partner_cover(uptown)', pHigh)).toBeGreaterThanOrEqual(4);
+    expect(num('partner_cover(downtown)', pHigh))
+      .toBeLessThan(num('partner_cover(uptown)', pHigh));
+
+    // Exclusion: if I hold most uptown tops myself, partner's cover shrinks
+    // to what remains outstanding.
+    const iHoldTops = ctxFromHand([
+      mk('hearts', 1), mk('hearts', 13), mk('hearts', 12),
+      mk('spades', 1), mk('spades', 13), mk('spades', 12),
+      mk('diamonds', 1), mk('diamonds', 13), mk('diamonds', 12),
+      mk('clubs', 1), mk('clubs', 13),
+    ], { partnerBid: 2 });
+    expect(num('partner_cover(uptown)', iHoldTops)).toBeLessThanOrEqual(1);
+
+    // Enemy cover mirrors with the enemy signal.
+    const eLow = ctxFromHand(junk, { enemyBid: 1 });
+    expect(num('enemy_cover(downtown)', eLow)).toBeGreaterThanOrEqual(4);
+    expect(num('enemy_cover(uptown)', eLow))
+      .toBeLessThan(num('enemy_cover(downtown)', eLow));
+
+    // No signals: both fall back to the 1-in-3 proportional prior.
+    const quiet = ctxFromHand(junk);
+    expect(num('partner_cover(uptown)', quiet)).toBeCloseTo(4, 5);
+    expect(num('enemy_cover(uptown)', quiet)).toBeCloseTo(4, 5);
+  });
+
+  it('exclusion neutralizes the enemy signal in a suit whose tops I hold', () => {
+    // I hold 2/3/4 of spades (all the noaces tops): the enemy's low signal
+    // cannot threaten low spades — outTop(spades, noaces) is 0, so spades
+    // must score above any suit with outstanding low tops.
+    const h = [
+      ...[2, 3, 4, 7, 9, 11].map(r => mk('spades', r)),
+      mk('diamonds', 8), mk('diamonds', 9), mk('diamonds', 10),
+      mk('hearts', 8), mk('hearts', 9), mk('clubs', 8),
+    ];
+    const ctx = ctxFromHand(h, { partnerBid: 0, enemyBid: 1 });
+    const result = trumpChoice(ctx, 'signal_aware_suit(downtown-noaces)', 'downtown-noaces');
+    expect(result).toEqual({ suit: 'spades', direction: 'downtown-noaces' });
   });
 });
 

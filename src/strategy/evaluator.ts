@@ -45,6 +45,55 @@ export function disableTracing(): RuleTraceEntry[] {
   return entries;
 }
 
+// ── Seen/outstanding card accounting ────────────────────────────────
+
+/**
+ * Card ids this player has seen leave play (or holds): completed tricks,
+ * the trick in progress, their own hand, and — declarer only — their own
+ * kitty discards. Every other card of a suit is "outstanding": possibly in
+ * an opponent's hand, possibly buried in the kitty.
+ */
+function seenCardIds(ctx: StrategyContext): Set<string> {
+  const seen = new Set<string>();
+  for (const c of ctx.playedCards) seen.add(c.id);
+  for (const c of ctx.hand) seen.add(c.id);
+  for (const p of ctx.currentTrick) seen.add(p.card.id);
+  for (const c of ctx.myDiscards) seen.add(c.id);
+  return seen;
+}
+
+function outstandingInSuit(suit: string, seen: Set<string>): Card[] {
+  const out: Card[] = [];
+  for (let rank = 1; rank <= 13; rank++) {
+    const id = `${suit}_${rank}`;
+    if (seen.has(id)) continue;
+    out.push({ suit, rank, id });
+  }
+  return out;
+}
+
+// ── Direction-aware card values ─────────────────────────────────────
+// Mirrors BidWhistGame.getCardValue so role primitives can analyze a hand
+// under a hypothetical direction during bidding (before trump/direction are
+// set, ctx.getCardValue still reflects the table default).
+
+function directionCardValue(direction: string): ((c: Card) => number) | null {
+  if (direction === 'uptown') return c => (c.rank === 1 ? 14 : c.rank);
+  if (direction === 'downtown') return c => (c.rank === 1 ? 14 : 14 - c.rank);
+  // Ace = 0 (not 1) so it sits strictly below the King's 14 - 13 = 1,
+  // matching BidWhistGame.getCardValue.
+  if (direction === 'downtown-noaces') return c => (c.rank === 1 ? 0 : 14 - c.rank);
+  return null;
+}
+
+function valueFnFor(ctx: StrategyContext, direction?: unknown): (c: Card) => number {
+  if (typeof direction === 'string') {
+    const fn = directionCardValue(direction);
+    if (fn) return fn;
+  }
+  return ctx.getCardValue;
+}
+
 // ── CardSet helpers ─────────────────────────────────────────────────
 
 function makeCardSet(cards: Card[]): CardSet {
@@ -99,21 +148,17 @@ function cardSetLosers(cs: CardSet, ctx: StrategyContext): CardSet {
   };
 }
 
-function cardSetBoss(cs: CardSet, ctx: StrategyContext): CardSet {
-  const playedIds = new Set(ctx.playedCards.map(c => c.id));
-  const myIds = new Set(ctx.hand.map(c => c.id));
-  const trickIds = new Set(ctx.currentTrick.map(p => p.card.id));
+function cardSetBoss(cs: CardSet, ctx: StrategyContext, direction?: unknown): CardSet {
+  const seen = seenCardIds(ctx);
+  const valueFn = valueFnFor(ctx, direction);
 
   return {
     cards: cs.cards.filter(card => {
-      const val = ctx.getCardValue(card);
-      for (let rank = 1; rank <= 13; rank++) {
-        const id = `${card.suit}_${rank}`;
-        if (id === card.id) continue;
-        if (playedIds.has(id) || myIds.has(id) || trickIds.has(id)) continue;
+      const val = valueFn(card);
+      for (const outCard of outstandingInSuit(card.suit, seen)) {
+        if (outCard.id === card.id) continue;
         // This card is still out there in an opponent's hand
-        const tempCard: Card = { suit: card.suit, rank, id };
-        if (ctx.getCardValue(tempCard) > val) {
+        if (valueFn(outCard) > val) {
           return false; // A higher card of this suit is still unplayed
         }
       }
@@ -159,21 +204,13 @@ function getPartnerCard(ctx: StrategyContext): Card | null {
 
 function cardsAbove(card: Card, ctx: StrategyContext): number {
   // Count unseen cards that rank above this card in its suit
-  const playedIds = new Set(ctx.playedCards.map(c => c.id));
-  const myIds = new Set(ctx.hand.map(c => c.id));
-  const trickIds = new Set(ctx.currentTrick.map(p => p.card.id));
-
+  const seen = seenCardIds(ctx);
   const val = ctx.getCardValue(card);
   let count = 0;
 
-  // There are 13 cards per suit. Any with higher value that are not in hand, played, or current trick
-  for (let rank = 1; rank <= 13; rank++) {
-    const id = `${card.suit}_${rank}`;
-    if (id === card.id) continue;
-    if (playedIds.has(id) || myIds.has(id) || trickIds.has(id)) continue;
-    // Create a temporary card to evaluate
-    const tempCard: Card = { suit: card.suit, rank, id };
-    if (ctx.getCardValue(tempCard) > val) {
+  for (const outCard of outstandingInSuit(card.suit, seen)) {
+    if (outCard.id === card.id) continue;
+    if (ctx.getCardValue(outCard) > val) {
       count++;
     }
   }
@@ -252,30 +289,20 @@ function countOutstandingThreats(ctx: StrategyContext): number {
   if (winIdx < 0) return 0;
   const winCard = ctx.currentTrick[winIdx].card;
 
-  const playedIds = new Set(ctx.playedCards.map(c => c.id));
-  const myIds = new Set(ctx.hand.map(c => c.id));
-  const trickIds = new Set(ctx.currentTrick.map(p => p.card.id));
-
+  const seen = seenCardIds(ctx);
   const winVal = ctx.getCardValue(winCard);
   let count = 0;
 
   // Higher cards of the same suit as the winner
-  for (let rank = 1; rank <= 13; rank++) {
-    const id = `${winCard.suit}_${rank}`;
-    if (playedIds.has(id) || myIds.has(id) || trickIds.has(id)) continue;
-    const tempCard: Card = { suit: winCard.suit, rank, id };
-    if (ctx.getCardValue(tempCard) > winVal) {
+  for (const outCard of outstandingInSuit(winCard.suit, seen)) {
+    if (ctx.getCardValue(outCard) > winVal) {
       count++;
     }
   }
 
   // If winner is non-trump, any outstanding trump card also beats it
   if (ctx.trumpSuit && winCard.suit !== ctx.trumpSuit) {
-    for (let rank = 1; rank <= 13; rank++) {
-      const id = `${ctx.trumpSuit}_${rank}`;
-      if (playedIds.has(id) || myIds.has(id) || trickIds.has(id)) continue;
-      count++;
-    }
+    count += outstandingInSuit(ctx.trumpSuit, seen).length;
   }
 
   return count;
@@ -283,17 +310,7 @@ function countOutstandingThreats(ctx: StrategyContext): number {
 
 function countOutstandingTrump(ctx: StrategyContext): number {
   if (!ctx.trumpSuit) return 0;
-  const playedIds = new Set(ctx.playedCards.map(c => c.id));
-  const myIds = new Set(ctx.hand.map(c => c.id));
-  const trickIds = new Set(ctx.currentTrick.map(p => p.card.id));
-
-  let count = 0;
-  for (let rank = 1; rank <= 13; rank++) {
-    const id = `${ctx.trumpSuit}_${rank}`;
-    if (playedIds.has(id) || myIds.has(id) || trickIds.has(id)) continue;
-    count++;
-  }
-  return count;
+  return outstandingInSuit(ctx.trumpSuit, seenCardIds(ctx)).length;
 }
 
 function maxSuitCount(ctx: StrategyContext): number {
@@ -386,6 +403,329 @@ function computeSluffCandidates(ctx: StrategyContext): CardSet {
   return {
     cards: ctx.hand.filter(c => c.suit !== ctx.trumpSuit && !protectedIds.has(c.id)),
   };
+}
+
+// ── Suit-role analysis: winners / holes / backing ───────────────────
+//
+// Partitions the hand into the roles human players use to describe a
+// holding. A/K/10/9/5/3 with Q/J outstanding is "2 winners (A/K), a 2-hole
+// (Q/J), and 2-with-backing (10/9 promote once the 5/3 are fed to the
+// tricks the Q/J win)":
+//
+//   boss    — no outstanding higher card in the suit; wins if the suit is
+//             led and nobody trumps.
+//   backed  — holesAbove(c) > 0 but I hold at least that many LOWER cards
+//             of the suit: each hole card wins at most one trick of this
+//             suit, I feed a low card to each, and then c is boss.
+//   backing — the H HIGHEST cards strictly below the backed run (H = holes
+//             above the lowest backed card). These are reserved as feeds:
+//             sluffing or discarding them demotes the backed cards above.
+//             Any H cards below the backed run do the feeding job equally,
+//             and holding the higher ones weakly dominates (a bigger feed
+//             shrinks the opponents' duck space) — so the suit's LOWEST
+//             cards are the ones released as spare, matching the human
+//             discipline of throwing from the bottom.
+//   spare   — none of the above; no structural job in the suit, so the
+//             safest discards/sluffs.
+//
+// Within a suit the roles are always layered top-down as
+// [boss][backed][backing][spare]: holesAbove only grows as you go down
+// while the count of lower cards shrinks, so boss and backed each form a
+// contiguous run and the backing block sits directly beneath them.
+//
+// Trump override: once trump is set, every trump card has a ruffing job
+// regardless of its in-suit structure, so `.spare` never returns trump and
+// `.working` always includes all of it. The structural roles (boss / backed
+// / backing) stay rank-honest for trump — boss trump still matters for
+// pulling.
+//
+// Caveats (deliberate — this is the human counting model, not a solver):
+// backed counts are an OPTIMISTIC bound. They assume each hole card spends
+// itself winning a fed trick; a defender who ducks the feed (plays low,
+// keeps the A over your K/Q) can hold a backed card to fewer tricks. They
+// also ignore cross-suit trumping and tempo/entries — strategies gate on
+// enemy_has_trump / outstanding_trump() for that.
+
+interface SuitRoles {
+  boss: Set<string>;
+  backed: Set<string>;
+  backing: Set<string>;
+  spare: Set<string>;
+}
+
+function computeSuitRoles(ctx: StrategyContext, valueFn: (c: Card) => number): SuitRoles {
+  const roles: SuitRoles = { boss: new Set(), backed: new Set(), backing: new Set(), spare: new Set() };
+  const seen = seenCardIds(ctx);
+
+  const bySuit: Record<string, Card[]> = {};
+  for (const c of ctx.hand) {
+    if (!bySuit[c.suit]) bySuit[c.suit] = [];
+    bySuit[c.suit].push(c);
+  }
+
+  for (const suit of Object.keys(bySuit)) {
+    const mine = bySuit[suit].slice().sort((a, b) => valueFn(b) - valueFn(a)); // high → low
+    const outstandingVals = outstandingInSuit(suit, seen).map(valueFn);
+
+    let lowestBackedHoles = 0;
+    let lowestBackedIdx = -1;
+    mine.forEach((card, i) => {
+      const v = valueFn(card);
+      const holes = outstandingVals.filter(o => o > v).length;
+      const lowerMine = mine.length - 1 - i;
+      if (holes === 0) {
+        roles.boss.add(card.id);
+      } else if (lowerMine >= holes) {
+        roles.backed.add(card.id);
+        lowestBackedHoles = holes;
+        lowestBackedIdx = i;
+      }
+    });
+
+    // Reserve the `lowestBackedHoles` highest cards below the backed run
+    // as backing feeds; anything beneath them is spare.
+    for (let i = lowestBackedIdx + 1; i <= lowestBackedIdx + lowestBackedHoles && i < mine.length; i++) {
+      roles.backing.add(mine[i].id);
+    }
+    for (const card of mine) {
+      if (!roles.boss.has(card.id) && !roles.backed.has(card.id) && !roles.backing.has(card.id)) {
+        roles.spare.add(card.id);
+      }
+    }
+  }
+  return roles;
+}
+
+type RoleName = 'boss' | 'backed' | 'backing' | 'spare' | 'working';
+
+// Roles are facts about the FULL hand; applying a role property to a
+// filtered set (hand.nontrump.spare) intersects that set with the role.
+function filterByRole(cs: CardSet, ctx: StrategyContext, role: RoleName, direction?: unknown): CardSet {
+  const roles = computeSuitRoles(ctx, valueFnFor(ctx, direction));
+  const isTrump = (c: Card) => ctx.trumpSuit !== null && c.suit === ctx.trumpSuit;
+  const structurallyWorking = (id: string) =>
+    roles.boss.has(id) || roles.backed.has(id) || roles.backing.has(id);
+  const inRole = (c: Card) =>
+    role === 'working' ? structurallyWorking(c.id) || isTrump(c)
+    : role === 'spare' ? roles.spare.has(c.id) && !isTrump(c)
+    : roles[role].has(c.id);
+  return { cards: cs.cards.filter(inRole) };
+}
+
+/**
+ * The size of the hole blocking my best non-boss card in the suit: for
+ * A/K/10/9/5/3 with Q/J out, the highest non-boss card is the 10 and the
+ * hole is 2 (Q, J). 0 when void in the suit or when everything is boss.
+ *
+ * When holes interleave my backed cards (A/K/J/9 with Q and 10 out), this
+ * reports only the gap above the FIRST candidate (1: the Q) — the total
+ * feed requirement for the whole suit is `.backing.count` (2 here).
+ */
+function holeCount(suit: string, ctx: StrategyContext, valueFn: (c: Card) => number): number {
+  const seen = seenCardIds(ctx);
+  const mine = ctx.hand.filter(c => c.suit === suit)
+    .sort((a, b) => valueFn(b) - valueFn(a));
+  const outstandingVals = outstandingInSuit(suit, seen).map(valueFn);
+
+  for (const card of mine) {
+    const holes = outstandingVals.filter(o => o > valueFn(card)).length;
+    if (holes > 0) return holes; // highest non-boss card found
+  }
+  return 0;
+}
+
+function suitMakeableTricks(suit: string, ctx: StrategyContext, valueFn: (c: Card) => number): number {
+  const roles = computeSuitRoles(ctx, valueFn);
+  return ctx.hand.filter(c => c.suit === suit && (roles.boss.has(c.id) || roles.backed.has(c.id))).length;
+}
+
+// "Books I can see in my hand": boss + backed winners across all suits.
+// An optimistic bound, not a guarantee — see the ducking caveat above.
+// Trump-independent, so usable at bid time — but ALWAYS pass an explicit
+// direction there; before trump selection ctx.getCardValue is just the
+// table default, which says nothing about the call you're weighing.
+function makeableTrickCount(ctx: StrategyContext, valueFn: (c: Card) => number): number {
+  const roles = computeSuitRoles(ctx, valueFn);
+  return roles.boss.size + roles.backed.size;
+}
+
+// The human trump-selection rule: pick the suit that makes the most tricks
+// AS TRUMP. Length comes FIRST — a low trump is nearly a full trick once
+// opponents are stripped, which the per-suit role math cannot see (it
+// ignores ruffs/exhaustion by design). The v1 blended key (tricks + length)
+// traded length for structure on split-length hands and LOST 48.25%±0.68 to
+// the length-first best_suit (report/trump-sweep.json), so structure only
+// breaks length ties: key = (length, makeable tricks, honor power).
+function bestSuitByTricks(ctx: StrategyContext, direction?: string): string {
+  const valueFn = valueFnFor(ctx, direction);
+  const roles = computeSuitRoles(ctx, valueFn);
+  const powerDirection = direction ?? ctx.bidDirection;
+
+  let best = 'spades';
+  let bestKey: [number, number, number] | null = null;
+  for (const suit of ['spades', 'hearts', 'diamonds', 'clubs']) {
+    const suitCards = ctx.hand.filter(c => c.suit === suit);
+    const tricks = suitCards.filter(c => roles.boss.has(c.id) || roles.backed.has(c.id)).length;
+    const key: [number, number, number] = [suitCards.length, tricks, suitPower(ctx, suit, powerDirection)];
+    if (!bestKey || key[0] > bestKey[0] ||
+        (key[0] === bestKey[0] && key[1] > bestKey[1]) ||
+        (key[0] === bestKey[0] && key[1] === bestKey[1] && key[2] > bestKey[2])) {
+      bestKey = key;
+      best = suit;
+    }
+  }
+  return best;
+}
+
+// ── Signal-aware trump selection ─────────────────────────────────────
+//
+// Implements the exclusion-information model from
+// report/bayesian-trump-selection.md. A direction signal (bid 1 = low,
+// bid 2 = high) says the signaler holds ~4 makeable winners in that
+// direction — necessarily drawn from the direction's TOP cards that I
+// don't hold. My own cards therefore sharpen everyone's signals:
+//   - the fewer tops I leave outstanding, the more precisely a signal
+//     localizes the signaler's holding (posterior concentration), and
+//   - per suit, signaled strength distributes over the OUTSTANDING tops,
+//     so a suit whose tops I hold gets little partner coverage and poses
+//     little enemy threat ("they can't have what I'm holding").
+//
+// score(S, D) = own structure (makeable tricks + trump length + trump-suit
+// makeable) + partner's expected top coverage − enemy-held tops in my
+// trump (unruffable, 1.25×) − enemy side-suit winners (ruffable, 0.75×,
+// halved when diffuse/unsignaled) + a counterpick bonus when D devalues
+// the enemy's signaled direction − a penalty when it devalues partner's.
+// Weights are v1 round numbers — see the report's caveats.
+
+const TRUMP_CALL_SUITS = ['spades', 'hearts', 'diamonds', 'clubs'];
+const TRUMP_CALL_DIRECTIONS = ['uptown', 'downtown', 'downtown-noaces'];
+
+// Bid-signal group for a direction: bid 2 signals high (uptown), bid 1
+// signals low (both downtown variants).
+function directionSignalGroup(direction: string): number {
+  return direction === 'uptown' ? 2 : 1;
+}
+
+// lenWeight scales the trump-length term. v1 used 1.0 (length blended with
+// structure) and lost 48.01%±0.69 to the length-first champion — see
+// report/trump-sweep.json and the bestSuitByTricks comment. Higher weights
+// make length progressively more sovereign, with signals deciding between
+// similar-length calls; at 13 the suit choice is effectively length-first
+// with signal tiebreaks (direction choice is unaffected by the length term,
+// which cancels across directions for a fixed suit).
+// Exclusion-aware signal analysis for one direction, shared by the scored
+// model (signalAwareScore) and the scalar cover primitives. All quantities
+// are computed over the direction's outstanding top-3-per-suit cards.
+interface SignalCover {
+  outTop: (suit: string) => number;
+  totalOutTop: number;
+  partnerShare: number;
+  enemyShare: number;   // both enemies combined
+  partnerTops: number;  // expected top cards held by partner
+  enemyTops: number;    // expected top cards held by the SIGNALING enemy
+  partnerMatches: boolean;
+  enemyMatches: boolean;
+  partnerSignaled: boolean;
+  enemySignaled: boolean;
+}
+
+function computeSignalCover(ctx: StrategyContext, direction: string): SignalCover {
+  const valueFn = directionCardValue(direction) ?? ctx.getCardValue;
+  const seen = seenCardIds(ctx);
+
+  // The direction's 3 top ranks (uptown: A,K,Q; downtown: A,2,3; noaces: 2,3,4)
+  const topRanks = Array.from({ length: 13 }, (_, i) => i + 1)
+    .sort((a, b) => valueFn({ suit: 'spades', rank: b, id: '' }) - valueFn({ suit: 'spades', rank: a, id: '' }))
+    .slice(0, 3);
+  const outTop = (suit: string) => topRanks.filter(r => !seen.has(`${suit}_${r}`)).length;
+  const totalOutTop = TRUMP_CALL_SUITS.reduce((sum, s) => sum + outTop(s), 0);
+
+  const dg = directionSignalGroup(direction);
+  const partnerSignaled = ctx.partnerBid === 1 || ctx.partnerBid === 2;
+  const enemySignaled = ctx.enemyBid === 1 || ctx.enemyBid === 2;
+  const partnerMatches = partnerSignaled && ctx.partnerBid === dg;
+  const enemyMatches = enemySignaled && ctx.enemyBid === dg;
+
+  // Share of the outstanding tops we expect each unseen hand to hold:
+  // signals tilt the split (matching signaler 2.0, opposite 0.3, silent 1.0;
+  // the second, non-signaling enemy is always 1.0).
+  const partnerW = partnerSignaled ? (partnerMatches ? 2.0 : 0.3) : 1.0;
+  const enemyW = enemySignaled ? (enemyMatches ? 2.0 : 0.3) : 1.0;
+  const partnerShare = partnerW / (partnerW + enemyW + 1.0);
+  const enemy1Share = enemyW / (partnerW + enemyW + 1.0);
+  const enemyShare = 1 - partnerShare;
+
+  // Posterior concentration: a matching signal means ~4 winners, however
+  // few tops remain outstanding for them to be made of.
+  const concentrate = (matches: boolean, share: number) =>
+    totalOutTop === 0 ? 0
+      : matches
+        ? Math.min(totalOutTop, Math.max(4, share * totalOutTop))
+        : share * totalOutTop;
+
+  return {
+    outTop, totalOutTop, partnerShare, enemyShare,
+    partnerTops: concentrate(partnerMatches, partnerShare),
+    enemyTops: concentrate(enemyMatches, enemy1Share),
+    partnerMatches, enemyMatches, partnerSignaled, enemySignaled,
+  };
+}
+
+function signalAwareScore(ctx: StrategyContext, trumpSuit: string, direction: string, lenWeight: number = 1): number {
+  const valueFn = directionCardValue(direction)!;
+  const roles = computeSuitRoles(ctx, valueFn);
+  const cover = computeSignalCover(ctx, direction);
+  const { outTop, totalOutTop, enemyShare, partnerTops, partnerMatches, enemyMatches, partnerSignaled, enemySignaled } = cover;
+
+  const myTricks = roles.boss.size + roles.backed.size;
+  const trumpLen = ctx.hand.filter(c => c.suit === trumpSuit).length;
+  const trumpTricks = ctx.hand.filter(c =>
+    c.suit === trumpSuit && (roles.boss.has(c.id) || roles.backed.has(c.id))).length;
+
+  const trumpTopRisk = outTop(trumpSuit) * enemyShare * 1.25;
+  const sideThreat = (totalOutTop - outTop(trumpSuit)) * enemyShare * 0.75
+    * (enemyMatches ? 1.0 : 0.5);
+
+  const counterpick = enemySignaled && !enemyMatches ? 1.0 : 0;
+  const partnerWaste = partnerSignaled && !partnerMatches ? 1.0 : 0;
+
+  return myTricks + lenWeight * trumpLen + trumpTricks
+    + partnerTops - trumpTopRisk - sideThreat + counterpick - partnerWaste;
+}
+
+function signalAwareBestCall(ctx: StrategyContext, lenWeight: number = 1): { suit: string; direction: string } {
+  let best = { suit: 'spades', direction: 'uptown' };
+  let bestScore = -Infinity;
+  for (const direction of TRUMP_CALL_DIRECTIONS) {
+    for (const suit of TRUMP_CALL_SUITS) {
+      const score = signalAwareScore(ctx, suit, direction, lenWeight);
+      if (score > bestScore) {
+        bestScore = score;
+        best = { suit, direction };
+      }
+    }
+  }
+  return best;
+}
+
+// Argmax of raw honor density (suit_power) — the "strength not length"
+// picker for calling into a contested direction. Ties break by length,
+// then fixed suit order.
+function bestSuitByPower(ctx: StrategyContext, direction?: string): string {
+  const powerDirection = direction ?? ctx.bidDirection;
+  let best = 'spades';
+  let bestKey: [number, number] | null = null;
+  for (const suit of TRUMP_CALL_SUITS) {
+    const key: [number, number] = [
+      suitPower(ctx, suit, powerDirection),
+      ctx.hand.filter(c => c.suit === suit).length,
+    ];
+    if (!bestKey || key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) {
+      bestKey = key;
+      best = suit;
+    }
+  }
+  return best;
 }
 
 // ── Expression Evaluator ────────────────────────────────────────────
@@ -531,6 +871,51 @@ function evalCall(name: string, args: any[], ctx: StrategyContext): any {
       result = typeof args[0] === 'string' ? trumpPower(ctx, args[0]) : 0; break;
     case 'sluff_candidates':
       result = computeSluffCandidates(ctx); break;
+    case 'hole_count':
+      result = typeof args[0] === 'string' ? holeCount(args[0], ctx, valueFnFor(ctx, args[1])) : 0; break;
+    case 'suit_makeable_tricks':
+      result = typeof args[0] === 'string' ? suitMakeableTricks(args[0], ctx, valueFnFor(ctx, args[1])) : 0; break;
+    case 'makeable_trick_count':
+      result = makeableTrickCount(ctx, valueFnFor(ctx, args[0])); break;
+    case 'best_suit_by_tricks':
+      result = bestSuitByTricks(ctx, typeof args[0] === 'string' ? args[0] : undefined); break;
+    case 'best_suit_by_power':
+      result = bestSuitByPower(ctx, typeof args[0] === 'string' ? args[0] : undefined); break;
+    case 'partner_cover':
+      // Expected count of the direction's top cards in partner's hand,
+      // signal- and exclusion-conditioned. The scalar "direction lean"
+      // form of the coverage model — see computeSignalCover.
+      result = typeof args[0] === 'string' && directionCardValue(args[0])
+        ? computeSignalCover(ctx, args[0]).partnerTops : 0;
+      break;
+    case 'enemy_cover':
+      // Same for the signaling enemy.
+      result = typeof args[0] === 'string' && directionCardValue(args[0])
+        ? computeSignalCover(ctx, args[0]).enemyTops : 0;
+      break;
+    case 'signal_aware_direction':
+      // Optional numeric arg = lenWeight (see signalAwareScore).
+      result = signalAwareBestCall(ctx, typeof args[0] === 'number' ? args[0] : 1).direction; break;
+    case 'signal_aware_suit': {
+      // Args: optional direction string, optional numeric lenWeight — in
+      // either order. With a direction: best suit under that direction.
+      // Without: the suit of the globally best (suit, direction) call, so
+      // it composes consistently with signal_aware_direction().
+      const dirArg = args.find((a: any) => typeof a === 'string' && directionCardValue(a));
+      const lenWeight = args.find((a: any) => typeof a === 'number') ?? 1;
+      if (typeof dirArg === 'string') {
+        let bestSuit = 'spades';
+        let bestScore = -Infinity;
+        for (const suit of TRUMP_CALL_SUITS) {
+          const score = signalAwareScore(ctx, suit, dirArg, lenWeight);
+          if (score > bestScore) { bestScore = score; bestSuit = suit; }
+        }
+        result = bestSuit;
+      } else {
+        result = signalAwareBestCall(ctx, lenWeight).suit;
+      }
+      break;
+    }
     default:
       result = undefined;
   }
@@ -564,7 +949,11 @@ function evalProperty(expr: any, ctx: StrategyContext): any {
       case 'strongest_safe': return highestSafe(cs, ctx);
       case 'winners': return cardSetWinners(cs, ctx);
       case 'losers': return cardSetLosers(cs, ctx);
-      case 'boss': return cardSetBoss(cs, ctx);
+      case 'boss': return cardSetBoss(cs, ctx, args[0]);
+      case 'backed': return filterByRole(cs, ctx, 'backed', args[0]);
+      case 'backing': return filterByRole(cs, ctx, 'backing', args[0]);
+      case 'spare': return filterByRole(cs, ctx, 'spare', args[0]);
+      case 'working': return filterByRole(cs, ctx, 'working', args[0]);
       case 'count': return cs.cards.length;
       case 'above':
         return args.length > 0 ? cardSetAbove(cs, args[0] as Card, ctx.getCardValue) : cs;
@@ -608,8 +997,7 @@ function evalProperty(expr: any, ctx: StrategyContext): any {
 function computeStopperCards(ctx: StrategyContext): CardSet {
   const trumpSuit = ctx.trumpSuit;
   const suits = ['spades', 'hearts', 'diamonds', 'clubs'].filter(s => s !== trumpSuit);
-  const playedIds = new Set(ctx.playedCards.map(c => c.id));
-  const myIds = new Set(ctx.hand.map(c => c.id));
+  const seen = seenCardIds(ctx);
   const stopperCards: Card[] = [];
 
   for (const suit of suits) {
@@ -621,13 +1009,10 @@ function computeStopperCards(ctx: StrategyContext): CardSet {
     const bestCard = suitCards[0];
     const bestVal = ctx.getCardValue(bestCard);
 
-    // Count cards with higher value that are NOT in hand and NOT played
+    // Count outstanding cards with higher value
     let protectorsNeeded = 0;
-    for (let rank = 1; rank <= 13; rank++) {
-      const id = `${suit}_${rank}`;
-      if (myIds.has(id) || playedIds.has(id)) continue;
-      const tempCard: Card = { suit, rank, id };
-      if (ctx.getCardValue(tempCard) > bestVal) {
+    for (const outCard of outstandingInSuit(suit, seen)) {
+      if (ctx.getCardValue(outCard) > bestVal) {
         protectorsNeeded++;
       }
     }

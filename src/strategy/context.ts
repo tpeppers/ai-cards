@@ -89,6 +89,14 @@ export function buildBidWhistContext(game: BidWhistGameLike, playerId: number): 
   // Void discard signals
   const discardSuits = game.getFirstDiscardSuits();
 
+  // The declarer's kitty discards land in their tricks pile during the
+  // discard phase, before any trick can be won, so during play the first 4
+  // cards there are exactly the discards. At discard-evaluation time the
+  // pile is still empty — slice(0, 4) is safely [] then.
+  const myDiscards = declarer !== null && declarer === playerId
+    ? state.players[playerId].tricks.slice(0, 4)
+    : [];
+
   // Void tracking
   const voidSuits = game.getPlayerVoidSuits();
   const enemy1VoidInTrump = trumpSuit ? voidSuits[enemy1Id].has(trumpSuit) : false;
@@ -132,6 +140,7 @@ export function buildBidWhistContext(game: BidWhistGameLike, playerId: number): 
     compareCards: (a: Card, b: Card) => game.compareCards(a, b),
     evaluateCurrentWinner: () => game.evaluateCurrentWinner(),
     playedCards: game.getPlayedCards(),
+    myDiscards,
   };
 }
 
@@ -225,5 +234,6 @@ export function buildHeartsContext(game: HeartsGameLike, playerId: number): Stra
     compareCards,
     evaluateCurrentWinner,
     playedCards: game.getPlayedCards(),
+    myDiscards: [],
   };
 }
