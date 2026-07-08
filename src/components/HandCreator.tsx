@@ -366,7 +366,8 @@ const HandCreator: React.FC<HandCreatorProps> = ({ initialCards, onAccept, onCan
       if (mode === 'default') return rank;
       if (mode === 'uptown') return rank === 1 ? 14 : rank;
       if (mode === 'downtown') return rank === 1 ? 14 : (14 - rank);
-      /* downtown-noaces */ return rank === 1 ? 1 : (14 - rank);
+      /* downtown-noaces: ace = 0, strictly below the King's 1 */
+      return rank === 1 ? 0 : (14 - rank);
     };
 
     setSelectedCards(prev => [...prev].sort((a, b) => {

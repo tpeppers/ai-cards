@@ -160,19 +160,17 @@ describe('BidWhistGame Deterministic Test', () => {
     state = game.getGameState();
     expect(state.gameStage).toBe('scoring');
 
-    // Verify the team scores - player 0's team (0 & 2) should have won
+    // Taking all 12 tricks (13 books counting the kitty discard) is a
+    // WHISTING: an instant game win for the declarer's team that scores
+    // zero points. (This test predates the whisting rule and used to
+    // assert points > 0 for the swept hand.)
+    expect(game.getWhistingWinner()).toBe(0);
+    expect(game.isGameOver()).toBe(true);
     const teamScores = game.getTeamScores();
-
-    // With a bid of 6 and making all 12 tricks (13 books counting discard),
-    // team should score points for making the contract
-    // Books won should be 12 for player 0's team (plus 1 for discard = 13 total)
-    // Contract was 6+6=12, so they made it!
-
-    // Check that player 0's team scored positively
-    expect(teamScores[0]).toBeGreaterThan(0);
+    expect(teamScores).toEqual([0, 0]);
 
     console.log('Final team scores:', teamScores);
-    console.log('Player 0 total score:', state.players[0].totalScore);
+    console.log('Whisting winner team:', game.getWhistingWinner());
   });
 
   test('verifies initial hand distribution from URL', () => {
@@ -259,5 +257,92 @@ describe('BidWhistGame Deterministic Test', () => {
       const hand2 = state2.players[i].hand.map(c => c.id).sort();
       expect(hand1).toEqual(hand2);
     }
+  });
+});
+
+describe('BidWhistGame card values and direction reset', () => {
+  const TEST_URL = 'oVKtOPzUAJYMDWsTNFIGbqcSaifXEkHQnLuRplryChmwBdvxjZge';
+
+  function gameWithDirection(direction: 'uptown' | 'downtown' | 'downtown-noaces'): BidWhistGame {
+    const game = new BidWhistGame();
+    game.dealCards(TEST_URL);
+    let state = game.getGameState();
+    while (state.gameStage === 'bidding') {
+      if (state.currentPlayer === 0) {
+        game.placeBid(0, 6);
+      } else {
+        game.processAIBid(state.currentPlayer!);
+      }
+      state = game.getGameState();
+    }
+    // Whoever won the bid, force the direction we want to test
+    expect(game.setTrumpSuitForPlayer('clubs', direction, false)).toBe(true);
+    return game;
+  }
+
+  test('downtown-noaces: the King strictly beats the Ace', () => {
+    const game = gameWithDirection('downtown-noaces');
+    const ace = { suit: 'hearts', rank: 1, id: 'hearts_1' };
+    const king = { suit: 'hearts', rank: 13, id: 'hearts_13' };
+    // Regression: A and K both used to map to value 1 (a tie), letting an
+    // already-played Ace hold the trick against the King.
+    expect(game.getCardValue(king)).toBeGreaterThan(game.getCardValue(ace));
+    expect(game.compareCards(king, ace)).toBeGreaterThan(0);
+  });
+
+  test('downtown-noaces: the deuce is the best card in the suit', () => {
+    const game = gameWithDirection('downtown-noaces');
+    const deuce = { suit: 'hearts', rank: 2, id: 'hearts_2' };
+    const king = { suit: 'hearts', rank: 13, id: 'hearts_13' };
+    expect(game.getCardValue(deuce)).toBeGreaterThan(game.getCardValue(king));
+  });
+
+  test('startNewHand resets bid direction to uptown', () => {
+    const game = gameWithDirection('downtown-noaces');
+    expect(game.getBidDirection()).toBe('downtown-noaces');
+    // Regression: the next hand's bidding phase used to evaluate card
+    // values under the PREVIOUS hand's direction.
+    game.startNewHand();
+    expect(game.getBidDirection()).toBe('uptown');
+  });
+});
+
+describe('Game Mode faithful-replay anchoring', () => {
+  test('with dealer at index 0, the tagged 1st bidder (index 3) bids first', () => {
+    // Mirror server/deckReconstruct.js's convention: dealer→0 (hearts),
+    // bid3→1 (diamonds), bid2→2 (clubs), bid1→3 (spades); kitty '_'.
+    // If either the engine's bid order or the reconstruction mapping
+    // changes, this test fails — they must move together.
+    const hearts = 'abcdefghijkl';   // ranks 1-12
+    const diamonds = 'NOPQRSTUVWXY';
+    const clubs = 'ABCDEFGHIJKL';
+    const spades = 'nopqrstuvwxy';
+    let url = '';
+    for (let i = 0; i < 12; i++) {
+      url += hearts[i] + diamonds[i] + clubs[i] + spades[i];
+    }
+    url += '____'; // kitty: the four kings, filled randomly on load
+
+    const game = new BidWhistGame();
+    game.setDealer(0); // the loader does this for URL-seeded deals
+    game.dealCards(url);
+
+    const state = game.getGameState();
+    // Hands land at the anchored indices…
+    expect(state.players[0].hand.every(c => c.suit === 'hearts')).toBe(true);
+    expect(state.players[1].hand.every(c => c.suit === 'diamonds')).toBe(true);
+    expect(state.players[2].hand.every(c => c.suit === 'clubs')).toBe(true);
+    expect(state.players[3].hand.every(c => c.suit === 'spades')).toBe(true);
+    // …and the engine's first bidder is index 3 — the person tagged
+    // "1st bidder" at the real table (spades holder).
+    expect(state.gameStage).toBe('bidding');
+    expect(state.currentPlayer).toBe(3);
+    // Bid order proceeds 3 → 2 → 1 → 0 (dealer last).
+    expect(game.placeBid(3, 1)).toBe(true);
+    expect(game.getGameState().currentPlayer).toBe(2);
+    expect(game.placeBid(2, 2)).toBe(true);
+    expect(game.getGameState().currentPlayer).toBe(1);
+    expect(game.placeBid(1, 0)).toBe(true);
+    expect(game.getGameState().currentPlayer).toBe(0); // dealer bids last
   });
 });

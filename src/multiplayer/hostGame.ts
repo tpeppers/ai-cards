@@ -265,7 +265,11 @@ export class HostGame {
       const delay = 1000 + Math.random() * 500;
       const timer = setTimeout(() => {
         if (this.destroyed) return;
-        this.game.processAITrumpSelection(declarer);
+        // Use the seat-aware path: processAITrumpSelection routes through
+        // setTrumpSuit, which assumes "declarer 0 = the human" and would
+        // park an AI declarer at seat 0 in the discarding stage forever.
+        const { suit, direction } = this.game.getAITrumpSelection(declarer);
+        this.game.setTrumpSuitForPlayer(suit, direction, false);
         this.broadcastAllStates();
         this.checkAutoTransitions();
         this.scheduleAITurn();

@@ -198,6 +198,9 @@ export class BidWhistGame extends CardGame {
   placeBid(playerId: number, amount: number): boolean {
     if (this.gameStage !== 'bidding') return false;
     if (this.currentPlayer !== playerId) return false;
+    // Guard against malformed inputs (e.g. relayed multiplayer payloads):
+    // a fractional amount would corrupt currentHighBid and contract math.
+    if (!Number.isInteger(amount)) return false;
 
     // Handle "take it" - dealer claims the current high bid
     if (amount === -1) {
@@ -349,6 +352,9 @@ export class BidWhistGame extends CardGame {
 
     const validSuits = ['spades', 'hearts', 'diamonds', 'clubs'];
     if (!validSuits.includes(suit)) return false;
+    // An unknown direction would silently play as downtown-noaces via
+    // getCardValue's else-branch — reject it instead.
+    if (!['uptown', 'downtown', 'downtown-noaces'].includes(direction)) return false;
 
     this.trumpSuit = suit;
     this.bidDirection = direction;
@@ -716,8 +722,10 @@ export class BidWhistGame extends CardGame {
     } else if (this.bidDirection === 'downtown') {
       return card.rank === 1 ? 14 : (14 - card.rank);
     } else {
-      // downtown-noaces: Ace is worst (value 1), 2 is best (value 13)
-      return card.rank === 1 ? 1 : (14 - card.rank);
+      // downtown-noaces: Ace is worst. Must be 0, not 1 — the King is
+      // 14 - 13 = 1, and an A/K tie would make compareCards treat the K
+      // as unable to beat the A.
+      return card.rank === 1 ? 0 : (14 - card.rank);
     }
   }
 
@@ -865,6 +873,9 @@ export class BidWhistGame extends CardGame {
     // Reset bid whist state BEFORE calling super (which deals cards)
     this.leadSuit = null;
     this.trumpSuit = null;
+    // Direction must reset too, or bidding-phase card values (and the
+    // deal-time hand sort) reflect the PREVIOUS hand's contract.
+    this.bidDirection = 'uptown';
     this.currentHighBid = 0;
     this.currentHighBidder = null;
     this.bids = [];
@@ -887,6 +898,7 @@ export class BidWhistGame extends CardGame {
 
     const validSuits = ['spades', 'hearts', 'diamonds', 'clubs'];
     if (!validSuits.includes(suit)) return false;
+    if (!['uptown', 'downtown', 'downtown-noaces'].includes(direction)) return false;
 
     this.trumpSuit = suit;
     this.bidDirection = direction;

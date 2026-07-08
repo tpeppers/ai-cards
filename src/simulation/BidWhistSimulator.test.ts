@@ -68,9 +68,13 @@ describe('BidWhistSimulator', () => {
       expect(result.winningTeam).toBeLessThanOrEqual(1);
       expect(result.teamScores[0]).toBeGreaterThanOrEqual(0);
       expect(result.teamScores[1]).toBeGreaterThanOrEqual(0);
-      // Game ends at 21 or mercy (11-0)
+      // Game ends at 21, mercy (11-0), or a whisting (instant win at any
+      // score — even 0-0 on the first hand). A whisting hand shows as the
+      // declarer's team sweeping all 12 tricks (the 13th book is the kitty).
       const maxScore = Math.max(result.teamScores[0], result.teamScores[1]);
-      expect(maxScore).toBeGreaterThanOrEqual(11);
+      const whisted = result.hands.some(
+        h => h.bidWinner >= 0 && h.booksWon[h.bidWinner % 2] === 12);
+      expect(whisted || maxScore >= 11).toBe(true);
       expect(result.handsPlayed).toBeGreaterThan(0);
     });
 
