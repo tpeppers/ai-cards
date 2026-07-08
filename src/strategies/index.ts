@@ -7,6 +7,29 @@
 import { BIDWHIST_CLAUDEFAM } from './claudeFam.ts';
 export { BIDWHIST_CLAUDEFAM };
 
+// ClaudeFam (Roles): ClaudeFam with the suit-role primitives (working /
+// spare / backing) swapped into the discard and sluff rules.
+import { BIDWHIST_CLAUDEFAM_ROLES } from './claudeFamRoles.ts';
+export { BIDWHIST_CLAUDEFAM_ROLES };
+
+// ClaudeFam (Roles+MTC): ClaudeFam (Roles) with the bid-signal conditions
+// switched from hand_power to makeable_trick_count (mtc_sig = 4) — the
+// confirmed winner of the makeable_trick_count bid sweep.
+import { BIDWHIST_CLAUDEFAM_ROLES_MTC } from './claudeFamRoles.ts';
+export { BIDWHIST_CLAUDEFAM_ROLES_MTC };
+
+// ClaudeFam (Roles+MTC+CP): ClaudeFam (Roles+MTC) with counterpick and
+// contested-direction strength rules in the trump section — the confirmed
+// winner of the trump-section sweep.
+import { BIDWHIST_CLAUDEFAM_ROLES_MTC_CP } from './claudeFamRoles.ts';
+export { BIDWHIST_CLAUDEFAM_ROLES_MTC_CP };
+
+// Claude Omni: the consolidated, fully-documented champion — behaviorally
+// identical to ClaudeFam (Roles+MTC+CP) (asserted by an AST-equality test),
+// packaged as a single annotated file with the information audit.
+import { BIDWHIST_CLAUDE_OMNI } from './claudeOmni.ts';
+export { BIDWHIST_CLAUDE_OMNI };
+
 // ── Trump section: Ignore Signals (reads own hand only) ──
 
 const TRUMP_SECTION_NOSIGNAL = `\
@@ -947,5 +970,9 @@ export const STRATEGY_REGISTRY: StrategyRegistryEntry[] = [
   { name: 'Family (Powered)', game: 'bidwhist', text: BIDWHIST_FAMILY_POWERED },
   { name: 'Claude', game: 'bidwhist', text: BIDWHIST_CLAUDE },
   { name: 'ClaudeFam', game: 'bidwhist', text: BIDWHIST_CLAUDEFAM },
+  { name: 'ClaudeFam (Roles)', game: 'bidwhist', text: BIDWHIST_CLAUDEFAM_ROLES },
+  { name: 'ClaudeFam (Roles+MTC)', game: 'bidwhist', text: BIDWHIST_CLAUDEFAM_ROLES_MTC },
+  { name: 'ClaudeFam (Roles+MTC+CP)', game: 'bidwhist', text: BIDWHIST_CLAUDEFAM_ROLES_MTC_CP },
+  { name: 'Claude Omni', game: 'bidwhist', text: BIDWHIST_CLAUDE_OMNI },
   { name: 'Standard', game: 'hearts', text: HEARTS_STANDARD },
 ];

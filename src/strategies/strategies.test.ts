@@ -5,6 +5,8 @@ import {
   BIDWHIST_FAMILY,
   BIDWHIST_FAMILY_CONSTANTS,
   BIDWHIST_FAMILY_POWERED,
+  BIDWHIST_CLAUDE_OMNI,
+  BIDWHIST_CLAUDEFAM_ROLES_MTC_CP,
   STRATEGY_REGISTRY,
 } from './index.ts';
 
@@ -13,6 +15,19 @@ describe('strategy registry', () => {
     for (const entry of STRATEGY_REGISTRY) {
       expect(() => parseStrategy(entry.text)).not.toThrow();
     }
+  });
+
+  it('Claude Omni is behaviorally identical to ClaudeFam (Roles+MTC+CP)', () => {
+    // Omni is the documented repackaging of the benchmarked champion. The
+    // texts differ only in name, comments, and layout — all stripped or
+    // normalized by the parser — so the ASTs must match exactly once the
+    // strategy name is normalized. If this fails, the documentation has
+    // drifted from the thing that actually won the benchmarks.
+    const omni = parseStrategy(BIDWHIST_CLAUDE_OMNI);
+    const champion = parseStrategy(BIDWHIST_CLAUDEFAM_ROLES_MTC_CP);
+    expect(omni.name).toBe('Claude Omni');
+    const normalize = (ast: object) => JSON.parse(JSON.stringify({ ...ast, name: '' }));
+    expect(normalize(omni)).toEqual(normalize(champion));
   });
 
   it('Family (Constants) declares the expected let bindings', () => {
