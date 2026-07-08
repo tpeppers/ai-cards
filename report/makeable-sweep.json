@@ -1,0 +1,152 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "holdoutSeed": 999999
+  },
+  "results": [
+    {
+      "config": "parity",
+      "axis": "parity",
+      "threshold": null,
+      "wins": 11376,
+      "losses": 11376,
+      "games": 22752,
+      "winRate": 0.5,
+      "ci95": 0.006497051154101795
+    },
+    {
+      "config": "sigA-2",
+      "axis": "sig",
+      "threshold": 2,
+      "wins": 9864,
+      "losses": 9704,
+      "games": 19568,
+      "winRate": 0.5040883074407195,
+      "ci95": 0.007005487097555312
+    },
+    {
+      "config": "sigA-3",
+      "axis": "sig",
+      "threshold": 3,
+      "wins": 10330,
+      "losses": 9134,
+      "games": 19464,
+      "winRate": 0.5307233867653103,
+      "ci95": 0.0070111392344721765
+    },
+    {
+      "config": "sigA-4",
+      "axis": "sig",
+      "threshold": 4,
+      "wins": 10708,
+      "losses": 9524,
+      "games": 20232,
+      "winRate": 0.5292605773032819,
+      "ci95": 0.006877992873111467
+    },
+    {
+      "config": "sigA-5",
+      "axis": "sig",
+      "threshold": 5,
+      "wins": 10778,
+      "losses": 10142,
+      "games": 20920,
+      "winRate": 0.5152007648183556,
+      "ci95": 0.006772428736089225
+    },
+    {
+      "config": "sigA-6",
+      "axis": "sig",
+      "threshold": 6,
+      "wins": 10884,
+      "losses": 11092,
+      "games": 21976,
+      "winRate": 0.4952675646159447,
+      "ci95": 0.006610469392882639
+    },
+    {
+      "config": "sigA-7",
+      "axis": "sig",
+      "threshold": 7,
+      "wins": 10652,
+      "losses": 11452,
+      "games": 22104,
+      "winRate": 0.4819037278320666,
+      "ci95": 0.006587278301603374
+    },
+    {
+      "config": "bid4-6",
+      "axis": "bid4",
+      "threshold": 6,
+      "wins": 10900,
+      "losses": 10692,
+      "games": 21592,
+      "winRate": 0.5048165987402742,
+      "ci95": 0.006668981121859373
+    },
+    {
+      "config": "bid4-7",
+      "axis": "bid4",
+      "threshold": 7,
+      "wins": 11302,
+      "losses": 11170,
+      "games": 22472,
+      "winRate": 0.502936988252047,
+      "ci95": 0.006537289533700291
+    },
+    {
+      "config": "bid4-8",
+      "axis": "bid4",
+      "threshold": 8,
+      "wins": 11376,
+      "losses": 11376,
+      "games": 22752,
+      "winRate": 0.5,
+      "ci95": 0.006497051154101795
+    },
+    {
+      "config": "bid4-9",
+      "axis": "bid4",
+      "threshold": 9,
+      "wins": 11376,
+      "losses": 11376,
+      "games": 22752,
+      "winRate": 0.5,
+      "ci95": 0.006497051154101795
+    }
+  ],
+  "holdout": [
+    {
+      "config": "sigA-3",
+      "axis": "sig",
+      "threshold": 3,
+      "wins": 10290,
+      "losses": 9702,
+      "games": 19992,
+      "winRate": 0.5147058823529411,
+      "ci95": 0.006928034300674396
+    },
+    {
+      "config": "sigA-4",
+      "axis": "sig",
+      "threshold": 4,
+      "wins": 10600,
+      "losses": 9416,
+      "games": 20016,
+      "winRate": 0.5295763389288569,
+      "ci95": 0.006914746933388116
+    },
+    {
+      "config": "sigA-5",
+      "axis": "sig",
+      "threshold": 5,
+      "wins": 10438,
+      "losses": 9994,
+      "games": 20432,
+      "winRate": 0.5108653093187158,
+      "ci95": 0.0068543783061229
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "holdoutSeed": 999999
+  },
+  "results": [
+    {
+      "config": "parity",
+      "axis": "parity",
+      "threshold": null,
+      "wins": 10892,
+      "losses": 10892,
+      "games": 21784,
+      "winRate": 0.5,
+      "ci95": 0.006639834606296434
+    },
+    {
+      "config": "establish",
+      "axis": "lead",
+      "threshold": null,
+      "wins": 10754,
+      "losses": 10886,
+      "games": 21640,
+      "winRate": 0.4969500924214418,
+      "ci95": 0.0066617659093895
+    },
+    {
+      "config": "establish-open",
+      "axis": "lead",
+      "threshold": null,
+      "wins": 10192,
+      "losses": 10296,
+      "games": 20488,
+      "winRate": 0.49746192893401014,
+      "ci95": 0.006846532871216219
+    }
+  ],
+  "holdout": []
+}

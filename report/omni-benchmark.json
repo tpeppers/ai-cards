@@ -1,0 +1,121 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313
+  },
+  "results": [
+    {
+      "opponent": "Standard (Ignore Signals)",
+      "wins": 15790,
+      "losses": 4090,
+      "games": 19880,
+      "winRate": 0.7942655935613682,
+      "ci95": 0.0056193258997739425
+    },
+    {
+      "opponent": "Standard (Partner Signals)",
+      "wins": 16136,
+      "losses": 3608,
+      "games": 19744,
+      "winRate": 0.8172609400324149,
+      "ci95": 0.005390568446729499
+    },
+    {
+      "opponent": "Standard (All Signals)",
+      "wins": 15430,
+      "losses": 4466,
+      "games": 19896,
+      "winRate": 0.7755327704061118,
+      "ci95": 0.005797619851395677
+    },
+    {
+      "opponent": "Conservative (Ignore Signals)",
+      "wins": 16680,
+      "losses": 1968,
+      "games": 18648,
+      "winRate": 0.8944658944658944,
+      "ci95": 0.004409793477721968
+    },
+    {
+      "opponent": "Conservative (Partner Signals)",
+      "wins": 17098,
+      "losses": 1838,
+      "games": 18936,
+      "winRate": 0.9029362061681453,
+      "ci95": 0.004216665143098072
+    },
+    {
+      "opponent": "Conservative (All Signals)",
+      "wins": 16258,
+      "losses": 2350,
+      "games": 18608,
+      "winRate": 0.8737102321582115,
+      "ci95": 0.004772808572104019
+    },
+    {
+      "opponent": "Family",
+      "wins": 12056,
+      "losses": 7264,
+      "games": 19320,
+      "winRate": 0.6240165631469979,
+      "ci95": 0.00683022366762446
+    },
+    {
+      "opponent": "Family (Constants)",
+      "wins": 12056,
+      "losses": 7264,
+      "games": 19320,
+      "winRate": 0.6240165631469979,
+      "ci95": 0.00683022366762446
+    },
+    {
+      "opponent": "Family (Powered)",
+      "wins": 12536,
+      "losses": 7208,
+      "games": 19744,
+      "winRate": 0.6349270664505673,
+      "ci95": 0.006715683781989701
+    },
+    {
+      "opponent": "Claude",
+      "wins": 11824,
+      "losses": 7544,
+      "games": 19368,
+      "winRate": 0.610491532424618,
+      "ci95": 0.006867710142266944
+    },
+    {
+      "opponent": "ClaudeFam",
+      "wins": 11746,
+      "losses": 7462,
+      "games": 19208,
+      "winRate": 0.6115160349854227,
+      "ci95": 0.006892955446557449
+    },
+    {
+      "opponent": "ClaudeFam (Roles)",
+      "wins": 10730,
+      "losses": 9398,
+      "games": 20128,
+      "winRate": 0.5330882352941176,
+      "ci95": 0.006892435601621106
+    },
+    {
+      "opponent": "ClaudeFam (Roles+MTC)",
+      "wins": 10732,
+      "losses": 10492,
+      "games": 21224,
+      "winRate": 0.5056539766302299,
+      "ci95": 0.006726430958353468
+    },
+    {
+      "opponent": "ClaudeFam (Roles+MTC+CP)",
+      "wins": 10892,
+      "losses": 10892,
+      "games": 21784,
+      "winRate": 0.5,
+      "ci95": 0.006639834606296434
+    }
+  ]
+}

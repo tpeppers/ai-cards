@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313
+  },
+  "results": [
+    {
+      "variant": "parity",
+      "opponent": "ClaudeFam",
+      "wins": 10688,
+      "losses": 10688,
+      "games": 21376,
+      "winRate": 0.5,
+      "ci95": 0.0067029017757661395
+    },
+    {
+      "variant": "discard",
+      "opponent": "ClaudeFam",
+      "wins": 11938,
+      "losses": 8134,
+      "games": 20072,
+      "winRate": 0.5947588680749303,
+      "ci95": 0.006791848191965885
+    },
+    {
+      "variant": "discard",
+      "opponent": "Family",
+      "wins": 10946,
+      "losses": 8702,
+      "games": 19648,
+      "winRate": 0.5571050488599348,
+      "ci95": 0.0069456965982242205
+    },
+    {
+      "variant": "sluff",
+      "opponent": "ClaudeFam",
+      "wins": 11682,
+      "losses": 8006,
+      "games": 19688,
+      "winRate": 0.5933563592035758,
+      "ci95": 0.006861515743503801
+    },
+    {
+      "variant": "sluff",
+      "opponent": "Family",
+      "wins": 11394,
+      "losses": 8254,
+      "games": 19648,
+      "winRate": 0.5799063517915309,
+      "ci95": 0.006901585728889459
+    },
+    {
+      "variant": "full",
+      "opponent": "ClaudeFam",
+      "wins": 11992,
+      "losses": 7752,
+      "games": 19744,
+      "winRate": 0.6073743922204214,
+      "ci95": 0.006811708425685005
+    },
+    {
+      "variant": "full",
+      "opponent": "Family",
+      "wins": 11764,
+      "losses": 7756,
+      "games": 19520,
+      "winRate": 0.6026639344262295,
+      "ci95": 0.0068648769876629
+    }
+  ]
+}

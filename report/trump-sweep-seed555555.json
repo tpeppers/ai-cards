@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "hands": 200,
+    "pool": 100,
+    "seed": 73313,
+    "holdoutSeed": 999999
+  },
+  "results": [
+    {
+      "config": "parity",
+      "axis": "parity",
+      "threshold": null,
+      "wins": 120,
+      "losses": 120,
+      "games": 240,
+      "winRate": 0.5,
+      "ci95": 0.06325872798805447
+    },
+    {
+      "config": "tricksb",
+      "axis": "trump",
+      "threshold": null,
+      "wins": 120,
+      "losses": 120,
+      "games": 240,
+      "winRate": 0.5,
+      "ci95": 0.06325872798805447
+    },
+    {
+      "config": "counterpickb",
+      "axis": "trump",
+      "threshold": null,
+      "wins": 116,
+      "losses": 108,
+      "games": 224,
+      "winRate": 0.5178571428571429,
+      "ci95": 0.0654372313748068
+    },
+    {
+      "config": "signal3",
+      "axis": "trump",
+      "threshold": null,
+      "wins": 96,
+      "losses": 120,
+      "games": 216,
+      "winRate": 0.4444444444444444,
+      "ci95": 0.06626766745124231
+    },
+    {
+      "config": "signal-dir",
+      "axis": "trump",
+      "threshold": null,
+      "wins": 100,
+      "losses": 116,
+      "games": 216,
+      "winRate": 0.46296296296296297,
+      "ci95": 0.0664973654275075
+    }
+  ],
+  "holdout": []
+}

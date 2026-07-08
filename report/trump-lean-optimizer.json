@@ -1,0 +1,140 @@
+{
+  "meta": {
+    "timestamp": "2026-07-08T02:48:10.797Z",
+    "args": {
+      "pop": 16,
+      "elite": 4,
+      "gens": 12,
+      "hands": 2000,
+      "pool": 500,
+      "mutation": 0.25,
+      "seed": 42,
+      "holdoutHands": 20000,
+      "holdoutSeed": 999999,
+      "out": "C:\\code\\ai-cards\\report\\trump-lean-optimizer.json"
+    },
+    "opponent": "ClaudeFam (Roles+MTC+CP)",
+    "elapsedSeconds": 3621.393
+  },
+  "history": [
+    {
+      "generation": 1,
+      "bestFitness": 0.5081573896353166,
+      "meanFitness": 0.4754419713568728,
+      "bestDescribe": "net pT=0 eC=2 up=0 na=-1 cp=N"
+    },
+    {
+      "generation": 2,
+      "bestFitness": 0.5051746442432082,
+      "meanFitness": 0.4889959801948883,
+      "bestDescribe": "net pT=0 eC=2 up=0 na=-1 cp=N"
+    },
+    {
+      "generation": 3,
+      "bestFitness": 0.4997586872586873,
+      "meanFitness": 0.4868671450154718,
+      "bestDescribe": "net pT=0 eC=2 up=0 na=-1 cp=N"
+    },
+    {
+      "generation": 4,
+      "bestFitness": 0.5057915057915058,
+      "meanFitness": 0.49338936257864197,
+      "bestDescribe": "net pT=1 eC=1 up=0 na=-1 cp=N"
+    },
+    {
+      "generation": 5,
+      "bestFitness": 0.49942484662576686,
+      "meanFitness": 0.49069775001488997,
+      "bestDescribe": "net pT=2 eC=2 up=0 na=-1 cp=N"
+    },
+    {
+      "generation": 6,
+      "bestFitness": 0.5079113924050633,
+      "meanFitness": 0.4959619479531383,
+      "bestDescribe": "net pT=2 eC=4 up=0 na=-1 cp=N"
+    },
+    {
+      "generation": 7,
+      "bestFitness": 0.5241779497098646,
+      "meanFitness": 0.5018027742788361,
+      "bestDescribe": "net pT=3 eC=2 up=0 na=-1 cp=N"
+    },
+    {
+      "generation": 8,
+      "bestFitness": 0.5164041994750657,
+      "meanFitness": 0.49891048139091426,
+      "bestDescribe": "net pT=3 eC=2 up=0 na=-1 cp=N"
+    },
+    {
+      "generation": 9,
+      "bestFitness": 0.5175609756097561,
+      "meanFitness": 0.49050964798610946,
+      "bestDescribe": "net pT=2 eC=2 up=0 na=-1 cp=Y"
+    },
+    {
+      "generation": 10,
+      "bestFitness": 0.5186770428015565,
+      "meanFitness": 0.49093751583892803,
+      "bestDescribe": "net pT=2 eC=2 up=0 na=-1 cp=Y"
+    },
+    {
+      "generation": 11,
+      "bestFitness": 0.5214703968770332,
+      "meanFitness": 0.4998786720717623,
+      "bestDescribe": "net pT=2 eC=2 up=0 na=-1 cp=Y"
+    },
+    {
+      "generation": 12,
+      "bestFitness": 0.5210189309576837,
+      "meanFitness": 0.5011373165844407,
+      "bestDescribe": "net pT=2 eC=2 up=0 na=-1 cp=Y"
+    }
+  ],
+  "holdout": [
+    {
+      "params": {
+        "mode": "net",
+        "pTrust": 2,
+        "eCounter": 2,
+        "upBias": 0,
+        "noacesBias": -1,
+        "contestedPower": true
+      },
+      "wins": 10040,
+      "losses": 10440,
+      "games": 20480,
+      "winRate": 0.490234375,
+      "ci95": 0.006846651912138282
+    },
+    {
+      "params": {
+        "mode": "net",
+        "pTrust": 2,
+        "eCounter": 2,
+        "upBias": 0,
+        "noacesBias": -1,
+        "contestedPower": false
+      },
+      "wins": 10040,
+      "losses": 10440,
+      "games": 20480,
+      "winRate": 0.490234375,
+      "ci95": 0.006846651912138282
+    },
+    {
+      "params": {
+        "mode": "net",
+        "pTrust": 3,
+        "eCounter": 2,
+        "upBias": 0,
+        "noacesBias": -1,
+        "contestedPower": false
+      },
+      "wins": 10200,
+      "losses": 10440,
+      "games": 20640,
+      "winRate": 0.4941860465116279,
+      "ci95": 0.006820902900435861
+    }
+  ]
+}
