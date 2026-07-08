@@ -4,12 +4,19 @@
  * photos of their dealt hands (tagged by seat), this produces the
  * canonical URL string for that game.
  *
- * Convention (per user confirmation):
+ * Convention — FAITHFUL-REPLAY anchoring (matches the engine's bid order):
+ *   The engine bids clockwise starting left of the dealer: with the dealer
+ *   at player index 0, the first bidder is index (0+3)%4 = 3, then 2, then
+ *   1, and the dealer bids last (BidWhistGame.dealCards). So:
  *   - Dealer anchors at player index 0 (URL positions 0,4,8,...,44)
- *   - 1st bidder → player index 1 (positions 1,5,9,...,45)
+ *   - 1st bidder → player index 3 (positions 3,7,11,...,47)
  *   - 2nd bidder → player index 2 (positions 2,6,10,...,46)
- *   - 3rd bidder → player index 3 (positions 3,7,11,...,47)
+ *   - 3rd bidder → player index 1 (positions 1,5,9,...,45)
  *   - Kitty (positions 48-51) filled with `_` (random placeholder)
+ *   Loading a reconstructed URL with the dealer set to 0 (the UI does this
+ *   for hash-seeded deals) replays the real table's bidding order exactly.
+ *   (The pre-July-2026 convention mapped bid1→1/bid3→3, which reversed the
+ *   bid order on replay.)
  *
  * Cards are matched against the 52-character URL alphabet:
  *   a-m hearts (rank 1-13), n-z spades, A-M clubs, N-Z diamonds.
@@ -50,9 +57,9 @@ function normalizeCard(cardStr) {
 
 const SEAT_TO_PLAYER_INDEX = {
   dealer: 0,
-  bid1: 1,
+  bid1: 3,
   bid2: 2,
-  bid3: 3,
+  bid3: 1,
 };
 
 const VALID_SEATS = Object.keys(SEAT_TO_PLAYER_INDEX);

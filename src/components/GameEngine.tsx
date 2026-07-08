@@ -214,10 +214,18 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
     }
   };
 
-  // TODO: Is there a better starting point for this? 
+  // TODO: Is there a better starting point for this?
   // e.g., should it pull from a checkbox, not have an open-top dead-end && really be always on?
   const dealCards = (urlToDeal?: string) => {
-    game.dealCards(getGameStateFromUrl());
+    const urlDeal = getGameStateFromUrl();
+    // URL-seeded deals anchor the dealer at player index 0 so a shared or
+    // Game-Mode-reconstructed deck replays with a deterministic (and, for
+    // reconstructed real-life hands, faithful) bidding order. Games without
+    // a setDealer hook (e.g. Hearts) are unaffected.
+    if (urlDeal && typeof (game as any).setDealer === 'function') {
+      (game as any).setDealer(0);
+    }
+    game.dealCards(urlDeal);
     updateGameState();
   };
 

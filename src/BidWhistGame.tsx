@@ -328,7 +328,15 @@ Card Rankings:
 
   // Deal handler (replaces GameEngine's built-in Deal button)
   const handleDeal = useCallback(() => {
-    game.dealCards(getGameStateFromUrl());
+    const urlDeal = getGameStateFromUrl();
+    if (urlDeal) {
+      // URL-seeded deals anchor the dealer at player index 0 so the same
+      // URL always replays the same bidding order — and so Game Mode's
+      // reconstructed real-life decks (dealer→0, bid1→3, bid2→2, bid3→1)
+      // replay the actual table's bid sequence faithfully.
+      game.setDealer(0);
+    }
+    game.dealCards(urlDeal);
     updateStates();
     setRefreshKey(prev => prev + 1);
   }, [game]);
