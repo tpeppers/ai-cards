@@ -264,9 +264,22 @@ export async function evaluateFitness(
   };
 }
 
-// ── Evolutionary loop ────────────────────────────────────────────────
+// ── Generic evolutionary loop ────────────────────────────────────────
 
-export interface OptimizerOptions {
+/**
+ * Candidate-type-agnostic hooks for runGenericOptimizer. The SignalLab
+ * optimizer supplies SignalLabConfig hooks; other searches (e.g. trump
+ * lean weights) supply their own candidate type.
+ */
+export interface GenericOptimizerHooks<T> {
+  evaluate: (candidate: T, pool: string[], hands: number) => Promise<FitnessResult>;
+  mutate: (c: T, rng: () => number, rate: number, name: string) => T;
+  crossover: (a: T, b: T, rng: () => number, name: string) => T;
+  random: (rng: () => number, name: string) => T;
+  describe: (c: T) => string;  // short config summary for logs
+}
+
+export interface GenericOptimizerOptions<T> {
   populationSize: number;
   eliteSize: number;
   generations: number;
@@ -274,36 +287,33 @@ export interface OptimizerOptions {
   deckPoolSize: number;
   mutationRate: number;
   seed: number;
-  seedConfigs?: SignalLabConfig[];
+  hooks: GenericOptimizerHooks<T>;
+  seedCandidates?: T[];
   // Per-seed starting fitness (e.g. reused from a diagnostic eval).
-  // Parallel to seedConfigs. Anchors presets with low-variance
+  // Parallel to seedCandidates. Anchors presets with low-variance
   // estimates so noise-lucky offspring can't beat them on LCB.
   seedFitnesses?: FitnessResult[];
 }
 
-export interface Individual {
-  config: SignalLabConfig;
+export interface GenericIndividual<T> {
+  config: T;
   fitness: FitnessResult;
 }
 
-export interface GenerationReport {
+export interface GenericGenerationReport<T> {
   generation: number;
   bestFitness: number;
   meanFitness: number;
-  best: Individual;
-  population: Individual[];
+  best: GenericIndividual<T>;
+  population: GenericIndividual<T>[];
 }
 
-export async function runOptimizer(
-  opts: OptimizerOptions,
-  onGeneration?: (report: GenerationReport) => void
-): Promise<{ best: Individual; history: GenerationReport[] }> {
+export async function runGenericOptimizer<T>(
+  opts: GenericOptimizerOptions<T>,
+  onGeneration?: (report: GenericGenerationReport<T>) => void
+): Promise<{ best: GenericIndividual<T>; history: GenericGenerationReport<T>[] }> {
   const rng = makeRng(opts.seed);
-
-  // Resolve the Family strategy text from the registry
-  const familyEntry = STRATEGY_REGISTRY.find(s => s.name === 'Family');
-  if (!familyEntry) throw new Error('Family strategy not found in registry');
-  const familyText = familyEntry.text;
+  const { hooks } = opts;
 
   const basePoolSeed = (opts.seed ^ 0xdeadbeef) >>> 0;
   // Deck pool rotates every generation so the optimizer can't overfit
@@ -312,20 +322,20 @@ export async function runOptimizer(
   // fitness estimate.
   let deckPool = generateDeckPool(opts.deckPoolSize, basePoolSeed);
 
-  // Initialize population: seed configs + random fill
-  const population: Individual[] = [];
-  const seeds = opts.seedConfigs ?? [];
+  // Initialize population: seed candidates + random fill
+  const population: GenericIndividual<T>[] = [];
+  const seeds = opts.seedCandidates ?? [];
   const seedFits = opts.seedFitnesses ?? [];
   for (let i = 0; i < seeds.length && population.length < opts.populationSize; i++) {
     const preFit = seedFits[i];
     population.push({
-      config: { ...seeds[i], name: `seed-${i}` },
+      config: seeds[i],
       fitness: preFit ?? { winRate: 0, wins: 0, losses: 0, games: 0 },
     });
   }
   while (population.length < opts.populationSize) {
     population.push({
-      config: randomConfig(rng, `rand-${population.length}`),
+      config: hooks.random(rng, `rand-${population.length}`),
       fitness: { winRate: 0, wins: 0, losses: 0, games: 0 },
     });
   }
@@ -334,12 +344,12 @@ export async function runOptimizer(
   // fitness the individual already has so the new data augments
   // (rather than replaces) the diagnostic estimate.
   for (const ind of population) {
-    const batch = await evaluateFitness(ind.config, familyText, deckPool, opts.handsPerEval);
+    const batch = await hooks.evaluate(ind.config, deckPool, opts.handsPerEval);
     ind.fitness = accumulateFitness(ind.fitness, batch);
   }
   population.sort((a, b) => lowerConfidenceBound(b.fitness) - lowerConfidenceBound(a.fitness));
 
-  const history: GenerationReport[] = [];
+  const history: GenericGenerationReport<T>[] = [];
 
   for (let gen = 0; gen < opts.generations; gen++) {
     // Rotate deck pool for this generation
@@ -349,18 +359,18 @@ export async function runOptimizer(
     const elites = population.slice(0, opts.eliteSize);
 
     // Generate offspring to fill the rest of the population
-    const offspring: Individual[] = [];
+    const offspring: GenericIndividual<T>[] = [];
     const numChildren = opts.populationSize - elites.length;
     for (let i = 0; i < numChildren; i++) {
-      let childConfig: SignalLabConfig;
+      let childConfig: T;
       if (rng() < 0.4 && elites.length >= 2) {
         const a = choice(rng, elites).config;
         const b = choice(rng, elites).config;
-        childConfig = crossoverConfigs(a, b, rng, `g${gen + 1}-x${i}`);
-        childConfig = mutateConfig(childConfig, rng, opts.mutationRate * 0.5, childConfig.name);
+        childConfig = hooks.crossover(a, b, rng, `g${gen + 1}-x${i}`);
+        childConfig = hooks.mutate(childConfig, rng, opts.mutationRate * 0.5, `g${gen + 1}-x${i}`);
       } else {
         const parent = choice(rng, elites).config;
-        childConfig = mutateConfig(parent, rng, opts.mutationRate, `g${gen + 1}-m${i}`);
+        childConfig = hooks.mutate(parent, rng, opts.mutationRate, `g${gen + 1}-m${i}`);
       }
       offspring.push({
         config: childConfig,
@@ -371,7 +381,7 @@ export async function runOptimizer(
     // Re-evaluate elites on the new pool, accumulating stats so their
     // fitness estimate tightens with each generation they survive.
     for (const ind of elites) {
-      const batch = await evaluateFitness(ind.config, familyText, deckPool, opts.handsPerEval);
+      const batch = await hooks.evaluate(ind.config, deckPool, opts.handsPerEval);
       ind.fitness = accumulateFitness(ind.fitness, batch);
     }
 
@@ -384,8 +394,8 @@ export async function runOptimizer(
       (basePoolSeed + gen + 1 + 0x5a5a5a5a) >>> 0
     );
     for (const ind of offspring) {
-      const batch1 = await evaluateFitness(ind.config, familyText, deckPool, opts.handsPerEval);
-      const batch2 = await evaluateFitness(ind.config, familyText, offspringPool2, opts.handsPerEval);
+      const batch1 = await hooks.evaluate(ind.config, deckPool, opts.handsPerEval);
+      const batch2 = await hooks.evaluate(ind.config, offspringPool2, opts.handsPerEval);
       ind.fitness = accumulateFitness(batch1, batch2);
     }
 
@@ -403,7 +413,7 @@ export async function runOptimizer(
 
     const best = population[0];
     const meanFitness = population.reduce((s, p) => s + p.fitness.winRate, 0) / population.length;
-    const report: GenerationReport = {
+    const report: GenericGenerationReport<T> = {
       generation: gen + 1,
       bestFitness: best.fitness.winRate,
       meanFitness,
@@ -415,4 +425,56 @@ export async function runOptimizer(
   }
 
   return { best: population[0], history };
+}
+
+// ── SignalLab optimizer (thin wrapper over the generic loop) ─────────
+
+export interface OptimizerOptions {
+  populationSize: number;
+  eliteSize: number;
+  generations: number;
+  handsPerEval: number;
+  deckPoolSize: number;
+  mutationRate: number;
+  seed: number;
+  seedConfigs?: SignalLabConfig[];
+  // Per-seed starting fitness (e.g. reused from a diagnostic eval).
+  // Parallel to seedConfigs. Anchors presets with low-variance
+  // estimates so noise-lucky offspring can't beat them on LCB.
+  seedFitnesses?: FitnessResult[];
+}
+
+export type Individual = GenericIndividual<SignalLabConfig>;
+
+export type GenerationReport = GenericGenerationReport<SignalLabConfig>;
+
+export async function runOptimizer(
+  opts: OptimizerOptions,
+  onGeneration?: (report: GenerationReport) => void
+): Promise<{ best: Individual; history: GenerationReport[] }> {
+  // Resolve the Family strategy text from the registry
+  const familyEntry = STRATEGY_REGISTRY.find(s => s.name === 'Family');
+  if (!familyEntry) throw new Error('Family strategy not found in registry');
+  const familyText = familyEntry.text;
+
+  const hooks: GenericOptimizerHooks<SignalLabConfig> = {
+    evaluate: (candidate, pool, hands) => evaluateFitness(candidate, familyText, pool, hands),
+    mutate: mutateConfig,
+    crossover: crossoverConfigs,
+    random: randomConfig,
+    describe: (c) => c.name,
+  };
+
+  return runGenericOptimizer<SignalLabConfig>({
+    populationSize: opts.populationSize,
+    eliteSize: opts.eliteSize,
+    generations: opts.generations,
+    handsPerEval: opts.handsPerEval,
+    deckPoolSize: opts.deckPoolSize,
+    mutationRate: opts.mutationRate,
+    seed: opts.seed,
+    hooks,
+    seedCandidates: (opts.seedConfigs ?? []).map((c, i) => ({ ...c, name: `seed-${i}` })),
+    seedFitnesses: opts.seedFitnesses,
+  }, onGeneration);
 }
