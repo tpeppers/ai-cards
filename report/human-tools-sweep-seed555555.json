@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 555555,
+    "holdoutSeed": 222222
+  },
+  "results": [
+    {
+      "config": "parity",
+      "axis": "parity",
+      "threshold": null,
+      "wins": 11220,
+      "losses": 11220,
+      "games": 22440,
+      "winRate": 0.5,
+      "ci95": 0.006542061905473271
+    },
+    {
+      "config": "probe-lead",
+      "axis": "tools",
+      "threshold": null,
+      "wins": 10786,
+      "losses": 10486,
+      "games": 21272,
+      "winRate": 0.5070515231289958,
+      "ci95": 0.006718598977817379
+    },
+    {
+      "config": "pass-control",
+      "axis": "tools",
+      "threshold": null,
+      "wins": 11146,
+      "losses": 11070,
+      "games": 22216,
+      "winRate": 0.5017104789341016,
+      "ci95": 0.006574921939412761
+    },
+    {
+      "config": "clubs3-5",
+      "axis": "tools",
+      "threshold": 5,
+      "wins": 11136,
+      "losses": 11320,
+      "games": 22456,
+      "winRate": 0.4959030993943712,
+      "ci95": 0.006539511328912765
+    },
+    {
+      "config": "clubs3-4",
+      "axis": "tools",
+      "threshold": 4,
+      "wins": 10352,
+      "losses": 11360,
+      "games": 21712,
+      "winRate": 0.4767870302137067,
+      "ci95": 0.006643663435905558
+    }
+  ],
+  "holdout": [
+    {
+      "config": "probe-lead",
+      "axis": "tools",
+      "threshold": null,
+      "wins": 11188,
+      "losses": 10212,
+      "games": 21400,
+      "winRate": 0.5228037383177571,
+      "ci95": 0.006692171209827466
+    }
+  ]
+}

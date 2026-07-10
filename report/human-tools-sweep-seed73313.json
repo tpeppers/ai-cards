@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "hands": 20000,
+    "pool": 3000,
+    "seed": 73313,
+    "holdoutSeed": 999999
+  },
+  "results": [
+    {
+      "config": "parity",
+      "axis": "parity",
+      "threshold": null,
+      "wins": 10892,
+      "losses": 10892,
+      "games": 21784,
+      "winRate": 0.5,
+      "ci95": 0.006639834606296434
+    },
+    {
+      "config": "probe-lead",
+      "axis": "tools",
+      "threshold": null,
+      "wins": 10650,
+      "losses": 10414,
+      "games": 21064,
+      "winRate": 0.5056019749335359,
+      "ci95": 0.006751937176962513
+    },
+    {
+      "config": "pass-control",
+      "axis": "tools",
+      "threshold": null,
+      "wins": 10776,
+      "losses": 10864,
+      "games": 21640,
+      "winRate": 0.49796672828096117,
+      "ci95": 0.006661834764175298
+    },
+    {
+      "config": "clubs3-5",
+      "axis": "tools",
+      "threshold": 5,
+      "wins": 10726,
+      "losses": 10786,
+      "games": 21512,
+      "winRate": 0.4986054295277055,
+      "ci95": 0.006681654142530151
+    },
+    {
+      "config": "clubs3-4",
+      "axis": "tools",
+      "threshold": 4,
+      "wins": 10110,
+      "losses": 10850,
+      "games": 20960,
+      "winRate": 0.4823473282442748,
+      "ci95": 0.006764872267458622
+    }
+  ],
+  "holdout": []
+}
