@@ -708,6 +708,56 @@ function signalAwareBestCall(ctx: StrategyContext, lenWeight: number = 1): { sui
   return best;
 }
 
+// The card in a set with the FEWEST outstanding cards that beat it in its
+// suit ("least beaten") — the human counting heuristic for what to throw
+// when you have control: a near-boss card (K with only the A unseen) wins
+// the trick unless the one beater appears, and is dead weight later; a
+// backed card should be held instead (its promotion is already secured),
+// which callers express by selecting from .spare. Ties break toward the
+// higher card (bigger equity to cash), then fixed suit order.
+function cardSetLeastBeaten(cs: CardSet, ctx: StrategyContext): Card | null {
+  let best: Card | null = null;
+  let bestKey: [number, number, number] | null = null;
+  const suitOrder: Record<string, number> = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 };
+  for (const card of cs.cards) {
+    const key: [number, number, number] = [
+      cardsAbove(card, ctx),
+      -ctx.getCardValue(card),
+      suitOrder[card.suit] ?? 4,
+    ];
+    if (!bestKey ||
+        key[0] < bestKey[0] ||
+        (key[0] === bestKey[0] && key[1] < bestKey[1]) ||
+        (key[0] === bestKey[0] && key[1] === bestKey[1] && key[2] < bestKey[2])) {
+      bestKey = key;
+      best = card;
+    }
+  }
+  return best;
+}
+
+// The non-trump suit with the most outstanding top cards under the given
+// direction (default: the played direction). By exclusion, this is where a
+// direction-signaling PARTNER's strength most likely concentrates — their
+// signaled winners can only be made of tops I don't hold — so leading low
+// in this suit is the "pass control to partner" play. Ties break by fixed
+// suit order.
+function partnerCoverSuit(ctx: StrategyContext, direction?: string): string {
+  const dir = direction ?? ctx.bidDirection;
+  const cover = computeSignalCover(ctx, dir);
+  let best = 'spades';
+  let bestOut = -1;
+  for (const suit of TRUMP_CALL_SUITS) {
+    if (ctx.trumpSuit !== null && suit === ctx.trumpSuit) continue;
+    const out = cover.outTop(suit);
+    if (out > bestOut) {
+      bestOut = out;
+      best = suit;
+    }
+  }
+  return best;
+}
+
 // Argmax of raw honor density (suit_power) — the "strength not length"
 // picker for calling into a contested direction. Ties break by length,
 // then fixed suit order.
@@ -893,6 +943,8 @@ function evalCall(name: string, args: any[], ctx: StrategyContext): any {
       result = typeof args[0] === 'string' && directionCardValue(args[0])
         ? computeSignalCover(ctx, args[0]).enemyTops : 0;
       break;
+    case 'partner_cover_suit':
+      result = partnerCoverSuit(ctx, typeof args[0] === 'string' ? args[0] : undefined); break;
     case 'signal_aware_direction':
       // Optional numeric arg = lenWeight (see signalAwareScore).
       result = signalAwareBestCall(ctx, typeof args[0] === 'number' ? args[0] : 1).direction; break;
@@ -946,6 +998,7 @@ function evalProperty(expr: any, ctx: StrategyContext): any {
         return args.length > 0 ? filterSuit(cs, args[0] as string) : cs;
       case 'strongest': return cardSetHighest(cs, ctx.getCardValue);
       case 'weakest': return cardSetLowest(cs, ctx.getCardValue);
+      case 'least_beaten': return cardSetLeastBeaten(cs, ctx);
       case 'strongest_safe': return highestSafe(cs, ctx);
       case 'winners': return cardSetWinners(cs, ctx);
       case 'losers': return cardSetLosers(cs, ctx);

@@ -684,6 +684,64 @@ trump:
   });
 });
 
+describe('least_beaten and partner_cover_suit primitives', () => {
+  const { evaluatePlay, evaluateTrump } = require('./evaluator.ts');
+
+  function mk(suit: string, rank: number): Card {
+    return { suit, rank, id: `${suit}_${rank}` };
+  }
+
+  function playCard(expr: string, ctx: StrategyContext): string | null {
+    const ast = parseStrategy(
+      `strategy "t"\ngame: bidwhist\n\nplay:\n  leading:\n    default:\n      play ${expr}\n`);
+    const result = evaluatePlay(ast, ctx);
+    return result ? result.id : null;
+  }
+
+  it('least_beaten picks the card with fewest outstanding beaters', () => {
+    // K hearts: only the A beats it (1 beater). Q spades: A,K out (2).
+    // 5 diamonds: many. The K is the near-boss probe.
+    const h = [mk('hearts', 13), mk('spades', 12), mk('diamonds', 5)];
+    const ctx = ctxFromHand(h);
+    expect(playCard('hand.least_beaten', ctx)).toBe('hearts_13');
+  });
+
+  it('least_beaten honors played cards (boss = 0 beaters wins outright)', () => {
+    const h = [mk('hearts', 13), mk('spades', 12)];
+    const ctx = ctxFromHand(h, { playedCards: [mk('hearts', 1)] });
+    // A hearts is gone: K hearts is boss (0 beaters) vs Q spades (2).
+    expect(playCard('hand.least_beaten', ctx)).toBe('hearts_13');
+  });
+
+  it('least_beaten tie-breaks by fixed suit order at equal count and value', () => {
+    // K spades and K hearts each have exactly 1 beater (their ace).
+    const h = [mk('hearts', 13), mk('spades', 13)];
+    const ctx = ctxFromHand(h);
+    expect(playCard('hand.least_beaten', ctx)).toBe('spades_13');
+  });
+
+  it('partner_cover_suit finds where the outstanding tops concentrate', () => {
+    // Uptown context. I hold A/K/Q of hearts (hearts outTop = 0) and
+    // A/K of diamonds (outTop 1); spades is trump (excluded); clubs is
+    // untouched (outTop 3) — partner's signaled strength lives in clubs.
+    const h = [
+      mk('hearts', 1), mk('hearts', 13), mk('hearts', 12),
+      mk('diamonds', 1), mk('diamonds', 13),
+      mk('clubs', 5), mk('clubs', 4),
+    ];
+    const ctx = ctxFromHand(h, { trumpSuit: 'spades', partnerBid: 2 });
+    const STRAT = `strategy "t"
+game: bidwhist
+
+trump:
+  default:
+    choose suit: partner_cover_suit(uptown) direction: uptown
+`;
+    const result = evaluateTrump(parseStrategy(STRAT), ctx);
+    expect(result).toEqual({ suit: 'clubs', direction: 'uptown' });
+  });
+});
+
 describe('am_declarer / partner_is_declarer DSL variables', () => {
   const h = hand('amlk' + 'bcdefghi'); // AKQJ hearts + 8 low hearts
 
