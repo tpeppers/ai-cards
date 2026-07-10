@@ -62,6 +62,37 @@ const LEAD_DEFAULT_ROLES = `    # Throwaway lead: burn a spare, not a backing ca
       play hand.weakest
 `;
 
+// Full leading: block (header included) for RolesOverrides.leadingSection —
+// the champion's leading block with the throwaway lead playing
+// .least_beaten instead of .weakest. Winner of the human-tools sweep
+// (report/human-tools-sweep*.json); adopted as ClaudeFam (Roles+MTC+CP+PL).
+export const PROBE_LEADING_SECTION = `  leading:
+    # Last-run: one non-trump left — run out trump and then play it.
+    when on_declarer_team and has_trump and hand.nontrump.count == 1:
+      play hand.trump.strongest
+    # Pull trump aggressively when enemies still have any.
+    when on_declarer_team and has_trump and enemy_has_trump and outstanding_trump() > 0:
+      play hand.trump.strongest
+    # Cash boss non-trump cards before they lose tempo value.
+    when hand.boss.nontrump.count > 0:
+      play hand.boss.nontrump.weakest
+    # Lead partner's short suit if we called trump and partner still
+    # has trump — lets partner trump that suit to grab the trick.
+    when on_declarer_team and partner_has_trump and partner_shortsuit.count > 0:
+      play partner_shortsuit.weakest
+    # Lead partner's signal suit (from their first void discard).
+    when partner_signal != "" and hand.suit(partner_signal).count > 0:
+      play hand.suit(partner_signal).weakest
+    # Probe lead: with control, throw the spare with the fewest outstanding
+    # beaters — it wins now or forces the beater out; junk stays for later.
+    when hand.nontrump.spare.count > 0:
+      play hand.nontrump.spare.least_beaten
+    when hand.nontrump.count > 0:
+      play hand.nontrump.weakest
+    default:
+      play hand.weakest
+`;
+
 const PLAY_FOLLOWING = `  following:
     when partner_winning and outstanding_threats() == 0:
       play hand.suit(lead_suit).weakest
@@ -345,3 +376,15 @@ export const BIDWHIST_CLAUDEFAM_ROLES_MTC_CP = buildRolesVariant('ClaudeFam (Rol
   rolesSluff: true,
   rolesLead: true,
 }, { bidSection: MTC_BID_SECTION, extraLets: 'let mtc_sig = 4', trumpSection: COUNTERPICK_TRUMP_SECTION });
+
+// ClaudeFam (Roles+MTC+CP+PL): the human-tools sweep winner
+// (report/human-tools-sweep*.json). One change: the throwaway lead
+// picks the spare with the FEWEST outstanding beaters (.least_beaten)
+// instead of the weakest spare — a near-boss spare wins the trick now
+// or forces its beater out, while junk spares keep their flexibility.
+// Beat Claude Omni at 51.37%±0.30 pooled over five 20k-game pools.
+export const BIDWHIST_CLAUDEFAM_ROLES_MTC_CP_PL = buildRolesVariant('ClaudeFam (Roles+MTC+CP+PL)', {
+  rolesDiscard: true,
+  rolesSluff: true,
+  rolesLead: true,
+}, { bidSection: MTC_BID_SECTION, extraLets: 'let mtc_sig = 4', trumpSection: COUNTERPICK_TRUMP_SECTION, leadingSection: PROBE_LEADING_SECTION });

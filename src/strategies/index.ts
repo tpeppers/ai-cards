@@ -1,34 +1,48 @@
 // Strategy file contents exported as string constants.
 // Built from composable sections: play (varies by signal mode) + bid + trump.
 
-// ClaudeFam lives in its own file (fully-annotated final strategy). Imported
-// at top-level so the registry below can reference it, and re-exported so
+// Strategy files with their own modules (fully-annotated lineage). Imported
+// at top-level so the registry below can reference them, and re-exported so
 // external callers can use `import { BIDWHIST_CLAUDEFAM } from './strategies'`.
+// (All imports first — CRA's eslint import/first rule fails the dev build
+// when an import follows any other statement.)
 import { BIDWHIST_CLAUDEFAM } from './claudeFam.ts';
+import {
+  BIDWHIST_CLAUDEFAM_ROLES,
+  BIDWHIST_CLAUDEFAM_ROLES_MTC,
+  BIDWHIST_CLAUDEFAM_ROLES_MTC_CP,
+  BIDWHIST_CLAUDEFAM_ROLES_MTC_CP_PL,
+} from './claudeFamRoles.ts';
+import { BIDWHIST_CLAUDE_OMNI } from './claudeOmni.ts';
+
 export { BIDWHIST_CLAUDEFAM };
 
 // ClaudeFam (Roles): ClaudeFam with the suit-role primitives (working /
 // spare / backing) swapped into the discard and sluff rules.
-import { BIDWHIST_CLAUDEFAM_ROLES } from './claudeFamRoles.ts';
 export { BIDWHIST_CLAUDEFAM_ROLES };
 
 // ClaudeFam (Roles+MTC): ClaudeFam (Roles) with the bid-signal conditions
 // switched from hand_power to makeable_trick_count (mtc_sig = 4) — the
 // confirmed winner of the makeable_trick_count bid sweep.
-import { BIDWHIST_CLAUDEFAM_ROLES_MTC } from './claudeFamRoles.ts';
 export { BIDWHIST_CLAUDEFAM_ROLES_MTC };
 
 // ClaudeFam (Roles+MTC+CP): ClaudeFam (Roles+MTC) with counterpick and
 // contested-direction strength rules in the trump section — the confirmed
 // winner of the trump-section sweep.
-import { BIDWHIST_CLAUDEFAM_ROLES_MTC_CP } from './claudeFamRoles.ts';
 export { BIDWHIST_CLAUDEFAM_ROLES_MTC_CP };
 
+// ClaudeFam (Roles+MTC+CP+PL): ClaudeFam (Roles+MTC+CP) with the throwaway
+// lead switched to the least-beaten spare (probe lead) — the confirmed
+// winner of the human-tools sweep (51.37%±0.30 over five 20k pools).
+export { BIDWHIST_CLAUDEFAM_ROLES_MTC_CP_PL };
+
 // Claude Omni: the consolidated, fully-documented champion — behaviorally
-// identical to ClaudeFam (Roles+MTC+CP) (asserted by an AST-equality test),
-// packaged as a single annotated file with the information audit.
-import { BIDWHIST_CLAUDE_OMNI } from './claudeOmni.ts';
+// identical to ClaudeFam (Roles+MTC+CP+PL) (asserted by an AST-equality
+// test), packaged as a single annotated file with the information audit.
 export { BIDWHIST_CLAUDE_OMNI };
+
+// Single source of truth for "the strategy to beat" — used by Challenge Mode.
+export const BIDWHIST_CURRENT_BEST = { name: 'Claude Omni', text: BIDWHIST_CLAUDE_OMNI };
 
 // ── Trump section: Ignore Signals (reads own hand only) ──
 
@@ -973,6 +987,7 @@ export const STRATEGY_REGISTRY: StrategyRegistryEntry[] = [
   { name: 'ClaudeFam (Roles)', game: 'bidwhist', text: BIDWHIST_CLAUDEFAM_ROLES },
   { name: 'ClaudeFam (Roles+MTC)', game: 'bidwhist', text: BIDWHIST_CLAUDEFAM_ROLES_MTC },
   { name: 'ClaudeFam (Roles+MTC+CP)', game: 'bidwhist', text: BIDWHIST_CLAUDEFAM_ROLES_MTC_CP },
+  { name: 'ClaudeFam (Roles+MTC+CP+PL)', game: 'bidwhist', text: BIDWHIST_CLAUDEFAM_ROLES_MTC_CP_PL },
   { name: 'Claude Omni', game: 'bidwhist', text: BIDWHIST_CLAUDE_OMNI },
   { name: 'Standard', game: 'hearts', text: HEARTS_STANDARD },
 ];

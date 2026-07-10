@@ -9,11 +9,12 @@
  *   (Roles)           +10.7pp  suit-role model in discard/sluff/lead
  *   (+MTC)            +3.0pp   signals on makeable_trick_count(dir) >= 4
  *   (+CP)             +1.1pp   trump counterpick + contested strength picks
+ *   (+PL)             +1.4pp   least-beaten probe leads
  *
- * Claude Omni is BEHAVIORALLY IDENTICAL to ClaudeFam (Roles+MTC+CP) — a
- * unit test asserts AST equality — repackaged as one documented file. The
- * text below is the thing that won ~108k pooled head-to-head games; the
- * comments are the provenance.
+ * Claude Omni is BEHAVIORALLY IDENTICAL to ClaudeFam (Roles+MTC+CP+PL) —
+ * the AST-parity unit test pins Omni to exactly that strategy —
+ * repackaged as one documented file. The text below is the thing that won
+ * the pooled head-to-head games; the comments are the provenance.
  *
  * # The information audit (the "approaching optimal" argument)
  *
@@ -103,10 +104,11 @@ play:
     # Lead the suit partner signaled with their first void discard.
     when partner_signal != "" and hand.suit(partner_signal).count > 0:
       play hand.suit(partner_signal).weakest
-    # Throwaway lead: burn a spare, never a backing card that a backed
-    # winner depends on. (Part of the +10.7pp roles adoption.)
+    # Throwaway lead: with control, throw the spare with the fewest
+    # outstanding beaters — it wins now or forces the beater out; junk
+    # spares stay flexible for later. (+1.4pp, five-pool confirmed.)
     when hand.nontrump.spare.count > 0:
-      play hand.nontrump.spare.weakest
+      play hand.nontrump.spare.least_beaten
     when hand.nontrump.count > 0:
       play hand.nontrump.weakest
     default:
