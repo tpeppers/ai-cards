@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useCallback } from 'react';
-import { STRATEGY_REGISTRY, splitStrategySections, replaceStrategySection } from '../strategies/index.ts';
+import { useNavigate } from 'react-router-dom';
+import { STRATEGY_REGISTRY, splitStrategySections, replaceStrategySection, BIDWHIST_CURRENT_BEST } from '../strategies/index.ts';
 import { BatchRunner } from '../simulation/BatchRunner.ts';
 import { ComparisonConfig, StrategyComparisonResult } from '../simulation/types.ts';
 import { RED_TEAM_DECKS } from '../simulation/redTeamDecks.ts';
@@ -221,6 +222,7 @@ const ABDiffPane: React.FC<{
 };
 
 const StrategyComparison: React.FC = () => {
+  const navigate = useNavigate();
   const [assignmentMode, setAssignmentMode] = useState<'by-team' | 'round-robin' | 'ab-test' | 'signal-lab'>('by-team');
   const [team0Selection, setTeam0Selection] = useState('0');
   const [team1Selection, setTeam1Selection] = useState('1');
@@ -958,23 +960,45 @@ const StrategyComparison: React.FC = () => {
           </div>
         </div>
 
-        {/* Run button */}
-        <button
-          onClick={handleRun}
-          disabled={running || !canRun}
-          style={{
-            padding: '10px 32px',
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: (running || !canRun) ? '#4b5563' : '#10b981',
-            color: '#ffffff',
-            fontWeight: 'bold',
-            fontSize: '16px',
-            cursor: (running || !canRun) ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {running ? 'Running...' : 'Run Comparison'}
-        </button>
+        {/* Run button + Challenge Mode entry */}
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleRun}
+            disabled={running || !canRun}
+            style={{
+              padding: '10px 32px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: (running || !canRun) ? '#4b5563' : '#10b981',
+              color: '#ffffff',
+              fontWeight: 'bold',
+              fontSize: '16px',
+              cursor: (running || !canRun) ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {running ? 'Running...' : 'Run Comparison'}
+          </button>
+          <div>
+            <button
+              onClick={() => navigate('/bidwhist?challenge=1')}
+              style={{
+                padding: '10px 32px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#d97706',
+                color: '#ffffff',
+                fontWeight: 'bold',
+                fontSize: '16px',
+                cursor: 'pointer',
+              }}
+            >
+              ⚔️ Challenge the Champion
+            </button>
+            <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px', maxWidth: '380px' }}>
+              Play vs {BIDWHIST_CURRENT_BEST.name} on every seat; hands where you beat its own line get flagged and recorded.
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Progress bar */}

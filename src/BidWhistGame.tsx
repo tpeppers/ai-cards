@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import GameEngine from './components/GameEngine.tsx';
 import BiddingOverlay from './components/BiddingOverlay.tsx';
 import TrumpSelectionOverlay from './components/TrumpSelectionOverlay.tsx';
@@ -7,7 +8,7 @@ import LastBook from './components/LastBook.tsx';
 import StrategyConfigModal from './components/StrategyConfigModal.tsx';
 import { BidWhistGame } from './games/BidWhistGame.ts';
 import { GameState } from './types/CardGame.ts';
-import { STRATEGY_REGISTRY } from './strategies/index.ts';
+import { STRATEGY_REGISTRY, BIDWHIST_CURRENT_BEST } from './strategies/index.ts';
 import { getGameStateFromUrl } from './urlGameState.js';
 import { useDraggable } from './hooks/useDraggable.ts';
 import { useResponsiveLayout, PlayAreaLayoutProvider } from './hooks/useResponsiveLayout.ts';
@@ -19,6 +20,19 @@ import {
   recordPlayDecision, finalizeHand,
   RecordContext,
 } from './utils/deviationJournal.ts';
+import { ChallengeRecorder, StoredChallengeRecord } from './utils/challengeRecorder.ts';
+import { decodeHandRecord } from './utils/gameRecord.ts';
+import { BidWhistSimulator } from './simulation/BidWhistSimulator.ts';
+import { parseStrategy } from './strategy/parser.ts';
+import { StrategyAST } from './strategy/types.ts';
+
+// Champion AST for the Challenge Mode shadow sim — parsed lazily once
+// (mirrors deviationJournal's familyAst pattern).
+let _championAst: StrategyAST | null = null;
+function championAst(): StrategyAST {
+  if (!_championAst) _championAst = parseStrategy(BIDWHIST_CURRENT_BEST.text);
+  return _championAst;
+}
 
 const SUIT_SYMBOLS: { [key: string]: string } = {
   spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣'
@@ -60,6 +74,12 @@ const WHISTING_ANIMATIONS = [
 ];
 
 const BidWhistGameComponent: React.FunctionComponent = () => {
+  // Challenge Mode: /bidwhist?challenge=1 — every seat (including the
+  // human's Auto Play) uses BIDWHIST_CURRENT_BEST, and each completed
+  // hand is recorded as a BWR1 record next to its shadow counterfactual.
+  const location = useLocation();
+  const challengeMode = new URLSearchParams(location.search).get('challenge') === '1';
+
   const gameRef = useRef<BidWhistGame>(new BidWhistGame());
   const [gameState, setGameState] = useState<GameState>(gameRef.current.getGameState());
   const [biddingState, setBiddingState] = useState(gameRef.current.getBiddingState());
@@ -73,10 +93,21 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
 
   // Strategy configuration state
   const familyStrategyText = STRATEGY_REGISTRY.find(s => s.game === 'bidwhist' && s.name === 'Family')?.text || null;
-  const [tableStrategy, setTableStrategy] = useState<string | null>(familyStrategyText);
+  // Challenge Mode puts the champion on the table (overrides stay all-null
+  // so every seat, including the human's Auto Play, uses it).
+  const [tableStrategy, setTableStrategy] = useState<string | null>(
+    challengeMode ? BIDWHIST_CURRENT_BEST.text : familyStrategyText
+  );
   const [playerStrategyOverrides, setPlayerStrategyOverrides] = useState<(string | null)[]>([null, null, null, null]);
   const [showStrategyModal, setShowStrategyModal] = useState(false);
   const [showJournalPanel, setShowJournalPanel] = useState(false);
+
+  // Challenge Mode recorder + records panel
+  const challengeRecorderRef = useRef(challengeMode ? new ChallengeRecorder(BIDWHIST_CURRENT_BEST.name) : null);
+  const [challengeRecords, setChallengeRecords] = useState<StoredChallengeRecord[]>(
+    () => (challengeMode ? ChallengeRecorder.load() : [])
+  );
+  const [showChallengePanel, setShowChallengePanel] = useState(false);
 
   const game = gameRef.current;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -283,18 +314,25 @@ Card Rankings:
     loadStrategyForPlayer(0);
 
     const stage = game.getGameState().gameStage;
+    const recorder = challengeRecorderRef.current;
 
     if (stage === 'bidding') {
+      if (recorder) recorder.assist({ type: 'bidAssist', bidIndex: game.getBiddingState().bids.length });
       const bid = game.getAIBid(0);
       handleBid(bid);
     } else if (stage === 'trumpSelection') {
+      if (recorder) recorder.assist({ type: 'trumpAssist' });
       const result = game.getAITrumpSelection(0);
       handleTrumpSelection(result.suit, result.direction);
     } else if (stage === 'discarding') {
+      if (recorder) recorder.assist({ type: 'discardAssist' });
       game.simulateAutoDiscard(0);
       updateStates();
       setRefreshKey(prev => prev + 1);
     } else if (stage === 'play') {
+      // Record BEFORE bumping the signal so playIndex reflects the
+      // pre-play state the autoplay decision was made in.
+      if (recorder) recorder.assist({ type: 'autoplay', playIndex: recorder.playsSoFar(game) });
       // Signal GameEngine to run its internal handleAutoPlay
       setAutoPlaySignal(prev => prev + 1);
     }
@@ -303,6 +341,12 @@ Card Rankings:
   // Preview: compute what Auto Play would do on hover
   const handleAutoPlayHover = useCallback(() => {
     loadStrategyForPlayer(0);
+
+    // Consulting the hint counts as assistance. The recorder collapses
+    // repeated previews at the same playIndex, so hover-jitter doesn't
+    // inflate the record.
+    const recorder = challengeRecorderRef.current;
+    if (recorder) recorder.assist({ type: 'preview', playIndex: recorder.playsSoFar(game) });
 
     const stage = game.getGameState().gameStage;
 
@@ -399,6 +443,25 @@ Card Rankings:
           made: declarerTeamBooks >= contract,
         });
       }
+
+      // Challenge Mode: shadow-sim the same deal/dealer with the champion
+      // on all four seats and store the BWR1 record. The sim constructs
+      // its own BidWhistGame internally, so the live `game` ref is never
+      // touched.
+      const challengeRecorder = challengeRecorderRef.current;
+      if (challengeRecorder) {
+        let shadow: { booksWon: [number, number] } | null = null;
+        try {
+          const detail = BidWhistSimulator.simulateDetailedHand(
+            game.getLastDealtDeckUrl(),
+            [championAst(), championAst(), championAst(), championAst()],
+            game.getDealer(),
+          );
+          if (detail) shadow = { booksWon: detail.booksWon };
+        } catch {}
+        challengeRecorder.finalizeHand(game as any, shadow);
+        setChallengeRecords(ChallengeRecorder.load());
+      }
     }
 
     // Update both states together to keep them in sync
@@ -483,6 +546,125 @@ Card Rankings:
       {showJournalPanel && (
         <JournalSettingsPanel onClose={() => setShowJournalPanel(false)} />
       )}
+      {/* Challenge Mode banner strip — sits just below the menu bar */}
+      {challengeMode && (
+        <div
+          style={{
+            position: 'absolute', top: 36, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 40, background: '#162b1e', border: '1px solid #2f5d3f',
+            borderRadius: 6, padding: '4px 14px', color: '#d1fae5',
+            fontSize: 13, whiteSpace: 'nowrap', pointerEvents: 'none',
+          }}
+        >
+          🏆 Challenge Mode — everyone plays {BIDWHIST_CURRENT_BEST.name}. Beat the machine's own line on a deal to flag it.
+        </div>
+      )}
+      {/* Challenge records toggle — bottom-left, next to the journal gear */}
+      {challengeMode && (
+        <button
+          onClick={() => setShowChallengePanel(prev => !prev)}
+          title="Challenge records"
+          style={{
+            position: 'absolute', bottom: 8, left: 48, zIndex: 50,
+            background: 'rgba(17,24,39,0.7)',
+            color: '#fbbf24',
+            border: '1px solid #374151',
+            borderRadius: '50%',
+            width: 32, height: 32,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+        >
+          🏆
+        </button>
+      )}
+      {/* Challenge records panel */}
+      {challengeMode && showChallengePanel && (
+        <div
+          style={{
+            position: 'absolute', bottom: 48, left: 8, zIndex: 55,
+            width: 400, maxWidth: 'calc(100% - 16px)', maxHeight: '60%', overflowY: 'auto',
+            background: '#162b1e', border: '1px solid #2f5d3f', borderRadius: 8,
+            padding: 12, color: '#e5e7eb', fontSize: 12,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontWeight: 'bold' }}>Challenge Records ({challengeRecords.length})</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => {
+                  const csv = ChallengeRecorder.toCsv(challengeRecords);
+                  const blob = new Blob([csv], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'challenge-records.csv';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                style={{ background: '#374151', color: '#e5e7eb', border: '1px solid #4b5563', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: 11 }}
+              >
+                Download CSV
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm('Clear all challenge records?')) {
+                    ChallengeRecorder.clear();
+                    setChallengeRecords([]);
+                  }
+                }}
+                style={{ background: '#374151', color: '#fca5a5', border: '1px solid #4b5563', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: 11 }}
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setShowChallengePanel(false)}
+                style={{ background: 'transparent', color: '#9ca3af', border: 'none', cursor: 'pointer', fontSize: 12 }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          {challengeRecords.length === 0 && (
+            <div style={{ color: '#9ca3af' }}>No hands recorded yet — finish a hand to record it.</div>
+          )}
+          {challengeRecords.slice().reverse().map((r, i) => {
+            let humanBooks: [number, number] | null = null;
+            let shadowBooks: [number, number] | null = null;
+            try {
+              const decoded = decodeHandRecord(r.encoded);
+              humanBooks = decoded.outcome.humanBooks;
+              shadowBooks = decoded.outcome.shadowBooks;
+            } catch {}
+            return (
+              <div
+                key={`${r.ts}-${i}`}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderTop: '1px solid #234233' }}
+              >
+                <span style={{ color: '#9ca3af', flexShrink: 0 }}>{new Date(r.ts).toLocaleTimeString()}</span>
+                <span style={{ fontFamily: 'monospace' }} title={r.deal}>{r.deal.slice(0, 8)}…</span>
+                <span title="Your books vs the champion's shadow line">
+                  H {humanBooks ? `${humanBooks[0]}-${humanBooks[1]}` : '?'} vs X {shadowBooks ? `${shadowBooks[0]}-${shadowBooks[1]}` : '—'}
+                </span>
+                <span title="Assists used this hand" style={{ color: '#9ca3af' }}>✋{r.assistCount}</span>
+                {r.flagged && (
+                  <span style={{ background: '#059669', color: 'white', borderRadius: 4, padding: '0 6px', fontWeight: 'bold' }}>
+                    FLAG
+                  </span>
+                )}
+                <button
+                  onClick={() => navigator.clipboard.writeText(r.encoded)}
+                  title="Copy the encoded BWR1 record"
+                  style={{ marginLeft: 'auto', background: '#374151', color: '#e5e7eb', border: '1px solid #4b5563', borderRadius: 4, padding: '1px 8px', cursor: 'pointer', fontSize: 11, flexShrink: 0 }}
+                >
+                  Copy
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <PlayAreaLayoutProvider elementRef={rootRef}>
       <GameEngine
         game={game}
@@ -503,7 +685,17 @@ Card Rankings:
         }}
         playerDisplayNames={playerDisplayNames}
         showAllCards={showAllCards}
-        onToggleShowAllCards={() => setShowAllCards(prev => !prev)}
+        onToggleShowAllCards={() => {
+          const nextValue = !showAllCards;
+          const recorder = challengeRecorderRef.current;
+          if (recorder) {
+            recorder.assist({
+              type: nextValue ? 'showAllOn' : 'showAllOff',
+              playIndex: recorder.playsSoFar(game),
+            });
+          }
+          setShowAllCards(nextValue);
+        }}
         hideGameOver={!!whistingAnimation}
         extraControls={
           <>
