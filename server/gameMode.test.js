@@ -12,7 +12,11 @@ const assert = require('assert');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gamemode-test-'));
 process.env.GAME_MODE_STORAGE = tmpDir;
 
-const { registerUpload, correctSeat, getSessionStatus, STORAGE_DIR, _sessions, _buildDetectionModsText } = require('./gameMode');
+const {
+  registerUpload, correctSeat, getSessionStatus, newHand, STORAGE_DIR,
+  getDealerPos, setDealerPos, seatForPos, posRoles, getRounds,
+  _sessions, _buildDetectionModsText,
+} = require('./gameMode');
 
 let tests = 0, failed = 0;
 function test(name, fn) {
@@ -283,6 +287,97 @@ test('zip includes detection_mods.txt when a seat was corrected', () => {
   // Extract ZIP entries by scanning for the detection_mods.txt name.
   const zipBuf = fs.readFileSync(r4.zipPath);
   assert.ok(zipBuf.includes(Buffer.from('detection_mods.txt')), 'detection_mods.txt missing from zip');
+});
+
+// ── Table positions / rotating dealer / rounds log ──
+
+// A deterministic 4-way split: 12 cards per seat, kings in the kitty.
+function seatCards() {
+  const rankStr = r => (r === 1 ? 'A' : r === 11 ? 'J' : r === 12 ? 'Q' : String(r));
+  const build = ch => Array.from({ length: 12 }, (_, i) => `${rankStr(i + 1)}${ch}`);
+  return { dealer: build('h'), bid1: build('s'), bid2: build('c'), bid3: build('d') };
+}
+
+function uploadFor(seatOrPos, cards) {
+  return registerUpload({
+    sessionCode: null,
+    ...(typeof seatOrPos === 'number' ? { pos: seatOrPos } : { seat: seatOrPos }),
+    cards,
+    imageBuffer: Buffer.from('fake'),
+    imageExt: 'png',
+  });
+}
+
+test('seatForPos maps clockwise from the dealer at every dealerPos', () => {
+  for (let d = 0; d < 4; d++) {
+    setDealerPos(d);
+    assert.strictEqual(seatForPos(d), 'dealer');
+    assert.strictEqual(seatForPos((d + 1) % 4), 'bid1');
+    assert.strictEqual(seatForPos((d + 2) % 4), 'bid2');
+    assert.strictEqual(seatForPos((d + 3) % 4), 'bid3');
+    assert.deepStrictEqual(posRoles(), [0, 1, 2, 3].map(p => seatForPos(p)));
+  }
+});
+
+test('pos-based upload resolves the right seat via the dealer mapping', () => {
+  _sessions.clear();
+  setDealerPos(2); // P3 deals → pos 3 is bid1, pos 0 is bid2, pos 1 is bid3
+  const cards = seatCards();
+  const r = uploadFor(3, cards.bid1);
+  assert.strictEqual(r.status, 'accepted');
+  assert.strictEqual(r.seat, 'bid1');
+  assert.strictEqual(r.pos, 3);
+  assert.strictEqual(r.dealerPos, 2);
+  const status = getSessionStatus(null);
+  assert.ok(status.seatsFilled.includes('bid1'));
+});
+
+test('completing a hand logs a round and rotates the dealer', () => {
+  _sessions.clear();
+  setDealerPos(1);
+  const cards = seatCards();
+  uploadFor(1, cards.dealer);          // pos 1 = dealer
+  uploadFor(2, cards.bid1);            // pos 2 = bid1
+  uploadFor(3, cards.bid2);            // pos 3 = bid2
+  const r4 = uploadFor(0, cards.bid3); // pos 0 = bid3
+  assert.strictEqual(r4.status, 'completed');
+  assert.ok(r4.url && r4.url.length === 52, 'expected 52-char url');
+  assert.strictEqual(r4.dealerPos, 1, 'result carries the HAND dealer');
+  assert.strictEqual(getDealerPos(), 2, 'dealer rotated clockwise');
+  const rounds = getRounds();
+  assert.ok(rounds.length >= 1);
+  assert.strictEqual(rounds[0].kind, 'completed');
+  assert.strictEqual(rounds[0].url, r4.url);
+  assert.strictEqual(rounds[0].dealerPos, 1);
+});
+
+test('newHand with 2+ seats archives, logs, and rotates; discarded does not rotate', () => {
+  _sessions.clear();
+  setDealerPos(0);
+  const cards = seatCards();
+  uploadFor('dealer', cards.dealer);
+  uploadFor('bid1', cards.bid1);
+  const archived = newHand(null);
+  assert.strictEqual(archived.status, 'archived');
+  assert.strictEqual(archived.dealerPos, 0, 'result carries the HAND dealer');
+  assert.strictEqual(getDealerPos(), 1, 'archived hand rotates the dealer');
+  assert.strictEqual(getRounds()[0].kind, 'archived');
+
+  // A 1-seat discard must NOT rotate.
+  uploadFor('dealer', cards.dealer);
+  const discarded = newHand(null);
+  assert.strictEqual(discarded.status, 'discarded');
+  assert.strictEqual(getDealerPos(), 1, 'discard does not rotate the dealer');
+});
+
+test('correctSeat accepts pos and resolves through the dealer mapping', () => {
+  _sessions.clear();
+  setDealerPos(0);
+  const cards = seatCards();
+  uploadFor(1, cards.bid1); // pos 1 = bid1
+  const fixed = correctSeat({ sessionCode: null, pos: 1, cards: cards.bid1 });
+  assert.strictEqual(fixed.status, 'corrected');
+  assert.strictEqual(fixed.seat, 'bid1');
 });
 
 console.log(`\n${tests - failed}/${tests} passed`);

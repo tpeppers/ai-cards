@@ -5,13 +5,16 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const FormData = require('form-data');
+// NOTE: deliberately NOT requiring the npm 'form-data' package — it would
+// shadow Node's native FormData, whose undici multipart encoding is the
+// only one FastAPI accepts through Node's built-in fetch.
 const { spawn } = require('child_process');
 const sharp = require('sharp');
 const http = require('http');
 const labelStudio = require('./labelStudio');
 const { initMultiplayer } = require('./multiplayer');
 const gameMode = require('./gameMode');
+const { normalizeMlCards } = require('./mlCards');
 
 // ML service configuration
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:3002';
@@ -238,25 +241,29 @@ app.post('/api/game-mode/upload', upload.single('image'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'No image file provided' });
     }
     const seat = req.body.seat;
+    const pos = req.body.pos !== undefined && req.body.pos !== '' ? parseInt(req.body.pos, 10) : undefined;
     const sessionCode = req.body.session || null;
-    if (!seat) {
-      return res.status(400).json({ success: false, error: 'seat is required (dealer|bid1|bid2|bid3)' });
+    if (!seat && pos === undefined) {
+      return res.status(400).json({ success: false, error: 'seat (dealer|bid1|bid2|bid3) or pos (0-3) is required' });
     }
 
     tempImagePath = path.join(uploadDir, req.file.filename);
     const imageBuffer = fs.readFileSync(tempImagePath);
     const imageExt = path.extname(req.file.originalname).replace('.', '') || 'png';
 
-    // Forward to ML service for card detection
-    const formData = new FormData();
-    formData.append('image', imageBuffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype,
-    });
+    // Forward to ML service for card detection. Native undici FormData —
+    // the npm form-data package's stream is rejected by FastAPI when sent
+    // through Node's built-in fetch ("There was an error parsing the body").
+    const fd = new FormData();
+    fd.append(
+      'image',
+      new Blob([imageBuffer], { type: req.file.mimetype || 'image/jpeg' }),
+      req.file.originalname || 'photo.jpg',
+    );
     const confidence = parseFloat(req.query.confidence) || 0.5;
     const mlResponse = await fetch(
       `${ML_SERVICE_URL}/recognize?confidence=${confidence}`,
-      { method: 'POST', body: formData, headers: formData.getHeaders() },
+      { method: 'POST', body: fd },
     );
     if (!mlResponse.ok) {
       const errorText = await mlResponse.text();
@@ -267,11 +274,15 @@ app.post('/api/game-mode/upload', upload.single('image'), async (req, res) => {
       });
     }
     const mlJson = await mlResponse.json();
-    const cards = mlJson.cards || [];
+    // The ML service returns card OBJECTS ({rank_name, suit, ...});
+    // everything downstream (display, EDIT, deck reconstruction) needs
+    // '10h'-style strings.
+    const cards = normalizeMlCards(mlJson.cards || []);
 
     const result = gameMode.registerUpload({
       sessionCode,
       seat,
+      pos,
       cards,
       imageBuffer,
       imageExt,
@@ -281,7 +292,10 @@ app.post('/api/game-mode/upload', upload.single('image'), async (req, res) => {
       success: result.status !== 'error',
       status: result.status,
       session: result.session,
-      seat,
+      seat: result.seat || seat,
+      seatRole: result.seat || seat,
+      pos: result.pos !== undefined ? result.pos : (pos ?? null),
+      dealerPos: result.dealerPos !== undefined ? result.dealerPos : gameMode.getDealerPos(),
       detectedCards: cards,
       seatsFilled: result.seatsFilled,
       seatsMissing: result.seatsMissing,
@@ -290,11 +304,57 @@ app.post('/api/game-mode/upload', upload.single('image'), async (req, res) => {
       errors: result.errors,
     });
   } catch (e) {
+    if (e && (e.code === 'ECONNREFUSED' || (e.cause && e.cause.code === 'ECONNREFUSED'))) {
+      return res.status(503).json({
+        success: false,
+        error: 'ML service unavailable',
+        message: 'Start the ML inference server with: npm run ml:server',
+      });
+    }
     res.status(500).json({ success: false, error: String(e && e.message || e) });
   } finally {
     if (tempImagePath) {
       fs.unlink(tempImagePath, () => {});
     }
+  }
+});
+
+// Table state for phones + host screen: current dealer position, the
+// pos→role mapping for this hand, and live seat-fill status. Never 404s.
+app.get('/api/game-mode/table', (req, res) => {
+  try {
+    const status = gameMode.getSessionStatus(req.query.session || null);
+    res.json({
+      success: true,
+      dealerPos: gameMode.getDealerPos(),
+      posRoles: gameMode.posRoles(),
+      session: status ? status.session : null,
+      seatsFilled: status ? status.seatsFilled : [],
+      seatsMissing: status ? status.seatsMissing : ['dealer', 'bid1', 'bid2', 'bid3'],
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e && e.message || e) });
+  }
+});
+
+// Set who is dealing THIS hand (host screen). Rotates automatically
+// after each completed/archived hand.
+app.post('/api/game-mode/dealer', (req, res) => {
+  try {
+    const pos = parseInt(req.body && req.body.pos, 10);
+    gameMode.setDealerPos(pos);
+    res.json({ success: true, dealerPos: gameMode.getDealerPos(), posRoles: gameMode.posRoles() });
+  } catch (e) {
+    res.status(400).json({ success: false, error: String(e && e.message || e) });
+  }
+});
+
+// Rounds history: every completed/archived hand, newest first.
+app.get('/api/game-mode/rounds', (req, res) => {
+  try {
+    res.json({ success: true, rounds: gameMode.getRounds() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e && e.message || e) });
   }
 });
 
@@ -372,8 +432,9 @@ app.get('/api/game-mode/wifi', (req, res) => {
 // from the Hand Creator. Server preserves the original detection so the
 // final zip can emit detection_mods.txt.
 app.post('/api/game-mode/correct', (req, res) => {
-  const { session = null, seat, cards } = req.body || {};
-  const result = gameMode.correctSeat({ sessionCode: session, seat, cards });
+  const { session = null, seat, pos, cards } = req.body || {};
+  const posNum = pos !== undefined && pos !== null && pos !== '' ? parseInt(pos, 10) : undefined;
+  const result = gameMode.correctSeat({ sessionCode: session, seat, pos: posNum, cards });
   res.json({ success: result.status !== 'error', ...result });
 });
 
@@ -410,12 +471,14 @@ app.post('/api/recognize', upload.single('image'), async (req, res) => {
     const imagePath = path.join(uploadDir, req.file.filename);
     const imageBuffer = fs.readFileSync(imagePath);
 
-    // Create form data for ML service
-    const formData = new FormData();
-    formData.append('image', imageBuffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype
-    });
+    // Create form data for ML service (native undici FormData — the npm
+    // form-data package's stream is rejected by FastAPI via Node fetch)
+    const fd = new FormData();
+    fd.append(
+      'image',
+      new Blob([imageBuffer], { type: req.file.mimetype || 'image/jpeg' }),
+      req.file.originalname || 'photo.jpg'
+    );
 
     // Get confidence threshold from query param (default 0.5)
     const confidence = parseFloat(req.query.confidence) || 0.5;
@@ -425,8 +488,7 @@ app.post('/api/recognize', upload.single('image'), async (req, res) => {
       `${ML_SERVICE_URL}/recognize?confidence=${confidence}`,
       {
         method: 'POST',
-        body: formData,
-        headers: formData.getHeaders()
+        body: fd
       }
     );
 

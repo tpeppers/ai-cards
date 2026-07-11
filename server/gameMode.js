@@ -50,6 +50,89 @@ function ensureStorageDir() {
   fs.mkdirSync(STORAGE_DIR, { recursive: true });
 }
 
+// ── Table positions / rotating dealer ──
+// Physical phones are FIXED to table positions 0-3 (displayed P1-P4,
+// numbered clockwise); the dealer ROLE rotates around the table.
+// Module-level so it survives sessions (not reset by the TTL sweep).
+const SEAT_ROLES = ['dealer', 'bid1', 'bid2', 'bid3'];
+let dealerPos = 0;
+
+function getDealerPos() {
+  return dealerPos;
+}
+
+function setDealerPos(pos) {
+  if (!Number.isInteger(pos) || pos < 0 || pos > 3) {
+    throw new Error(`dealerPos must be an integer 0-3, got ${pos}`);
+  }
+  dealerPos = pos;
+  return dealerPos;
+}
+
+// The next position clockwise from the dealer is the 1st bidder.
+function seatForPos(pos) {
+  if (!Number.isInteger(pos) || pos < 0 || pos > 3) {
+    throw new Error(`pos must be an integer 0-3, got ${pos}`);
+  }
+  return SEAT_ROLES[(pos - dealerPos + 4) % 4];
+}
+
+function posRoles() {
+  return [0, 1, 2, 3].map(p => seatForPos(p));
+}
+
+// Resolve the seat for an upload/correction: explicit seat wins; else a
+// table position resolves through the current dealer mapping. Returns
+// { seat, pos } or { error }.
+function resolveSeat(seat, pos) {
+  const posNum = (pos === undefined || pos === null || pos === '') ? null : Number(pos);
+  if (seat) return { seat, pos: posNum };
+  if (posNum === null) {
+    return { error: 'seat or pos is required' };
+  }
+  if (!Number.isInteger(posNum) || posNum < 0 || posNum > 3) {
+    return { error: `Invalid pos: ${pos}. Must be an integer 0-3` };
+  }
+  return { seat: seatForPos(posNum), pos: posNum };
+}
+
+// ── Rounds log ──
+// Append-only JSON log of every completed/archived hand, capped at the
+// most recent 500 entries. Tolerates a missing or corrupt file.
+const ROUNDS_LOG_NAME = 'rounds.json';
+
+function roundsLogPath() {
+  return path.join(STORAGE_DIR, ROUNDS_LOG_NAME);
+}
+
+function readRoundsFile() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(roundsLogPath(), 'utf8'));
+    if (Array.isArray(parsed)) return parsed;
+  } catch (_e) {
+    // missing or corrupt — start fresh
+  }
+  return [];
+}
+
+function appendRound(entry) {
+  try {
+    ensureStorageDir();
+    let rounds = readRoundsFile();
+    rounds.push(entry);
+    if (rounds.length > 500) rounds = rounds.slice(rounds.length - 500);
+    fs.writeFileSync(roundsLogPath(), JSON.stringify(rounds, null, 2));
+  } catch (e) {
+    // A rounds-log failure must never fail the hand itself.
+    console.error('Failed to append rounds log entry:', e.message);
+  }
+}
+
+/** Rounds log entries, newest first. */
+function getRounds() {
+  return readRoundsFile().slice().reverse();
+}
+
 // ── Session state ──
 // sessionCode → { createdAt, uploads: { [seat]: { cards, imageBuffer, imageExt, uploadedAt } } }
 const sessions = new Map();
@@ -228,21 +311,30 @@ function writeZip(outPath, files) {
 /**
  * Register an upload from one seat. If this completes the session
  * (all 4 seats present), reconstruct the deck and write the zip.
+ * Seat may be given directly OR as a table position `pos` (0-3),
+ * resolved through the current dealer mapping at intake.
  *
- * Returns:
+ * Returns (all include seat, pos, dealerPos — on 'completed' the
+ * dealerPos is the hand's ORIGINAL dealer; rotation happens after):
  *   { status: 'accepted',  session, seatsFilled, seatsMissing }
  *   { status: 'completed', session, url, zipPath }
  *   { status: 'error',     session?, errors }
  */
-function registerUpload({ sessionCode, seat, cards, imageBuffer, imageExt }) {
+function registerUpload({ sessionCode, seat, pos, cards, imageBuffer, imageExt }) {
+  const resolved = resolveSeat(seat, pos);
+  if (resolved.error) {
+    return { status: 'error', errors: [resolved.error], pos: pos ?? null, dealerPos };
+  }
+  seat = resolved.seat;
+  const resolvedPos = resolved.pos;
   if (!VALID_SEATS.includes(seat)) {
-    return { status: 'error', errors: [`Invalid seat: ${seat}. Must be one of: ${VALID_SEATS.join(', ')}`] };
+    return { status: 'error', errors: [`Invalid seat: ${seat}. Must be one of: ${VALID_SEATS.join(', ')}`], seat, pos: resolvedPos, dealerPos };
   }
   if (!Array.isArray(cards) || cards.length === 0) {
-    return { status: 'error', errors: ['No detected cards provided'] };
+    return { status: 'error', errors: ['No detected cards provided'], seat, pos: resolvedPos, dealerPos };
   }
   if (!imageBuffer || !Buffer.isBuffer(imageBuffer)) {
-    return { status: 'error', errors: ['Image buffer missing'] };
+    return { status: 'error', errors: ['Image buffer missing'], seat, pos: resolvedPos, dealerPos };
   }
 
   let session, code;
@@ -251,13 +343,16 @@ function registerUpload({ sessionCode, seat, cards, imageBuffer, imageExt }) {
     session = info.session;
     code = info.code;
   } catch (e) {
-    return { status: 'error', errors: [e.message] };
+    return { status: 'error', errors: [e.message], seat, pos: resolvedPos, dealerPos };
   }
 
   if (session.uploads[seat]) {
     return {
       status: 'error',
       session: code,
+      seat,
+      pos: resolvedPos,
+      dealerPos,
       errors: [`Seat ${seat} already uploaded for session ${code}; use a new session to re-upload`],
     };
   }
@@ -277,20 +372,41 @@ function registerUpload({ sessionCode, seat, cards, imageBuffer, imageExt }) {
     return {
       status: 'accepted',
       session: code,
+      seat,
+      pos: resolvedPos,
+      dealerPos,
       seatsFilled,
       seatsMissing,
     };
   }
 
-  // All 4 seats present — reconstruct
+  // All 4 seats present — attempt completion (shared with correctSeat,
+  // which re-attempts after an EDIT fixes a failed reconstruction).
+  return {
+    ...completeSession(code, session),
+    seat,
+    pos: resolvedPos,
+  };
+}
+
+/**
+ * Attempt to reconstruct + archive a session that has all 4 seats filled.
+ * On success: writes the zip, logs the round, rotates the dealer, clears
+ * the session, and returns { status: 'completed', ... }. On failure the
+ * session is LEFT IN PLACE (uploaders fix seats via EDIT/correctSeat and
+ * completion re-attempts) and returns { status: 'error', errors }.
+ */
+function completeSession(code, session) {
   const seatSubmissions = {};
   for (const s of VALID_SEATS) seatSubmissions[s] = session.uploads[s].cards;
   const { url, errors } = reconstructDeck(seatSubmissions);
   if (!url) {
-    // Leave the session in place so uploaders can see the errors; TTL
-    // will eventually clear it.
-    return { status: 'error', session: code, errors };
+    return { status: 'error', session: code, dealerPos, errors };
   }
+
+  // The hand's dealer position: captured BEFORE rotation so the result,
+  // metadata.json, and rounds log all carry the original.
+  const handDealerPos = dealerPos;
 
   // Write zip
   ensureStorageDir();
@@ -312,6 +428,7 @@ function registerUpload({ sessionCode, seat, cards, imageBuffer, imageExt }) {
     buffer: Buffer.from(JSON.stringify({
       session: code,
       url,
+      dealerPos: handDealerPos,
       createdAt: new Date(session.createdAt).toISOString(),
       completedAt: new Date().toISOString(),
       seats: Object.fromEntries(VALID_SEATS.map(s => [s, {
@@ -327,13 +444,25 @@ function registerUpload({ sessionCode, seat, cards, imageBuffer, imageExt }) {
   try {
     writeZip(zipPath, files);
   } catch (e) {
-    return { status: 'error', session: code, errors: [`Failed to write zip: ${e.message}`] };
+    return { status: 'error', session: code, dealerPos, errors: [`Failed to write zip: ${e.message}`] };
   }
 
   // Remove completed session from memory
   sessions.delete(code);
 
-  return { status: 'completed', session: code, url, zipPath };
+  // Log the round, then rotate the dealer for the next hand.
+  appendRound({
+    ts: Date.now(),
+    kind: 'completed',
+    url,
+    session: code,
+    zipName: path.basename(zipPath),
+    dealerPos: handDealerPos,
+    seats: Object.fromEntries(VALID_SEATS.map(s => [s, session.uploads[s].cards.length])),
+  });
+  dealerPos = (dealerPos + 1) % 4;
+
+  return { status: 'completed', session: code, dealerPos: handDealerPos, url, zipPath };
 }
 
 /**
@@ -383,11 +512,19 @@ function buildDetectionModsText(uploads) {
  * (typically from the Hand Creator EDIT flow). Preserves originalCards
  * so the session-final zip can emit detection_mods.txt.
  *
+ * Seat may be given directly OR as a table position `pos` (0-3),
+ * resolved through the current dealer mapping — same as registerUpload.
+ *
  * Returns:
  *   { status: 'corrected', session, seat, cards }
  *   { status: 'error',     session?, errors }
  */
-function correctSeat({ sessionCode, seat, cards }) {
+function correctSeat({ sessionCode, seat, pos, cards }) {
+  const resolved = resolveSeat(seat, pos);
+  if (resolved.error) {
+    return { status: 'error', errors: [resolved.error] };
+  }
+  seat = resolved.seat;
   if (!VALID_SEATS.includes(seat)) {
     return { status: 'error', errors: [`Invalid seat: ${seat}`] };
   }
@@ -421,6 +558,23 @@ function correctSeat({ sessionCode, seat, cards }) {
     return { status: 'error', session: code, errors: [e.message] };
   }
   upload.cards = cards.slice();
+
+  // If all 4 seats are in, a correction may be the fix that lets the hand
+  // complete — re-attempt reconstruction (this is the normal path when the
+  // 4th photo arrived with imperfect detections and players EDIT-fix).
+  if (VALID_SEATS.every(s => session.uploads[s])) {
+    const completion = completeSession(code, session);
+    if (completion.status === 'completed') {
+      return { ...completion, seat, cards: upload.cards };
+    }
+    // Still not reconstructable — the correction itself succeeded; report
+    // what remains wrong so the table knows which seats still need fixes.
+    return {
+      status: 'corrected', session: code, seat, cards: upload.cards,
+      pendingErrors: completion.errors,
+    };
+  }
+
   return { status: 'corrected', session: code, seat, cards: upload.cards };
 }
 
@@ -469,6 +623,10 @@ function newHand(sessionCode) {
     return { status: 'error', session: code, errors };
   }
 
+  // The hand's dealer position: captured BEFORE rotation so the
+  // metadata and rounds log carry the original.
+  const handDealerPos = dealerPos;
+
   ensureStorageDir();
   const zipPath = path.join(STORAGE_DIR, `${url}.zip`);
   const files = [];
@@ -483,6 +641,7 @@ function newHand(sessionCode) {
       session: code,
       url,
       partial: true,
+      dealerPos: handDealerPos,
       createdAt: new Date(session.createdAt).toISOString(),
       archivedAt: new Date().toISOString(),
       seats: Object.fromEntries(filled.map(s => [s, {
@@ -503,7 +662,21 @@ function newHand(sessionCode) {
   }
 
   sessions.delete(code);
-  return { status: 'archived', session: code, url, zipPath, seatsFilled: filled };
+
+  // A partially-captured hand was still PLAYED at the table — log it and
+  // advance the deal like a completed hand.
+  appendRound({
+    ts: Date.now(),
+    kind: 'archived',
+    url,
+    session: code,
+    zipName: path.basename(zipPath),
+    dealerPos: handDealerPos,
+    seats: Object.fromEntries(filled.map(s => [s, session.uploads[s].cards.length])),
+  });
+  dealerPos = (dealerPos + 1) % 4;
+
+  return { status: 'archived', session: code, url, zipPath, seatsFilled: filled, dealerPos: handDealerPos };
 }
 
 module.exports = {
@@ -516,6 +689,11 @@ module.exports = {
   STORAGE_DIR,
   MULTI_SESSION,
   DEFAULT_SESSION_CODE,
+  getDealerPos,
+  setDealerPos,
+  seatForPos,
+  posRoles,
+  getRounds,
   // Exposed for tests
   _sessions: sessions,
   _generateSessionCode: generateSessionCode,

@@ -12,7 +12,7 @@ from typing import Optional
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 # Paths relative to this script
@@ -146,6 +146,12 @@ async def recognize_cards(
         # Read and validate image
         contents = await image.read()
         img = Image.open(io.BytesIO(contents))
+
+        # Apply EXIF orientation: iPhone portrait photos carry a rotation
+        # tag that PIL/Ultralytics do NOT auto-apply — without this the
+        # model sees the hand sideways (measured: 6 detections -> 2 on a
+        # real portrait photo).
+        img = ImageOps.exif_transpose(img)
 
         # Convert to RGB if necessary (handle PNG with alpha, etc.)
         if img.mode != 'RGB':
