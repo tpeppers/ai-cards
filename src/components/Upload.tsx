@@ -94,13 +94,45 @@ const Upload: React.FC = () => {
   const [gmResult, setGmResult] = useState<{
     status?: string; session?: string; detectedCards?: string[];
     seatsFilled?: string[]; seatsMissing?: string[]; url?: string;
-    errors?: string[];
+    errors?: string[]; seatRole?: string; pos?: number | null;
   } | null>(null);
   const [gmLoading, setGmLoading] = useState(false);
   const [gmNewHandLoading, setGmNewHandLoading] = useState(false);
   const [gmHostUrl, setGmHostUrl] = useState<string | null>(null);
   const [showQR, setShowQR] = useState<boolean>(true);
   const [gmWifi, setGmWifi] = useState<{ ssid: string; password: string; qrPayload: string } | null>(null);
+
+  // ── Table position lock ──
+  // Phones are FIXED to a physical table position (P1-P4 = pos 0-3,
+  // clockwise); the dealer ROLE rotates server-side each hand. Scanning a
+  // per-position QR (?pos=1..4) locks this browser to that position
+  // (persisted). A browser with no lock (the laptop) acts as the host
+  // screen: per-position QRs, dealer control, and rounds history.
+  const [gmPos, setGmPos] = useState<number | null>(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('pos');
+      if (q !== null) {
+        const n = parseInt(q, 10);
+        if (Number.isInteger(n) && n >= 1 && n <= 4) {
+          localStorage.setItem('gameModePos', String(n - 1));
+          return n - 1;
+        }
+      }
+      const stored = localStorage.getItem('gameModePos');
+      const n = stored === null ? NaN : parseInt(stored, 10);
+      return Number.isInteger(n) && n >= 0 && n <= 3 ? n : null;
+    } catch {
+      return null;
+    }
+  });
+  const [gmTable, setGmTable] = useState<{
+    dealerPos: number; posRoles: string[];
+    seatsFilled: string[]; seatsMissing: string[];
+  } | null>(null);
+  const [gmRounds, setGmRounds] = useState<Array<{
+    ts: number; kind: string; url: string; dealerPos: number;
+  }>>([]);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Edit/Hand-Creator modal state. editingCards is the seat whose
   // detected cards are being reviewed; when the user ACCEPTs, we POST
@@ -151,6 +183,74 @@ const Upload: React.FC = () => {
       .then(data => setAutoSave(data.autoSaveForRetraining))
       .catch(() => {});
   }, []);
+
+  // Poll table state (dealer position → per-position roles, seat fill)
+  // and, on the host screen, the rounds history. 5s cadence while the
+  // tab is visible; also refreshed immediately after uploads/new-hand.
+  const refreshTable = useCallback(() => {
+    fetch('/api/game-mode/table')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (d && d.success && Array.isArray(d.posRoles)) {
+          setGmTable({
+            dealerPos: d.dealerPos,
+            posRoles: d.posRoles,
+            seatsFilled: d.seatsFilled ?? [],
+            seatsMissing: d.seatsMissing ?? [],
+          });
+        }
+      })
+      .catch(() => {});
+    if (gmPos === null) {
+      fetch('/api/game-mode/rounds')
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (d && d.success && Array.isArray(d.rounds)) setGmRounds(d.rounds);
+        })
+        .catch(() => {});
+    }
+  }, [gmPos]);
+
+  useEffect(() => {
+    if (!gameModeEnabled) return;
+    refreshTable();
+    const id = setInterval(() => {
+      if (!document.hidden) refreshTable();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [gameModeEnabled, refreshTable]);
+
+  const ROLE_LABELS: Record<string, string> = {
+    dealer: 'Dealer', bid1: '1st bidder', bid2: '2nd bidder', bid3: '3rd bidder',
+  };
+  const roleForPos = (p: number): string =>
+    gmTable && gmTable.posRoles[p] ? (ROLE_LABELS[gmTable.posRoles[p]] ?? '…') : '…';
+
+  const handleCopy = (key: string, text: string) => {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setCopiedKey(key);
+        setTimeout(() => setCopiedKey(null), 1500);
+      })
+      .catch(() => {});
+  };
+
+  const handleUnlockPos = () => {
+    localStorage.removeItem('gameModePos');
+    setGmPos(null);
+  };
+
+  const handleSetDealer = (p: number) => {
+    fetch('/api/game-mode/dealer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pos: p }),
+    })
+      .then(r => r.json())
+      .then(() => refreshTable())
+      .catch(() => {});
+  };
 
   const toggleAutoSave = async () => {
     const newValue = !autoSave;
@@ -253,7 +353,13 @@ const Upload: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('image', selectedFile);
-      formData.append('seat', gmSeat);
+      // Position-locked phones send their table position; the server
+      // resolves it to this hand's seat role via the dealer mapping.
+      if (gmPos !== null) {
+        formData.append('pos', String(gmPos));
+      } else {
+        formData.append('seat', gmSeat);
+      }
       if (gmSession.trim()) formData.append('session', gmSession.trim().toUpperCase());
 
       const response = await fetch('/api/game-mode/upload', {
@@ -262,7 +368,7 @@ const Upload: React.FC = () => {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(data.message || data.error || 'Upload failed');
       }
       // If the server generated a session code, persist it so the next
       // uploader (same browser) doesn't have to retype it.
@@ -271,6 +377,7 @@ const Upload: React.FC = () => {
         localStorage.setItem('gameModeSession', data.session);
       }
       setGmResult(data);
+      refreshTable();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Game Mode upload failed');
     } finally {
@@ -315,7 +422,7 @@ const Upload: React.FC = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             session: gmMultiSession ? gmResult.session : undefined,
-            seat: gmSeat,
+            ...(gmPos !== null ? { pos: gmPos } : { seat: gmSeat }),
             cards: newCards,
           }),
         });
@@ -323,7 +430,20 @@ const Upload: React.FC = () => {
         if (!response.ok || data.status === 'error') {
           throw new Error((data.errors && data.errors[0]) || data.error || 'Correction failed');
         }
-        setGmResult({ ...gmResult, detectedCards: newCards });
+        if (data.status === 'completed') {
+          // This correction was the last fix the hand needed — the server
+          // reconstructed and archived it. Show the completed result.
+          setGmResult({ ...data, detectedCards: newCards });
+        } else {
+          setGmResult({
+            ...gmResult,
+            detectedCards: newCards,
+            errors: data.pendingErrors && data.pendingErrors.length > 0
+              ? ['Saved. Still waiting on other seats:', ...data.pendingErrors]
+              : undefined,
+          });
+        }
+        refreshTable();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Correction failed');
         setEditCorrectLoading(false);
@@ -364,6 +484,7 @@ const Upload: React.FC = () => {
       setSelectedFile(null);
       setPreview(null);
       setResult(null);
+      refreshTable();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'New hand failed');
     } finally {
@@ -418,7 +539,29 @@ const Upload: React.FC = () => {
         ACCEPT / CLEAR — Hide my hand before passing the phone
       </button>
 
-      {gameModeEnabled && (gmHostUrl || gmWifi) && (
+      {/* Position banner — this phone is locked to a table position; the
+          role rotates with the dealer automatically each hand. */}
+      {gameModeEnabled && gmPos !== null && (
+        <div className="mb-6 bg-purple-900 border-2 border-purple-500 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-white">
+            📍 You are P{gmPos + 1}
+          </div>
+          <div className="text-lg text-purple-200 mt-1">
+            This hand you are: <span className="font-bold text-yellow-300">{roleForPos(gmPos)}</span>
+          </div>
+          <div className="text-sm text-purple-300 mt-1">
+            Photos in: {gmTable ? `${gmTable.seatsFilled.length}/4` : '…'}
+          </div>
+          <button
+            onClick={handleUnlockPos}
+            className="mt-2 text-xs text-purple-400 hover:text-purple-200 underline"
+          >
+            not P{gmPos + 1}? unlock
+          </button>
+        </div>
+      )}
+
+      {gameModeEnabled && gmPos === null && (gmHostUrl || gmWifi) && (
         <div className="mb-6 bg-white border-2 border-purple-600 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm text-purple-900 font-semibold">
@@ -452,15 +595,51 @@ const Upload: React.FC = () => {
                 </div>
               )}
               {gmHostUrl && (
-                <div className="flex flex-col items-center">
+                <div className="flex-1">
                   <div className="text-xs font-semibold text-purple-800 mb-1">
-                    {gmWifi ? 'Step 2: Open Upload Page' : 'Open Upload Page'}
+                    {gmWifi ? 'Step 2: Scan YOUR seat' : 'Scan YOUR seat'} — positions go clockwise around the table
                   </div>
-                  <div className="bg-white p-2 rounded border border-gray-200">
-                    <QRCodeSVG value={gmHostUrl} size={160} includeMargin={false} />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[0, 1, 2, 3].map(p => {
+                      const posUrl = gmHostUrl + (gmHostUrl.includes('?') ? '&' : '?') + 'pos=' + (p + 1);
+                      return (
+                        <div key={p} className="flex flex-col items-center bg-purple-50 rounded p-2 border border-purple-200">
+                          <div className="text-sm font-bold text-purple-900">P{p + 1}</div>
+                          <div className="text-[11px] text-purple-700 mb-1">{roleForPos(p)} this hand</div>
+                          <div className="bg-white p-1 rounded border border-gray-200">
+                            <QRCodeSVG value={posUrl} size={110} includeMargin={false} />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="text-xs text-gray-700 mt-2 break-all max-w-[200px] text-center">
-                    <code>{gmHostUrl}</code>
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <span className="text-xs font-semibold text-purple-900">Dealer:</span>
+                    {[0, 1, 2, 3].map(p => (
+                      <button
+                        key={p}
+                        onClick={() => handleSetDealer(p)}
+                        className={`text-xs py-1 px-3 rounded font-semibold border ${
+                          gmTable && gmTable.dealerPos === p
+                            ? 'bg-purple-700 text-white border-purple-700'
+                            : 'bg-white text-purple-800 border-purple-300 hover:bg-purple-100'
+                        }`}
+                      >
+                        P{p + 1}
+                      </button>
+                    ))}
+                    <span className="text-[11px] text-gray-500">
+                      set once for the first hand — rotates clockwise automatically
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-2">
+                    Photos in: {gmTable ? `${gmTable.seatsFilled.length}/4` : '…'}
+                    {gmTable && gmTable.seatsFilled.length > 0 && gmTable.seatsMissing.length > 0 && (
+                      <> (waiting on: {gmTable.seatsMissing.map(s => ROLE_LABELS[s] ?? s).join(', ')})</>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-2 break-all">
+                    spectator link: <code>{gmHostUrl}</code>
                   </div>
                 </div>
               )}
@@ -468,9 +647,53 @@ const Upload: React.FC = () => {
           )}
           <div className="text-xs text-gray-500 mt-3">
             {gmWifi
-              ? 'Offline mode: phones join the host\'s ad-hoc WiFi (Step 1), then open the Upload page (Step 2). No internet needed.'
-              : 'Display this on the TV so every player can grab the URL without typing.'}
+              ? 'Offline mode: phones join the host\'s ad-hoc WiFi (Step 1), then each player scans THEIR seat\'s QR (Step 2). No internet needed.'
+              : 'Display this on the TV. Each player scans their own seat\'s QR once — their phone remembers it.'}
           </div>
+        </div>
+      )}
+
+      {/* Rounds history — every completed/archived hand with its deal
+          string, copyable and replayable. Host screen only. */}
+      {gameModeEnabled && gmPos === null && (
+        <div className="mb-6 bg-gray-900 border border-gray-700 rounded-lg p-4">
+          <div className="text-sm font-semibold text-gray-200 mb-2">
+            Rounds history {gmRounds.length > 0 && <span className="text-gray-500">({gmRounds.length})</span>}
+          </div>
+          {gmRounds.length === 0 ? (
+            <div className="text-xs text-gray-500">No hands recorded yet.</div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {gmRounds.slice(0, 20).map((r, i) => (
+                <div key={`${r.ts}-${i}`} className="flex items-center gap-2 text-xs flex-wrap">
+                  <span className="text-gray-400 font-mono">
+                    {new Date(r.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className={`py-0.5 px-2 rounded font-semibold ${
+                    r.kind === 'completed' ? 'bg-green-800 text-green-200' : 'bg-amber-800 text-amber-200'
+                  }`}>
+                    {r.kind === 'completed' ? 'HAND' : 'PARTIAL'}
+                  </span>
+                  <span className="text-gray-400">P{(r.dealerPos ?? 0) + 1} dealt</span>
+                  <code className="text-green-300 font-mono">{r.url.slice(0, 12)}…</code>
+                  <button
+                    onClick={() => handleCopy(`round-${i}`, r.url)}
+                    className="bg-gray-700 hover:bg-gray-600 text-white py-0.5 px-2 rounded"
+                  >
+                    {copiedKey === `round-${i}` ? 'Copied!' : 'Copy'}
+                  </button>
+                  <a
+                    href={`/bidwhist#${r.url}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-blue-800 hover:bg-blue-700 text-white py-0.5 px-2 rounded"
+                  >
+                    Replay ▶
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -566,19 +789,26 @@ const Upload: React.FC = () => {
                 <div className="bg-purple-900/30 border border-purple-700 p-3 rounded mb-3 space-y-2">
                   <div className="text-sm font-semibold text-purple-200">Game Mode upload</div>
                   <div className={gmMultiSession ? 'grid grid-cols-2 gap-2' : ''}>
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1">Seat</label>
-                      <select
-                        value={gmSeat}
-                        onChange={e => setGmSeat(e.target.value)}
-                        className="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm"
-                      >
-                        <option value="dealer">Dealer</option>
-                        <option value="bid1">1st bidder</option>
-                        <option value="bid2">2nd bidder</option>
-                        <option value="bid3">3rd bidder</option>
-                      </select>
-                    </div>
+                    {gmPos !== null ? (
+                      <div className="text-sm text-purple-200">
+                        Uploading as <span className="font-bold">P{gmPos + 1}</span>
+                        {' '}({roleForPos(gmPos)} this hand)
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Seat</label>
+                        <select
+                          value={gmSeat}
+                          onChange={e => setGmSeat(e.target.value)}
+                          className="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm"
+                        >
+                          <option value="dealer">Dealer</option>
+                          <option value="bid1">1st bidder</option>
+                          <option value="bid2">2nd bidder</option>
+                          <option value="bid3">3rd bidder</option>
+                        </select>
+                      </div>
+                    )}
                     {gmMultiSession && (
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Session code (blank → new)</label>
@@ -634,6 +864,12 @@ const Upload: React.FC = () => {
                   </div>
                   {gmResult.status === 'accepted' && (
                     <>
+                      {gmResult.seatRole && (
+                        <div className="text-sm text-purple-200 mb-1">
+                          Recorded as: <span className="font-semibold">{ROLE_LABELS[gmResult.seatRole] ?? gmResult.seatRole}</span>
+                          {gmResult.pos !== null && gmResult.pos !== undefined && <> (P{gmResult.pos + 1})</>}
+                        </div>
+                      )}
                       <div className="text-sm text-gray-400">
                         Seats filled: {(gmResult.seatsFilled ?? []).join(', ') || '(none)'}
                       </div>
@@ -652,8 +888,24 @@ const Upload: React.FC = () => {
                       <div className="font-mono text-xs text-green-300 break-all bg-gray-900 p-2 rounded">
                         {gmResult.url}
                       </div>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => handleCopy('gm-url', gmResult.url!)}
+                          className="text-xs bg-gray-700 hover:bg-gray-600 text-white py-1 px-3 rounded"
+                        >
+                          {copiedKey === 'gm-url' ? 'Copied!' : 'Copy'}
+                        </button>
+                        <a
+                          href={`/bidwhist#${gmResult.url}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs bg-blue-800 hover:bg-blue-700 text-white py-1 px-3 rounded"
+                        >
+                          Replay ▶
+                        </a>
+                      </div>
                       <div className="text-xs text-gray-500 mt-2">
-                        Zip archived server-side at the reconstructed URL's filename.
+                        Photos + hand string archived server-side (zip named after the deck URL).
                       </div>
                     </>
                   )}
@@ -678,7 +930,8 @@ const Upload: React.FC = () => {
                       {' '}{gmResult.detectedCards.join(', ')}
                     </div>
                   )}
-                  {gmResult.status === 'accepted' && (gmResult.detectedCards?.length ?? 0) > 0 && (
+                  {(gmResult.status === 'accepted' || gmResult.status === 'error' || gmResult.status === 'corrected') &&
+                    (gmResult.detectedCards?.length ?? 0) > 0 && (
                     <button
                       onClick={handleOpenEditor}
                       disabled={editCorrectLoading}
