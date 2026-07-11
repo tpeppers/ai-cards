@@ -90,6 +90,8 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const [previewTrump, setPreviewTrump] = useState<{ suit: string; direction: string } | null>(null);
   const [showAllCards, setShowAllCards] = useState(false);
   const [whistingAnimation, setWhistingAnimation] = useState<string | null>(null);
+  // Once-per-game latch for the whisting celebration (see handleGameStateChange).
+  const whistingCelebratedRef = useRef(false);
 
   // Strategy configuration state
   const familyStrategyText = STRATEGY_REGISTRY.find(s => s.game === 'bidwhist' && s.name === 'Family')?.text || null;
@@ -467,9 +469,17 @@ Card Rankings:
     // Update both states together to keep them in sync
     const newBiddingState = game.getBiddingState();
 
-    // Detect whisting game-over: show animation before game-over dialog
+    // Detect whisting game-over: show ONE random animation, ONCE per game.
+    // The latch is a ref (not the whistingAnimation state) because the
+    // overlay clears itself after 5s while game-over state changes keep
+    // arriving — guarding on the state re-fired a new random animation
+    // every cycle, looping through the whole collection.
+    if (!newState.gameOver) {
+      whistingCelebratedRef.current = false; // new game re-arms the celebration
+    }
     const animSetting = localStorage.getItem('whistingAnimation') || 'enabled';
-    if (newState.gameOver && game.getWhistingWinner() >= 0 && !whistingAnimation && animSetting !== 'disabled') {
+    if (newState.gameOver && game.getWhistingWinner() >= 0 && !whistingCelebratedRef.current && animSetting !== 'disabled') {
+      whistingCelebratedRef.current = true;
       const anim = WHISTING_ANIMATIONS[Math.floor(Math.random() * WHISTING_ANIMATIONS.length)];
       setWhistingAnimation(anim);
       const soundEnabled = (localStorage.getItem('whistingSound') || 'enabled') !== 'disabled';
@@ -483,7 +493,7 @@ Card Rankings:
 
     setGameState(newState);
     setBiddingState(newBiddingState);
-  }, [game, whistingAnimation]);
+  }, [game]);
 
   // Strategy name helper
   const strategyNameFromText = (text: string | null): string => {
