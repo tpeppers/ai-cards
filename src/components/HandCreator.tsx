@@ -75,16 +75,29 @@ const CardImage: React.FC<{ suit: string; rank: number; className?: string }> = 
 interface HandCreatorProps {
   /** Preload these cards when mounting (used by the Upload-page EDIT flow). */
   initialCards?: Card[];
+  /** Explicit edit target. Defaults to 12 so existing upload corrections keep
+   * their current behavior; Four-Snap Table passes 16 for its one kitty hand. */
+  initialHandSize?: number;
+  /** Optional heading for an embedded edit flow. */
+  title?: string;
   /** When provided, renders a compact 1-shot edit view with ACCEPT/CANCEL
    *  buttons. Omits the stored-hands, disk-import/export, and clipboard UI. */
   onAccept?: (cards: Card[]) => void;
   onCancel?: () => void;
 }
 
-const HandCreator: React.FC<HandCreatorProps> = ({ initialCards, onAccept, onCancel }) => {
+const HandCreator: React.FC<HandCreatorProps> = ({
+  initialCards,
+  initialHandSize,
+  title,
+  onAccept,
+  onCancel,
+}) => {
   const editMode = typeof onAccept === 'function';
   const [selectedCards, setSelectedCards] = useState<Card[]>(initialCards ?? []);
-  const [handSize, setHandSize] = useState<number>(12);
+  const [handSize, setHandSize] = useState<number>(
+    Math.max(1, Math.min(16, initialHandSize ?? 12)),
+  );
   const [storedHands, setStoredHands] = useState<string[]>([]);
   const [selectedStoredHand, setSelectedStoredHand] = useState<string>('');
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -383,7 +396,7 @@ const HandCreator: React.FC<HandCreatorProps> = ({ initialCards, onAccept, onCan
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-6 text-center">
-        {editMode ? 'Edit Detected Hand' : 'Hand Creator'}
+        {title ?? (editMode ? 'Edit Detected Hand' : 'Hand Creator')}
       </h1>
 
       <div className="mb-6">
@@ -418,7 +431,8 @@ const HandCreator: React.FC<HandCreatorProps> = ({ initialCards, onAccept, onCan
             max="16"
             value={handSize}
             onChange={(e) => handleHandSizeChange(Number(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+            disabled={initialHandSize !== undefined}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 slider"
           />
           <div className="flex justify-between text-sm text-gray-600 mt-1">
             <span>1</span>

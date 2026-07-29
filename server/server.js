@@ -15,6 +15,7 @@ const labelStudio = require('./labelStudio');
 const { initMultiplayer } = require('./multiplayer');
 const gameMode = require('./gameMode');
 const { normalizeMlCards } = require('./mlCards');
+const { aggregateBurst, composeFourSnapDeck } = require('./fourSnap');
 
 // ML service configuration
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:3002';
@@ -225,6 +226,105 @@ app.post('/api/hands', (req, res) => {
     console.error('Error saving hands:', error);
     res.status(500).json({ error: 'Failed to save hands' });
   }
+});
+
+// ── 4-Snap Table ─────────────────────────────────────────────────────
+// A shutter press can send several nearby camera frames. The ML service
+// evaluates them in one batch; the pure aggregator favors cards that are
+// stable across frames and returns a 12- or 16-card capture candidate.
+app.post('/api/four-snap/detect', upload.array('images', 7), async (req, res) => {
+  const startedAt = Date.now();
+  const tempImagePaths = [];
+
+  try {
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Provide at least one image using the images form field',
+      });
+    }
+
+    const formData = new FormData();
+    for (const file of files) {
+      const imagePath = path.join(uploadDir, file.filename);
+      tempImagePaths.push(imagePath);
+      const imageBuffer = fs.readFileSync(imagePath);
+      formData.append(
+        'images',
+        new Blob([imageBuffer], { type: file.mimetype || 'image/jpeg' }),
+        file.originalname || 'frame.jpg',
+      );
+    }
+
+    const parsedConfidence = Number.parseFloat(req.query.confidence);
+    const confidence = Number.isFinite(parsedConfidence) ? parsedConfidence : 0.35;
+    const mlResponse = await fetch(
+      `${ML_SERVICE_URL}/recognize-burst?confidence=${confidence}`,
+      { method: 'POST', body: formData },
+    );
+
+    if (!mlResponse.ok) {
+      const details = await mlResponse.text();
+      return res.status(mlResponse.status).json({
+        success: false,
+        error: `ML service error: ${mlResponse.statusText}`,
+        details,
+      });
+    }
+
+    const mlResult = await mlResponse.json();
+    const aggregation = aggregateBurst(
+      mlResult.frames,
+      req.body && req.body.expectedCount,
+    );
+
+    return res.json({
+      success: true,
+      ...aggregation,
+      processingTimeMs: mlResult.processingTimeMs,
+      totalProcessingTimeMs: Date.now() - startedAt,
+    });
+  } catch (error) {
+    if (
+      error
+      && (error.code === 'ECONNREFUSED' || (error.cause && error.cause.code === 'ECONNREFUSED'))
+    ) {
+      return res.status(503).json({
+        success: false,
+        error: 'ML service unavailable',
+        message: 'Start the ML inference server with: npm run ml:server',
+      });
+    }
+    if (error && /expectedCount must be/.test(error.message)) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    return res.status(500).json({
+      success: false,
+      error: 'Four-snap detection failed',
+      message: error && error.message ? error.message : String(error),
+    });
+  } finally {
+    for (const imagePath of tempImagePaths) {
+      fs.unlink(imagePath, () => {});
+    }
+  }
+});
+
+// Compose four reviewed 12-card snaps into the hand creator's 52-character
+// alpha representation. An explicit four-card kitty produces a complete
+// pangram; otherwise the final four positions remain "____".
+app.post('/api/four-snap/complete', (req, res) => {
+  const { snaps, kittyCards } = req.body || {};
+  const result = composeFourSnapDeck(snaps, kittyCards);
+  if (!result.url) {
+    return res.status(400).json({
+      success: false,
+      url: null,
+      errors: result.errors,
+    });
+  }
+  return res.json({ success: true, ...result });
 });
 
 // ── Game Mode upload ─────────────────────────────────────────────────

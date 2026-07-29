@@ -90,6 +90,30 @@ a seat from a menu.
 button — archives whatever was captured (missing seats become `_`) and
 resets for the next deal.
 
+## One-phone option: 4-SNAP TABLE
+
+The Upload page also has a large **4-SNAP TABLE** button for passing one
+phone around instead of using four position-locked phones:
+
+1. Start with the dealer, spread the hand, and tap **SNAP THIS HAND**.
+   On a secure page the browser captures three nearby video frames and
+   combines the most stable YOLO detections. On plain LAN HTTP, use the
+   native **TAKE SNAP WITH PHONE CAMERA** fallback.
+2. Review the found/expected percentage. Retake or use **EDIT CARDS** until
+   the hand has exactly 12 unique cards, then tap **ACCEPT & HIDE**.
+3. Pass the blacked-out phone clockwise and repeat for all four players.
+   Duplicate cards across snaps are blocked before the table can complete.
+4. A 16-card spread is treated as one 12-card hand plus the four-card kitty;
+   tap the four kitty cards during review. With no kitty capture, the final
+   deal is the standard 48 known letters plus `____`.
+5. After the fourth accepted snap, the privacy screen waits for the phone's
+   physical lock button and opens the completed `/bidwhist#...` hand while
+   the screen is hidden. **PLAY NOW** is the manual fallback.
+
+Browsers cannot lock a phone themselves. Live in-page video also requires
+HTTPS (or localhost), so the native camera fallback is intentional for
+`http://<LAN-IP>:3001` table-night links.
+
 ## What you get out of it
 
 - **Hand strings**: every completed hand appears in Rounds history with a

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 // eslint-disable-next-line import/no-useless-path-segments
 import HandCreator from './HandCreator.tsx';
+import FourSnapTable from './FourSnapTable.tsx';
 import { Card } from '../types/CardGame';
 
 interface DetectionResult {
@@ -76,6 +77,7 @@ const Upload: React.FC = () => {
   const [isReporting, setIsReporting] = useState(false);
   const [labelStudioUrl, setLabelStudioUrl] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [showFourSnapTable, setShowFourSnapTable] = useState(false);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [autoSave, setAutoSave] = useState(true);
@@ -528,6 +530,17 @@ const Upload: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-4">Card Detection</h1>
+
+      <button
+        type="button"
+        onClick={() => setShowFourSnapTable(true)}
+        className="w-full bg-violet-700 hover:bg-violet-600 text-white font-black py-5 px-6 rounded-2xl mb-6 text-2xl sm:text-3xl shadow-lg active:scale-[0.99] transition"
+      >
+        4-SNAP TABLE
+        <span className="block mt-1 text-sm sm:text-base font-semibold text-violet-200">
+          Pass one phone · capture four hands · open the table
+        </span>
+      </button>
 
       {/* Big green pass-the-phone reset — clears the preview, detection
           result, and any game-mode result so nothing about the previous
@@ -1050,6 +1063,10 @@ const Upload: React.FC = () => {
             />
           </div>
         </div>
+      )}
+
+      {showFourSnapTable && (
+        <FourSnapTable onClose={() => setShowFourSnapTable(false)} />
       )}
     </div>
   );
