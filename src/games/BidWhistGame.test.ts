@@ -307,6 +307,93 @@ describe('BidWhistGame card values and direction reset', () => {
   });
 });
 
+describe('Directional hand organization', () => {
+  const TEST_URL = 'oVKtOPzUAJYMDWsTNFIGbqcSaifXEkHQnLuRplryChmwBdvxjZge';
+
+  afterEach(() => {
+    localStorage.removeItem('directionalHandSort');
+  });
+
+  function dealtGame(): BidWhistGame {
+    const game = new BidWhistGame();
+    game.dealCards(TEST_URL);
+    let state = game.getGameState();
+    while (state.gameStage === 'bidding') {
+      if (state.currentPlayer === 0) {
+        game.placeBid(0, 6);
+      } else {
+        game.processAIBid(state.currentPlayer!);
+      }
+      state = game.getGameState();
+    }
+    return game;
+  }
+
+  /** Ranks of one suit, in the order they appear in the hand. */
+  function suitRanks(game: BidWhistGame, suit: string): number[] {
+    return game.getGameState().players[0].hand
+      .filter(c => c.suit === suit)
+      .map(c => c.rank);
+  }
+
+  /** Every suit reads strongest-first for the direction in play. */
+  function expectStrongestFirst(game: BidWhistGame) {
+    const hand = game.getGameState().players[0].hand;
+    for (let i = 1; i < hand.length; i++) {
+      if (hand[i].suit !== hand[i - 1].suit) continue;
+      expect(game.getCardValue(hand[i - 1])).toBeGreaterThan(game.getCardValue(hand[i]));
+    }
+  }
+
+  test('uptown hands read A K Q ... 2 within a suit', () => {
+    const game = dealtGame();
+    expect(game.setTrumpSuitForPlayer('clubs', 'uptown', false)).toBe(true);
+    expectStrongestFirst(game);
+  });
+
+  test('downtown hands reorganize so the ace and deuce lead the suit', () => {
+    const game = dealtGame();
+    expect(game.setTrumpSuitForPlayer('clubs', 'downtown', false)).toBe(true);
+    expectStrongestFirst(game);
+    // The King is the worst card downtown, so it can never lead its suit.
+    for (const suit of ['spades', 'hearts', 'clubs', 'diamonds']) {
+      const ranks = suitRanks(game, suit);
+      if (ranks.length > 1) expect(ranks[0]).not.toBe(13);
+    }
+  });
+
+  test('downtown-noaces hands push the ace to the back of its suit', () => {
+    const game = dealtGame();
+    expect(game.setTrumpSuitForPlayer('clubs', 'downtown-noaces', false)).toBe(true);
+    expectStrongestFirst(game);
+    for (const suit of ['spades', 'hearts', 'clubs', 'diamonds']) {
+      const ranks = suitRanks(game, suit);
+      if (ranks.includes(1) && ranks.length > 1) expect(ranks[ranks.length - 1]).toBe(1);
+    }
+  });
+
+  test('with the setting off, a downtown hand still reads uptown', () => {
+    localStorage.setItem('directionalHandSort', 'off');
+    const game = dealtGame();
+    expect(game.setTrumpSuitForPlayer('clubs', 'downtown', false)).toBe(true);
+    const hand = game.getGameState().players[0].hand;
+    for (let i = 1; i < hand.length; i++) {
+      if (hand[i].suit !== hand[i - 1].suit) continue;
+      const uptownValue = (rank: number) => (rank === 1 ? 14 : rank);
+      expect(uptownValue(hand[i - 1].rank)).toBeGreaterThan(uptownValue(hand[i].rank));
+    }
+  });
+
+  test('resortHands re-applies the preference mid-hand', () => {
+    localStorage.setItem('directionalHandSort', 'off');
+    const game = dealtGame();
+    expect(game.setTrumpSuitForPlayer('clubs', 'downtown', false)).toBe(true);
+    localStorage.setItem('directionalHandSort', 'on');
+    game.resortHands();
+    expectStrongestFirst(game);
+  });
+});
+
 describe('Game Mode faithful-replay anchoring', () => {
   test('with dealer at index 0, the tagged 1st bidder (index 3) bids first', () => {
     // Mirror server/deckReconstruct.js's convention: dealer→0 (hearts),

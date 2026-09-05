@@ -5,6 +5,7 @@ import {
   getDeviationAlertMode, setDeviationAlertMode, DeviationAlertMode,
   exportJournal, clearJournal, journalSize,
 } from '../utils/deviationJournal.ts';
+import { getDirectionalHandSort, setDirectionalHandSort } from '../utils/gameSettings.ts';
 
 const DEFAULT_SUIT_COLORS: { [key: string]: string } = {
   spades: '#000000',
@@ -40,6 +41,12 @@ const SettingsPage: React.FC = () => {
   const [gameModeEnabled, setGameModeEnabled] = useState<boolean>(() =>
     localStorage.getItem('gameModeEnabled') === '1'
   );
+  const [directionalSort, setDirectionalSort] = useState<boolean>(() => getDirectionalHandSort());
+
+  const handleDirectionalSortChange = (enabled: boolean) => {
+    setDirectionalSort(enabled);
+    setDirectionalHandSort(enabled);
+  };
 
   const handleBackingChange = (id: string) => {
     setSelectedBacking(id);
@@ -116,6 +123,31 @@ const SettingsPage: React.FC = () => {
     >
       <div className="max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">Settings</h1>
+
+        {/* Hand Organization */}
+        <section className="mb-10">
+          <h2 className="text-xl font-semibold mb-4 border-b border-gray-600 pb-2">Hand Organization</h2>
+          <label className="flex items-start gap-3 p-3 rounded-lg bg-gray-800 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={directionalSort}
+              onChange={e => handleDirectionalSortChange(e.target.checked)}
+              className="mt-1"
+            />
+            <div>
+              <div className="font-medium">Organize hand for high vs low</div>
+              <div className="text-sm text-gray-400">
+                Sorts each suit strongest-first for the direction that was called, so the boss
+                cards always sit at the left edge of their suit — uptown A K Q J&nbsp;… 2,
+                downtown A 2 3&nbsp;… K, downtown-no-aces 2 3&nbsp;… K A. Turn this off to read
+                every hand uptown regardless of the contract.
+              </div>
+            </div>
+          </label>
+          <p className="text-xs text-gray-500 mt-2">
+            Also available mid-game from the ⚙ button in the bottom-left corner of the Bid Whist table.
+          </p>
+        </section>
 
         {/* Card Backing */}
         <section className="mb-10">

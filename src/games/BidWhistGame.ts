@@ -2,6 +2,7 @@ import { CardGame, Card } from '../types/CardGame.ts';
 import { cardToLetter, letterToCard } from '../urlGameState.js';
 import { evaluatePlay, evaluateBid, evaluateTrump, evaluateDiscard } from '../strategy/evaluator.ts';
 import { buildBidWhistContext } from '../strategy/context.ts';
+import { getDirectionalHandSort } from '../utils/gameSettings.ts';
 
 type BidDirection = 'uptown' | 'downtown' | 'downtown-noaces';
 
@@ -139,19 +140,29 @@ export class BidWhistGame extends CardGame {
   }
 
   private sortHand(hand: Card[]): void {
+    const suitOrder: { [key: string]: number } = { spades: 1, hearts: 2, clubs: 3, diamonds: 4 };
+    // With the "organize for high vs low" preference off, every hand reads
+    // uptown no matter what was called; with it on (the default) the ranking
+    // follows the contract, so the boss cards always sit at the left edge of
+    // their suit whether the table is playing high or low.
+    const direction: BidDirection = getDirectionalHandSort() ? this.bidDirection : 'uptown';
+
     hand.sort((a, b) => {
-      const suitOrder: { [key: string]: number } = { spades: 1, hearts: 2, clubs: 3, diamonds: 4 };
       if (suitOrder[a.suit] !== suitOrder[b.suit]) {
         return suitOrder[a.suit] - suitOrder[b.suit];
       }
-
-      if (this.bidDirection === 'downtown') {
-        const rankA = a.rank === 1 ? 14 : a.rank;
-        const rankB = b.rank === 1 ? 14 : b.rank;
-        return rankA - rankB;
-      }
-      return a.rank - b.rank;
+      // Strongest first within a suit.
+      return this.getCardValue(b, direction) - this.getCardValue(a, direction);
     });
+  }
+
+  /**
+   * Re-apply the hand sort to every seat. Called when the player flips the
+   * high/low organization preference mid-hand so the change is visible
+   * immediately instead of at the next deal.
+   */
+  resortHands(): void {
+    this.players.forEach(player => this.sortHand(player.hand));
   }
 
   // Check if it's dealer's turn (4th bid)
@@ -713,13 +724,15 @@ export class BidWhistGame extends CardGame {
     );
   }
 
-  getCardValue(card: Card): number {
+  getCardValue(card: Card, direction: BidDirection = this.bidDirection): number {
     // Uptown: A K Q J 10 9 8 7 6 5 4 3 2 (A highest)
     // Downtown: A 2 3 4 5 6 7 8 9 10 J Q K (A still high, 2 is best)
     // Downtown No Aces: 2 3 4 5 6 7 8 9 10 J Q K A (2 is best, A is worst)
-    if (this.bidDirection === 'uptown') {
+    // `direction` defaults to the live contract; the hand sort passes an
+    // explicit one so display order can be decoupled from play order.
+    if (direction === 'uptown') {
       return card.rank === 1 ? 14 : card.rank;
-    } else if (this.bidDirection === 'downtown') {
+    } else if (direction === 'downtown') {
       return card.rank === 1 ? 14 : (14 - card.rank);
     } else {
       // downtown-noaces: Ace is worst. Must be 0, not 1 — the King is

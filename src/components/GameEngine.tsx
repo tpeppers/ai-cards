@@ -431,9 +431,10 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
         </button>
       </div>
 
-      {/* Score display */}
+      {/* Score display — z-40 so the side players' decorative card backs, which
+          carry their own stacking order, can't paint over it on narrow screens */}
       <div
-        className={`absolute bg-white bg-opacity-90 rounded border border-gray-400 shadow-md ${
+        className={`absolute z-40 bg-white bg-opacity-90 rounded border border-gray-400 shadow-md ${
           isCompact ? 'top-8 left-1 p-1 text-xs' : 'top-28 left-[140px] p-2'
         }`}
       >

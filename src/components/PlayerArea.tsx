@@ -16,7 +16,7 @@ interface PlayerAreaProps {
 
 // Player area component
 const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard, showAllCards, previewCardId = null, displayName, subtitle }) => {
-  const { width, height, scale, cardWidth, cardHeight, isCompact } = useResponsiveLayout();
+  const { width, height, scale, cardWidth, cardHeight, isCompact, handTopOffset } = useResponsiveLayout();
 
   // Scaled layout constants
   const humanFanSpacing = 30 * scale;
@@ -26,18 +26,29 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
   const eastEdgeX = width - 100 * scale;
   const sideTopY = 120 * scale;
   const topY = 70 * scale;
-  const bottomY = height - 140 * scale;
-  const humanHandMargin = 80 * scale;
+  const bottomY = height - handTopOffset;
+  // Compact keeps a wider side margin than the plain scaled value so the fan
+  // clears the corner affordances (journal gear / challenge button) that live
+  // in the bottom-left of the play area.
+  const humanHandMargin = isCompact ? Math.max(80 * scale, 96) : 80 * scale;
 
   // Create the fan-shaped layout for cards similar to classic Microsoft Hearts
   const getPositionStyle = (index: number, cardId?: string) => {
     const isPreview = !!(previewCardId && cardId === previewCardId);
 
     if (isHuman) {
-      // Bottom player (human) - fan out cards, pull UP toward center
-      const totalWidth = Math.min(width - humanHandMargin, player.hand.length * humanFanSpacing);
-      const spacing = totalWidth / Math.max(player.hand.length - 1, 1);
-      const startX = (width - totalWidth) / 2;
+      // Bottom player (human) - fan out cards, pull UP toward center.
+      // The fan is laid out from the space actually available (viewport minus
+      // margins minus one full card, since `x` is the card's left edge), so a
+      // narrow phone spreads the cards out instead of clumping them into an
+      // untappable stack in the middle of an otherwise empty row.
+      const available = Math.max(cardWidth, width - humanHandMargin - cardWidth);
+      const maxSpacing = available / Math.max(player.hand.length - 1, 1);
+      // Compact screens spend the whole row; larger ones keep the classic fan.
+      const preferredSpacing = isCompact ? cardWidth * 0.8 : humanFanSpacing;
+      const spacing = Math.min(maxSpacing, preferredSpacing);
+      const span = spacing * Math.max(player.hand.length - 1, 0);
+      const startX = (width - span - cardWidth) / 2;
 
       return {
         x: startX + index * spacing,

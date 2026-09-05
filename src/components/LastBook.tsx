@@ -31,13 +31,20 @@ const getRankDisplay = (rank: number): string => {
 };
 
 const LastBook: React.FC<LastBookProps> = ({ lastBook, playerNames, dragOffset, onDragStart, onTouchDragStart }) => {
-  const { isCompact } = useResponsiveLayout();
+  const { isCompact, chromeBottom } = useResponsiveLayout();
   return (
     <div
-      className={`absolute bg-white bg-opacity-90 rounded border border-gray-400 shadow-md z-10 ${
-        isCompact ? 'bottom-1 right-1 p-1 w-28' : 'bottom-4 right-4 p-3 w-48'
+      className={`absolute bg-white bg-opacity-90 rounded border border-gray-400 shadow-md z-40 ${
+        isCompact ? 'right-1 p-1 w-28' : 'bottom-4 right-4 p-3 w-48'
       }`}
-      style={dragOffset ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined}
+      style={{
+        // On phones the panel is parked just above the human's fan rather than
+        // in the corner, where it used to sit on top of the player's own cards.
+        // Landing on the side players' card backs is fine — z-40 keeps it above
+        // them (cards top out around z-16), and those backs are decorative.
+        ...(isCompact ? { bottom: `${chromeBottom}px` } : null),
+        ...(dragOffset ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : null),
+      }}
     >
       <div
         className={`font-bold border-b border-gray-400 mb-1 pb-1 ${isCompact ? 'text-[10px]' : 'text-sm'}`}

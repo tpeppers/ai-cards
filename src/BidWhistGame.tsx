@@ -5,6 +5,7 @@ import BiddingOverlay from './components/BiddingOverlay.tsx';
 import TrumpSelectionOverlay from './components/TrumpSelectionOverlay.tsx';
 import DiscardOverlay from './components/DiscardOverlay.tsx';
 import LastBook from './components/LastBook.tsx';
+import BottomDock from './components/BottomDock.tsx';
 import StrategyConfigModal from './components/StrategyConfigModal.tsx';
 import { BidWhistGame } from './games/BidWhistGame.ts';
 import { GameState } from './types/CardGame.ts';
@@ -532,13 +533,14 @@ Card Rankings:
   return (
     <div ref={rootRef} className="relative w-full h-full">
       <DeviationAlert />
-      {/* Journal settings trigger — small gear icon in the bottom-left
-          corner so it doesn't collide with the top menu bar or the
-          cards at the bottom. Absolute-positioned on the game root,
-          so it's present in both the main app and the standalone. */}
+      {/* Settings trigger — small gear icon in the bottom-left corner so it
+          doesn't collide with the top menu bar or the cards at the bottom
+          (PlayerArea keeps the compact fan clear of this corner strip).
+          Absolute-positioned on the game root, so it's present in both the
+          main app and the standalone. */}
       <button
         onClick={() => setShowJournalPanel(true)}
-        title="Strategy journal & deviation alerts"
+        title="Settings — hand organization, strategy journal"
         style={{
           position: 'absolute', bottom: 8, left: 8, zIndex: 50,
           background: 'rgba(17,24,39,0.7)',
@@ -554,7 +556,15 @@ Card Rankings:
         ⚙
       </button>
       {showJournalPanel && (
-        <JournalSettingsPanel onClose={() => setShowJournalPanel(false)} />
+        <JournalSettingsPanel
+          onClose={() => setShowJournalPanel(false)}
+          onHandSortChange={() => {
+            // Re-sort in place so flipping the preference mid-hand is visible
+            // immediately rather than at the next deal.
+            game.resortHands();
+            setRefreshKey(prev => prev + 1);
+          }}
+        />
       )}
       {/* Challenge Mode banner strip — sits just below the menu bar */}
       {challengeMode && (
@@ -569,13 +579,14 @@ Card Rankings:
           🏆 Challenge Mode — everyone plays {BIDWHIST_CURRENT_BEST.name}. Beat the machine's own line on a deal to flag it.
         </div>
       )}
-      {/* Challenge records toggle — bottom-left, next to the journal gear */}
+      {/* Challenge records toggle — bottom-left, stacked above the journal gear
+          so both stay inside the narrow corner strip the card fan leaves free */}
       {challengeMode && (
         <button
           onClick={() => setShowChallengePanel(prev => !prev)}
           title="Challenge records"
           style={{
-            position: 'absolute', bottom: 8, left: 48, zIndex: 50,
+            position: 'absolute', bottom: 48, left: 8, zIndex: 50,
             background: 'rgba(17,24,39,0.7)',
             color: '#fbbf24',
             border: '1px solid #374151',
@@ -593,7 +604,7 @@ Card Rankings:
       {challengeMode && showChallengePanel && (
         <div
           style={{
-            position: 'absolute', bottom: 48, left: 8, zIndex: 55,
+            position: 'absolute', bottom: 88, left: 8, zIndex: 55,
             width: 400, maxWidth: 'calc(100% - 16px)', maxHeight: '60%', overflowY: 'auto',
             background: '#162b1e', border: '1px solid #2f5d3f', borderRadius: 8,
             padding: 12, color: '#e5e7eb', fontSize: 12,
@@ -760,33 +771,35 @@ Card Rankings:
         />
       )}
 
-      {/* Books indicator */}
+      {/* Books indicator — bottom-left on phones, parked above the human's fan */}
       {gameState.gameStage === 'play' && (() => {
         const books = game.getBooksWon();
         return (
-          <div
-            className={`absolute bg-white bg-opacity-90 rounded border border-gray-400 shadow-md z-10 ${
-              isCompact ? 'bottom-1 left-1 p-1 text-[10px]' : 'top-8 right-4 p-2'
-            }`}
-            style={{ transform: `translate(${booksDrag.position.x}px, ${booksDrag.position.y}px)` }}
-          >
+          <BottomDock compactSide="left" wideClassName="top-8 right-4">
             <div
-              className={`font-bold border-b border-gray-400 mb-1 pb-1 ${isCompact ? 'text-[10px]' : 'text-sm'}`}
-              style={{ cursor: 'grab' }}
-              onMouseDown={booksDrag.handleMouseDown}
-              onTouchStart={booksDrag.handleTouchStart}
+              className={`bg-white bg-opacity-90 rounded border border-gray-400 shadow-md ${
+                isCompact ? 'p-1 text-[10px]' : 'p-2'
+              }`}
+              style={{ transform: `translate(${booksDrag.position.x}px, ${booksDrag.position.y}px)` }}
             >
-              Books
+              <div
+                className={`font-bold border-b border-gray-400 mb-1 pb-1 ${isCompact ? 'text-[10px]' : 'text-sm'}`}
+                style={{ cursor: 'grab' }}
+                onMouseDown={booksDrag.handleMouseDown}
+                onTouchStart={booksDrag.handleTouchStart}
+              >
+                Books
+              </div>
+              <div className={`flex justify-between ${isCompact ? 'text-[10px]' : 'text-xs'}`}>
+                <span>S/N:</span>
+                <span className="ml-3 font-bold">{books[0]}</span>
+              </div>
+              <div className={`flex justify-between ${isCompact ? 'text-[10px]' : 'text-xs'}`}>
+                <span>E/W:</span>
+                <span className="ml-3 font-bold">{books[1]}</span>
+              </div>
             </div>
-            <div className={`flex justify-between ${isCompact ? 'text-[10px]' : 'text-xs'}`}>
-              <span>S/N:</span>
-              <span className="ml-3 font-bold">{books[0]}</span>
-            </div>
-            <div className={`flex justify-between ${isCompact ? 'text-[10px]' : 'text-xs'}`}>
-              <span>E/W:</span>
-              <span className="ml-3 font-bold">{books[1]}</span>
-            </div>
-          </div>
+          </BottomDock>
         );
       })()}
 
@@ -855,9 +868,11 @@ Card Rankings:
         />
       )}
 
-      {/* Auto Play button (z-60 to float above overlays) */}
+      {/* Auto Play button (z-60 to float above overlays). On phones it takes the
+          bottom-center slot above the fan — the bottom-right corner is the Last
+          Book panel's, and the two used to sit on top of each other. */}
       {showAutoPlay && (
-        <div className={`absolute z-[60] ${isCompact ? 'bottom-1 right-1' : 'top-10 right-4'}`}>
+        <BottomDock compactSide="center" wideClassName="top-10 right-4" zIndexClass="z-[60]" className="text-center">
           <button
             className={`bg-green-600 text-white rounded hover:bg-green-700 ${isCompact ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm'}`}
             onClick={handleAutoPlay}
@@ -869,7 +884,7 @@ Card Rankings:
           <div className={`text-gray-300 mt-0.5 truncate ${isCompact ? 'text-[9px] max-w-[100px]' : 'text-xs max-w-[140px]'}`}>
             {player0StrategyName}
           </div>
-        </div>
+        </BottomDock>
       )}
 
       {/* Strategy Configuration Modal */}

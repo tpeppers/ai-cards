@@ -10,6 +10,13 @@ const COMPACT_WIDTH_BREAKPOINT = 700;
 // Any viewport shorter than this triggers compact mode too, so landscape
 // phones (wide but short) get the corner-anchored chrome.
 const COMPACT_HEIGHT_BREAKPOINT = 500;
+// Distance (in reference units) from the bottom of the play area to the TOP
+// of the human's card fan. PlayerArea positions the fan with it, and the
+// bottom-anchored chrome (Books / Last Book / Auto Play) uses the derived
+// `chromeBottom` to park itself just above the fan instead of on top of it.
+const HUMAN_HAND_BOTTOM_INSET = 140;
+// Breathing room between the top of the fan and the chrome sitting above it.
+const CHROME_GAP = 6;
 
 export interface ResponsiveLayout {
   width: number;
@@ -19,6 +26,10 @@ export interface ResponsiveLayout {
   cardHeight: number;
   isCompact: boolean;
   isLandscape: boolean;
+  /** Px from the bottom of the play area to the top of the human card fan. */
+  handTopOffset: number;
+  /** Px from the bottom of the play area where bottom-anchored chrome should sit. */
+  chromeBottom: number;
 }
 
 const computeLayout = (width: number, height: number): ResponsiveLayout => {
@@ -32,6 +43,7 @@ const computeLayout = (width: number, height: number): ResponsiveLayout => {
     effectiveHeight < COMPACT_HEIGHT_BREAKPOINT;
   const isLandscape =
     effectiveWidth > effectiveHeight && effectiveHeight < COMPACT_HEIGHT_BREAKPOINT;
+  const handTopOffset = HUMAN_HAND_BOTTOM_INSET * scale;
   return {
     width: effectiveWidth,
     height: effectiveHeight,
@@ -40,6 +52,8 @@ const computeLayout = (width: number, height: number): ResponsiveLayout => {
     cardHeight: BASE_CARD_HEIGHT * scale,
     isCompact,
     isLandscape,
+    handTopOffset,
+    chromeBottom: Math.round(handTopOffset + CHROME_GAP),
   };
 };
 
