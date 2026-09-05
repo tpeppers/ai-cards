@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout.ts';
+import { useOverlayFit, OVERLAY_TOP_INSET } from '../hooks/useOverlayFit.ts';
 
 interface BidInfo {
   playerId: number;
@@ -30,15 +31,10 @@ interface BiddingOverlayProps {
  * after measuring that the previous one still covers the human's hand — you
  * cannot bid a hand you cannot see, so the hand wins every trade.
  */
-const STAGE_ROOMY = 0;        // classic centred modal
+// Rung 0 is the classic centred modal.
 const STAGE_COLLAPSED = 1;    // top-anchored, bid history behind a "…" chip
 const STAGE_TWO_COLUMN = 2;   // bid controls move into a right-hand column
 const STAGE_COVER_HAND = 3;   // hand can't be cleared; leave its index strip showing
-
-/** Gap kept between the bottom of the panel and the top of the card fan. */
-const HAND_CLEARANCE = 6;
-/** Panel inset from the top of the play area once it stops being centred. */
-const TOP_INSET = 34;
 
 const BiddingOverlay: React.FC<BiddingOverlayProps> = ({
   isYourTurn,
@@ -54,75 +50,16 @@ const BiddingOverlay: React.FC<BiddingOverlayProps> = ({
 }) => {
   // Default to pass (0) - user can select a higher bid if they want
   const [selectedBid, setSelectedBid] = useState<number>(0);
-  const [stage, setStage] = useState<number>(STAGE_ROOMY);
   const [historyExpanded, setHistoryExpanded] = useState(false);
-  const { isCompact, isLandscape, width, height, cardHeight, handTopOffset } = useResponsiveLayout();
-
-  const backdropRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const { isCompact, isLandscape, width, height } = useResponsiveLayout();
 
   // Everything that changes how tall the panel wants to be.
   const contentKey = `${width}x${height}|${bids.length}|${isYourTurn}|${validBids.length}|${historyExpanded}|${previewBid != null}`;
-  const contentKeyRef = useRef(contentKey);
-  // Lowest rung still worth trying. Rungs proven too tall for the current
-  // content are never retried, which is what keeps the search from ping-ponging.
-  const floorRef = useRef(STAGE_ROOMY);
+  const { stage, backdropRef, panelRef, coveredMaxHeight } = useOverlayFit(contentKey, STAGE_COVER_HAND);
 
-  const handTop = height - handTopOffset;
   const isTight = stage >= STAGE_COLLAPSED;
   const isTwoColumn = stage >= STAGE_TWO_COLUMN && isYourTurn;
   const coversHand = stage >= STAGE_COVER_HAND;
-
-  /**
-   * Measure the panel against the top of the card fan and take one step.
-   *
-   * Steps up when the panel would sit on the hand, and back down when it turns
-   * out to have more room than the rung it is on needs — the walk terminates
-   * because `floorRef` only ever rises, so a rung that has been measured as
-   * too tall is never revisited.
-   */
-  const settle = useCallback(() => {
-    const backdrop = backdropRef.current;
-    const panel = panelRef.current;
-    if (!backdrop || !panel) return;
-    const panelBottom = panel.getBoundingClientRect().bottom - backdrop.getBoundingClientRect().top;
-    const fits = panelBottom <= handTop - HAND_CLEARANCE;
-    setStage(s => {
-      if (!fits) {
-        if (s >= STAGE_COVER_HAND) return s;
-        floorRef.current = Math.max(floorRef.current, s + 1);
-        return s + 1;
-      }
-      return s > floorRef.current ? s - 1 : s;
-    });
-  }, [handTop]);
-
-  // Re-measure before every paint in which the panel's height could have
-  // changed. Each step re-runs this, so the walk finishes within a frame.
-  useLayoutEffect(() => {
-    if (contentKeyRef.current !== contentKey) {
-      contentKeyRef.current = contentKey;
-      floorRef.current = STAGE_ROOMY;
-    }
-    settle();
-  }, [contentKey, stage, handTop, settle]);
-
-  // The play-CDN Tailwind build generates a utility's CSS asynchronously the
-  // first time that class appears, so the very first measurement of a rung can
-  // read too tall and strand the panel further down the ladder than it needs.
-  // Once the styles have landed, throw the floor away and let it walk back up.
-  useEffect(() => {
-    const recheck = () => {
-      floorRef.current = STAGE_ROOMY;
-      settle();
-    };
-    const raf = requestAnimationFrame(recheck);
-    const timer = setTimeout(recheck, 300);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timer);
-    };
-  }, [contentKey, settle]);
 
   // Tell the table when the hand is about to be covered, and hand the flag
   // back on the way out so the cards return to normal after bidding.
@@ -143,11 +80,10 @@ const BiddingOverlay: React.FC<BiddingOverlayProps> = ({
 
   // Once the panel has to overlap, cap it so a strip of every card — enough
   // for the flipped-down rank and suit — stays below it.
-  const indexStrip = Math.max(18, cardHeight * 0.45);
   const panelMaxHeight = coversHand
-    ? Math.max(140, handTop + cardHeight - indexStrip - TOP_INSET)
+    ? coveredMaxHeight
     : isTight
-      ? Math.max(140, height - TOP_INSET - 8)
+      ? Math.max(140, height - OVERLAY_TOP_INSET - 8)
       : undefined;
 
   const bidRows = (
@@ -276,10 +212,11 @@ const BiddingOverlay: React.FC<BiddingOverlayProps> = ({
       className={`absolute inset-0 bg-black bg-opacity-60 flex justify-center z-50 p-2 ${
         isTight ? 'items-start' : 'items-center'
       }`}
-      style={isTight ? { paddingTop: `${TOP_INSET}px` } : undefined}
+      style={isTight ? { paddingTop: `${OVERLAY_TOP_INSET}px` } : undefined}
     >
       <div
         ref={panelRef}
+        data-fit-stage={stage}
         className={`bg-white rounded-lg shadow-2xl w-full max-w-md flex flex-col ${
           isTight ? 'p-2' : isLandscape ? 'p-2 max-h-[95vh]' : isCompact ? 'p-3 max-h-[90vh]' : 'p-6'
         } ${isTight ? 'overflow-hidden' : 'overflow-y-auto'}`}
@@ -295,8 +232,9 @@ const BiddingOverlay: React.FC<BiddingOverlayProps> = ({
               {bidHistory}
               {dealerHint}
             </div>
-            {/* Right: the controls, always on screen */}
-            <div className="w-[45%] shrink-0 flex flex-col justify-center border-l border-gray-200 pl-2">
+            {/* Right: the controls, always on screen — scrolls internally rather
+                than clipping if the panel gets capped to a sliver. */}
+            <div className="w-[45%] shrink-0 flex flex-col justify-center overflow-y-auto border-l border-gray-200 pl-2">
               {bidControls}
             </div>
           </div>
