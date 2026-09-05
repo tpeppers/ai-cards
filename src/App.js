@@ -10,6 +10,7 @@ import ReplayPage from './components/ReplayPage.tsx';
 import SettingsPage from './components/SettingsPage.tsx';
 import MultiplayerPage from './components/MultiplayerPage.tsx';
 import TableAnalysis from './components/TableAnalysis.tsx';
+import DominanceLab from './components/DominanceLab.tsx';
 
 function NavDropdown({ label, items, openMenu, setOpenMenu }) {
   const ref = useRef(null);
@@ -82,6 +83,7 @@ function NavBar() {
     { label: 'Compare', to: '/compare' },
     { label: 'Replay', to: '/replay' },
     { label: 'Table Analysis', to: '/table-analysis' },
+    { label: 'Dominance Lab', to: '/dominance' },
   ];
 
   return (
@@ -130,6 +132,7 @@ function App() {
               <Route path="/replay" element={<ReplayPage />} />
               <Route path="/multiplayer" element={<MultiplayerPage />} />
               <Route path="/table-analysis" element={<TableAnalysis />} />
+              <Route path="/dominance" element={<DominanceLab />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </div>
