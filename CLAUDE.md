@@ -4,13 +4,17 @@
 This is a monorepo containing:
 - **React Web App** (`src/`) - Interactive Hearts card game  
 - **iOS App** (`ios/`) - Camera app for capturing card hands
-- **API Server** (`server/`) - Express.js backend for image uploads
+- **API Server** (`server/`) - Express.js backend for image uploads, Game Mode,
+  and server-authoritative multiplayer (matchmaking, blind hand seeds, Signal announcer)
 
 ## Build Commands
 - `npm start` - Run React development server (port 3000)
 - `npm run server` - Run API server (port 3001) 
 - `npm run dev` - Run both web app and API server concurrently
 - `npm run build` - Create production build of React app
+- `npm run build:engine` - Bundle the Bid Whist engine for Node (server/engine/bundle.cjs);
+  required for server-authoritative multiplayer, run automatically by `npm run server`
+- `npm run test:server` - Run the server-side test suite (plain node + assert, not Jest)
 - `npm run build:ios` - Build iOS application using Xcode
 - `npm test` - Run all tests in watch mode
 - `npm test -- --watchAll=false` - Run all tests once

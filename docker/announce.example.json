@@ -1,0 +1,36 @@
+{
+  "_comment": "Copy to /data/announce.json (the mounted volume) to configure the Signal announcer without rebuilding. Env vars override these.",
+
+  "adapter": "signal-cli",
+  "blockProfanity": true,
+
+  "signal": {
+    "rpcUrl": "http://signal:8080/api/v1/rpc",
+    "account": "+15551234567",
+    "groupId": "",
+    "recipient": ""
+  },
+
+  "posts": {
+    "hosting": {
+      "_comment": "One-shot invite, posted when the host presses the button.",
+      "enabled": true,
+      "roomPattern": null
+    },
+    "score": {
+      "_comment": "Final score line when a match ends.",
+      "enabled": true,
+      "roomPattern": null
+    },
+    "archive": {
+      "_comment": "Full replayable playout. Set a roomPattern to archive only some tables.",
+      "enabled": false,
+      "roomPattern": "^LEAGUE"
+    },
+    "redacted": {
+      "_comment": "Deal + result with names stripped to seat letters.",
+      "enabled": true,
+      "roomPattern": null
+    }
+  }
+}

@@ -1,18 +1,19 @@
-# Example docker-compose for self-hosting the Game Mode backend.
+# Self-hosting the whole app: uploads, Game Mode, four-snap capture,
+# multiplayer Bid Whist, and (optionally) card recognition and a Signal bot.
 #
-# Usage:
-#   1. Create the storage directory on your host:
-#        mkdir -p ./game-mode-storage
-#   2. Build and run:
-#        docker compose up --build
-#   3. Point a browser at http://localhost:3001 (the standalone frontend
-#      is served by the same container; toggle Settings → Enable Game
-#      Mode, then use the Upload page).
+# Quick start — everything except the two heavy optional services:
+#   mkdir -p ./game-mode-storage
+#   docker compose up --build
+#   open http://localhost:3001
 #
-# ML note: Game Mode currently requires the Python YOLO recognizer at
-# ML_SERVICE_URL for card detection. If you're running it locally, set
-# the env var to http://host.docker.internal:3002 (Docker Desktop on
-# Mac/Windows) or to the host IP on Linux.
+# With card recognition (large image, pulls torch):
+#   docker compose --profile ml up --build
+#
+# With the Signal announcer (needs a registered number, see docker/SIGNAL.md):
+#   docker compose --profile signal up --build
+#
+# Everything at once:
+#   docker compose --profile ml --profile signal up --build
 
 services:
   backend:
@@ -24,14 +25,58 @@ services:
     ports:
       - "3001:3001"
     environment:
-      # Where inside the container Game Mode zips are written.
+      # Game Mode zips land here; announce.json and profanity.json are read
+      # from the parent directory (/data).
       GAME_MODE_STORAGE: /data/games
-      # Point this at your running ML recognizer (see ml/server/
-      # inference_server.py). Commented out by default — uncomment and
-      # edit to match your setup.
-      # ML_SERVICE_URL: http://host.docker.internal:3002
+
+      # Card recognizer. Points at the `ml` service below; harmless when that
+      # profile isn't running — recognition just returns an error.
+      ML_SERVICE_URL: http://ml:3002
+
+      # Advertised in the "someone is hosting" Signal post. Set this to
+      # whatever address your players actually reach you on.
+      PUBLIC_URL: ""
+
+      # Signal announcer. "noop" (the default) posts nothing; switch to
+      # "signal-cli" once the number below is registered. Per-post-type
+      # toggles and regex filters live in /data/announce.json — see
+      # docker/announce.example.json.
+      ANNOUNCE_ADAPTER: noop
+      SIGNAL_RPC_URL: http://signal:8080/api/v1/rpc
+      SIGNAL_ACCOUNT: ""
+      SIGNAL_GROUP_ID: ""
     volumes:
-      # Host directory for persistent storage. Change the left side to
-      # wherever you want long-term storage on your host machine.
+      # Persistent storage + editable config. Change the left side to
+      # wherever you want long-term storage on the host.
       - ./game-mode-storage:/data
     restart: unless-stopped
+
+  ml:
+    profiles: ["ml"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ml
+    image: ai-cards-ml:latest
+    container_name: ai-cards-ml
+    # Not published by default: only the backend needs to reach it. Add a
+    # ports entry if you want to poke at it directly.
+    expose:
+      - "3002"
+    restart: unless-stopped
+
+  signal:
+    profiles: ["signal"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.signal
+    image: ai-cards-signal:latest
+    container_name: ai-cards-signal
+    expose:
+      - "8080"
+    volumes:
+      # Registration survives rebuilds; losing this means re-registering.
+      - signal-cli-data:/var/lib/signal-cli
+    restart: unless-stopped
+
+volumes:
+  signal-cli-data:

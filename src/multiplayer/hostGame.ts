@@ -5,6 +5,17 @@ import { LobbyPlayer, MultiplayerGameState, PlayerAction } from './types.ts';
 
 type BidDirection = 'uptown' | 'downtown' | 'downtown-noaces';
 
+/**
+ * Points where a host (browser or server) may want to snapshot the game.
+ *
+ * 'deal'         — a fresh hand has been dealt; per-seat blind seeds are valid now.
+ * 'handComplete' — scoring reached with declarer/trump still set, so the hand
+ *                  can still be encoded as a BWR1 record. Fires before the
+ *                  auto-transition that starts the next hand and clears them.
+ * 'gameOver'     — match finished; fires before the auto-restart.
+ */
+export type LifecycleEvent = 'deal' | 'handComplete' | 'gameOver';
+
 export class HostGame {
   private game: BidWhistGame;
   private players: LobbyPlayer[];       // human players in lobby
@@ -12,6 +23,9 @@ export class HostGame {
   private aiStrategy: string;
   private broadcastCallback: ((states: Map<number, MultiplayerGameState>) => void) | null = null;
   private aiTimers: ReturnType<typeof setTimeout>[] = [];
+  private aiMoveTimer: ReturnType<typeof setTimeout> | null = null;
+  private lifecycleCallback: ((kind: LifecycleEvent) => void) | null = null;
+  private handLatched = false;   // 'handComplete' already fired for this hand
   private destroyed = false;
   private playerNames: string[] = ['South', 'East', 'North', 'West'];
 
@@ -41,8 +55,46 @@ export class HostGame {
     this.broadcastCallback = callback;
   }
 
+  /** Subscribe to deal / hand-complete / game-over moments. */
+  onLifecycle(callback: (kind: LifecycleEvent) => void): void {
+    this.lifecycleCallback = callback;
+  }
+
+  /**
+   * The underlying engine. The server uses this to read the dealt deck and
+   * build hand records; the browser host has no need for it.
+   */
+  getGame(): BidWhistGame {
+    return this.game;
+  }
+
+  /** Seats currently occupied by humans (the rest are bots). */
+  getHumanSeats(): Set<number> {
+    return new Set(this.humanSeats);
+  }
+
+  /** Display names by absolute seat. */
+  getPlayerNames(): string[] {
+    return this.playerNames.slice();
+  }
+
+  private emitLifecycle(kind: LifecycleEvent): void {
+    if (this.destroyed) return;
+    // checkAutoTransitions() can run more than once while the table sits in
+    // 'scoring', so latch handComplete to one emission per hand — a repeat
+    // would double-record (and double-announce) the same hand.
+    if (kind === 'handComplete') {
+      if (this.handLatched) return;
+      this.handLatched = true;
+    } else if (kind === 'deal') {
+      this.handLatched = false;
+    }
+    this.lifecycleCallback?.(kind);
+  }
+
   startGame(): void {
     this.game.dealCards();
+    this.emitLifecycle('deal');
     this.broadcastAllStates();
     this.scheduleAITurn();
   }
@@ -53,6 +105,21 @@ export class HostGame {
     this.playerNames[seat] = `AI ${['South', 'East', 'North', 'West'][seat]}`;
     this.broadcastAllStates();
     // If it was this player's turn, trigger AI
+    this.scheduleAITurn();
+  }
+
+  /**
+   * Hand a bot-held seat to a human, mid-hand if need be. They inherit the
+   * seat exactly as the bot left it — same cards, same score.
+   *
+   * scheduleAITurn() cancels any pending bot move first, so a move already
+   * queued for this seat cannot land after the human has taken it over.
+   */
+  addPlayer(seat: number, name: string): void {
+    if (seat < 0 || seat > 3) return;
+    this.humanSeats.add(seat);
+    this.playerNames[seat] = name;
+    this.broadcastAllStates();
     this.scheduleAITurn();
   }
 
@@ -248,6 +315,15 @@ export class HostGame {
   private scheduleAITurn(): void {
     if (this.destroyed) return;
 
+    // This method owns a single pending bot move. Dropping any previous one
+    // keeps seat changes from leaving a stale timer that would play out of
+    // turn — or for a seat that is now a human's.
+    if (this.aiMoveTimer !== null) {
+      clearTimeout(this.aiMoveTimer);
+      this.aiTimers = this.aiTimers.filter(t => t !== this.aiMoveTimer);
+      this.aiMoveTimer = null;
+    }
+
     const gs = this.game.getGameState();
     if (gs.gameOver) return;
     if (gs.gameStage === 'scoring') return;
@@ -264,6 +340,7 @@ export class HostGame {
     if (gs.gameStage === 'trumpSelection' && declarer !== null && !this.humanSeats.has(declarer)) {
       const delay = 1000 + Math.random() * 500;
       const timer = setTimeout(() => {
+        this.aiMoveTimer = null;
         if (this.destroyed) return;
         // Use the seat-aware path: processAITrumpSelection routes through
         // setTrumpSuit, which assumes "declarer 0 = the human" and would
@@ -275,12 +352,14 @@ export class HostGame {
         this.scheduleAITurn();
       }, delay);
       this.aiTimers.push(timer);
+      this.aiMoveTimer = timer;
       return;
     }
 
     if (gs.gameStage === 'bidding') {
       const delay = 1000 + Math.random() * 500;
       const timer = setTimeout(() => {
+        this.aiMoveTimer = null;
         if (this.destroyed) return;
         this.game.processAIBid(currentPlayer);
         this.broadcastAllStates();
@@ -288,9 +367,11 @@ export class HostGame {
         this.scheduleAITurn();
       }, delay);
       this.aiTimers.push(timer);
+      this.aiMoveTimer = timer;
     } else if (gs.gameStage === 'play') {
       const delay = 1000 + Math.random() * 500;
       const timer = setTimeout(() => {
+        this.aiMoveTimer = null;
         if (this.destroyed) return;
         const bestMove = this.game.getBestMove(currentPlayer);
         if (bestMove) {
@@ -301,6 +382,7 @@ export class HostGame {
         }
       }, delay);
       this.aiTimers.push(timer);
+      this.aiMoveTimer = timer;
     }
   }
 
@@ -308,11 +390,14 @@ export class HostGame {
     if (this.destroyed) return;
     const gs = this.game.getGameState();
 
-    // After scoring, auto-start new hand
+    // After scoring, auto-start new hand. The record has to be taken now,
+    // while declarer/trump are still set — startNewHand() clears them.
     if (gs.gameStage === 'scoring' && !gs.gameOver) {
+      this.emitLifecycle('handComplete');
       const timer = setTimeout(() => {
         if (this.destroyed) return;
         this.game.startNewHand();
+        this.emitLifecycle('deal');
         this.broadcastAllStates();
         this.scheduleAITurn();
       }, 4000);
@@ -321,10 +406,13 @@ export class HostGame {
 
     // Game over: auto-restart after delay
     if (gs.gameOver) {
+      this.emitLifecycle('handComplete');
+      this.emitLifecycle('gameOver');
       const timer = setTimeout(() => {
         if (this.destroyed) return;
         this.game.resetGame();
         this.game.dealCards();
+        this.emitLifecycle('deal');
         this.broadcastAllStates();
         this.scheduleAITurn();
       }, 6000);
@@ -336,5 +424,6 @@ export class HostGame {
     this.destroyed = true;
     this.aiTimers.forEach(timer => clearTimeout(timer));
     this.aiTimers = [];
+    this.aiMoveTimer = null;
   }
 }

@@ -13,12 +13,31 @@ const sharp = require('sharp');
 const http = require('http');
 const labelStudio = require('./labelStudio');
 const { initMultiplayer } = require('./multiplayer');
+const { Announcer } = require('./announce');
 const gameMode = require('./gameMode');
 const { normalizeMlCards } = require('./mlCards');
 const { aggregateBurst, composeFourSnapDeck } = require('./fourSnap');
 
 // ML service configuration
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:3002';
+
+// Announcer configuration. Both files live alongside the Game Mode storage
+// volume so they can be edited without rebuilding the image; both are
+// optional and the announcer falls back to a no-op adapter without them.
+const ANNOUNCE_CONFIG_PATH =
+  process.env.ANNOUNCE_CONFIG || path.join(gameModeDataRoot(), 'announce.json');
+const ANNOUNCE_WORDLIST_PATH =
+  process.env.ANNOUNCE_WORDLIST || path.join(gameModeDataRoot(), 'profanity.json');
+
+/** Directory that holds operator-editable config (the mounted /data volume). */
+function gameModeDataRoot() {
+  return process.env.GAME_MODE_STORAGE
+    ? path.dirname(path.resolve(process.env.GAME_MODE_STORAGE))
+    : path.join(__dirname, '..');
+}
+
+// Public URL advertised in the "someone is hosting" Signal post.
+const PUBLIC_URL = process.env.PUBLIC_URL || '';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -945,7 +964,16 @@ if (hasBuild) {
 }
 
 const server = http.createServer(app);
-initMultiplayer(server);
+
+const announcer = new Announcer({
+  configPath: ANNOUNCE_CONFIG_PATH,
+  wordlistPath: ANNOUNCE_WORDLIST_PATH,
+});
+
+initMultiplayer(server, {
+  announcer,
+  hostUrl: () => PUBLIC_URL,
+});
 gameMode.startCleanupTimer();
 
 server.listen(PORT, () => {
@@ -955,4 +983,5 @@ server.listen(PORT, () => {
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Multiplayer: socket.io enabled`);
   console.log(`Game Mode storage: ${gameMode.STORAGE_DIR}`);
+  console.log(`Signal announcer: ${announcer.adapterName}`);
 });

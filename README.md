@@ -21,8 +21,12 @@ docker compose up --build
 # → backend at http://localhost:3001, zips land in ./game-mode-storage/
 ```
 
-ML-based card detection is a separate service (`ml/server/inference_server.py`). Set
-`ML_SERVICE_URL` in `docker-compose.yml` to point at it.
+ML-based card detection runs as its own service (`ml/server/inference_server.py`). It is a
+large image (torch), so compose keeps it behind a profile:
+
+```bash
+docker compose --profile ml up --build
+```
 
 ### Offline / ad-hoc WiFi (Steam Deck host)
 
@@ -44,6 +48,73 @@ codes**: Step 1 to join the WiFi (standard `WIFI:` URI), Step 2 to open the uplo
 the host's hotspot IP. Phones scan both, hand-photo upload works with no internet involved.
 
 Stop the hotspot with `nmcli connection down Hotspot && nmcli connection delete Hotspot`.
+
+## Multiplayer (self-hosted)
+
+Jackbox-style: there is no create/join split. Everyone opens `/multiplayer`, types the **same
+room code** — up to 20 characters of letters, numbers and spaces, case and spacing insensitive,
+so `baggle bytes` and `Baggle  Bytes` are the same table — and the first person in becomes the
+host. The host presses **Go** when the table looks right and bots fill any empty seats using the
+single strategy chosen in the lobby.
+
+The game runs **on the server**, not in the host's browser. The server deals, validates every
+move and drives the bots, so a player's socket only ever carries their own cards, and the table
+survives the host closing their tab (the host role is handed to whoever is left).
+
+### Joining a game already in progress
+
+The host picks one of three modes in the lobby:
+
+| mode | a player who dropped | someone new |
+|---|---|---|
+| **Drop-in** | straight back into their seat | asks the host, who accepts or declines, then picks up mid-hand |
+| **Reconnect** *(default)* | straight back into their seat | waits, and is seated at the next hand boundary |
+| **Closed** | refused | refused |
+
+Whoever takes a seat inherits it exactly as the bot left it — same cards, same score — and is
+handed that seat's opening blind seed so their end-of-hand summary is complete.
+
+A returning player is recognised by a **per-device token** the browser stores, not by IP.
+Four people at one card table share a network, so an IP would identify the table rather than the
+person; it is used only as a fallback when no token is available, and then only together with
+the same display name. A token that is present but *different* is treated as positive evidence
+of a different device, so nobody can claim a seat by retyping the name that just left it.
+
+An in-progress table whose last player drops is held open for a couple of minutes rather than
+torn down, so a solo game plus bots is still there to reconnect to.
+
+### Hand seeds
+
+Each player is dealt a *blind* seed — their own 12 cards at their deal positions, everything
+else `_`:
+
+```
+e___H___v___u___B___K___x___D___t___P___C___r_______
+```
+
+`_` already means "fill at random" to the deal parser, so this pastes back in as
+"my hand, everyone else random". After a hand you get that seed plus the full 52-card deal and
+the complete replayable playout, which drops straight into the Replay page.
+
+```bash
+docker compose up --build       # → http://localhost:3001/multiplayer
+```
+
+## Signal announcer (optional)
+
+The container can drive a Signal bot that posts to a group: a one-shot "someone is hosting"
+invite, final scores, the full replayable game, and/or a name-redacted archive. Each of the four
+is independently switchable and can be limited to rooms matching a regex, and everything is
+screened by a profanity filter before it leaves the box.
+
+Signal has no official bot API, so this needs `signal-cli` and a dedicated registered number.
+It is entirely optional — the default adapter posts nothing.
+
+```bash
+docker compose --profile signal up --build
+```
+
+See [docker/SIGNAL.md](docker/SIGNAL.md) for registration and configuration.
 
 ## Tech Stack
 
@@ -154,10 +225,19 @@ npm run build:ios
 npm test                        # Run tests in watch mode
 npm test -- --watchAll=false    # Run all tests once
 npm test -- -t "component"     # Run tests matching a name
+npm run test:server             # Run the server-side suite (plain node, not Jest)
 ```
+
+The `src/` tests run under Jest via react-scripts; the `server/` tests are plain node scripts
+using `assert`, so `npm test` does not pick them up.
 
 ## Build
 
 ```bash
-npm run build
+npm run build           # React frontend → build/
+npm run build:engine    # Bid Whist engine bundled for Node → server/engine/bundle.cjs
 ```
+
+`build:engine` is what lets the server run the game itself; `npm run server` does it
+automatically, and the Docker image builds it at image-build time. Without it the server still
+serves every upload feature but multiplayer games cannot start.

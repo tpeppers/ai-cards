@@ -1,0 +1,12 @@
+{
+  "_comment": "Copy to /data/profanity.json to tune the filter. These lists are MERGED with the built-in defaults in server/profanity.js.",
+
+  "_words": "Matched as whole words after normalization.",
+  "words": [],
+
+  "_strict": "Also hunted inside a single word and across runs of 1-2 character tokens (the 'f u c k' evasion signature). Keep these unambiguous — a short term here will fire inside innocent words.",
+  "strict": [],
+
+  "_allow": "Innocent words that would otherwise trip the filter.",
+  "allow": []
+}

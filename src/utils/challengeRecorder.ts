@@ -20,7 +20,7 @@ export interface StoredChallengeRecord {
 }
 
 // Minimal game-like handle (subset of BidWhistGame's public surface).
-interface ChallengeGameLike {
+export interface ChallengeGameLike {
   getGameState(): {
     players: { id: number; hand: Card[]; tricks: Card[] }[];
     currentTrick: { playerId: number; card: Card }[];
@@ -39,6 +39,64 @@ interface ChallengeGameLike {
   getDeclarer(): number | null;
   getPlayedCards(): Card[];
   getBooksWon(): [number, number];
+}
+
+/**
+ * Build a BWR1 HandRecord from public game state.
+ *
+ * Pure and storage-free, so the multiplayer server can record a finished
+ * hand with the same logic the browser uses. Returns null for all-pass /
+ * incomplete hands (no declarer or no trump), which have nothing to encode.
+ */
+export function buildHandRecord(
+  game: ChallengeGameLike,
+  assists: AssistEvent[],
+  shadow: { booksWon: [number, number] } | null
+): HandRecord | null {
+  const declarer = game.getDeclarer();
+  const trumpSuit = game.getTrumpSuit();
+  if (declarer === null || trumpSuit === null) return null;
+
+  const deal = game.getLastDealtDeckUrl();
+  const dealer = game.getDealer();
+
+  // Bids in recorded order; pass = 0. Take-it detection: the engine
+  // records a dealer "take" as a normal bid at the taken amount, so a
+  // final dealer bid that merely EQUALS the earlier max (a regular bid
+  // must be strictly higher) is a take.
+  const rawBids = game.getBiddingState().bids;
+  const bids: (number | 'T')[] = rawBids.map(b => (b.passed ? 0 : b.amount));
+  if (rawBids.length > 1) {
+    const last = rawBids[rawBids.length - 1];
+    const earlierMax = Math.max(...rawBids.slice(0, -1).map(b => (b.passed ? 0 : b.amount)));
+    if (last.playerId === dealer && !last.passed && last.amount === earlierMax) {
+      bids[bids.length - 1] = 'T';
+    }
+  }
+
+  const discards = game.getGameState().players[declarer].tricks
+    .slice(0, 4)
+    .map(c => c.id);
+  const plays = game.getPlayedCards().map(c => c.id);
+
+  const rawBooks = game.getBooksWon();
+  const humanBooks: [number, number] = [rawBooks[0], rawBooks[1]];
+  const shadowBooks: [number, number] | null =
+    shadow ? [shadow.booksWon[0], shadow.booksWon[1]] : null;
+  // The human sits on team 0; strictly more books than the
+  // all-strategy counterfactual = flag.
+  const flagged = shadow != null && humanBooks[0] > shadow.booksWon[0];
+
+  return {
+    deal,
+    dealer,
+    bids,
+    call: { suit: trumpSuit, direction: game.getBidDirection() },
+    discards,
+    plays,
+    assists: assists.slice(),
+    outcome: { humanBooks, shadowBooks, flagged },
+  };
 }
 
 const STORAGE_KEY = 'challengeRecords';
@@ -82,61 +140,21 @@ export class ChallengeRecorder {
     game: ChallengeGameLike,
     shadow: { booksWon: [number, number] } | null
   ): StoredChallengeRecord | null {
-    const declarer = game.getDeclarer();
-    const trumpSuit = game.getTrumpSuit();
-    if (declarer === null || trumpSuit === null) {
+    const record = buildHandRecord(game, this.assists, shadow);
+    if (!record) {
+      // All-pass / incomplete hand: nothing to encode, but the assists
+      // belonged to the skipped hand so the buffer still resets.
       this.assists = [];
       return null;
     }
-
-    const deal = game.getLastDealtDeckUrl();
-    const dealer = game.getDealer();
-
-    // Bids in recorded order; pass = 0. Take-it detection: the engine
-    // records a dealer "take" as a normal bid at the taken amount, so a
-    // final dealer bid that merely EQUALS the earlier max (a regular bid
-    // must be strictly higher) is a take.
-    const rawBids = game.getBiddingState().bids;
-    const bids: (number | 'T')[] = rawBids.map(b => (b.passed ? 0 : b.amount));
-    if (rawBids.length > 1) {
-      const last = rawBids[rawBids.length - 1];
-      const earlierMax = Math.max(...rawBids.slice(0, -1).map(b => (b.passed ? 0 : b.amount)));
-      if (last.playerId === dealer && !last.passed && last.amount === earlierMax) {
-        bids[bids.length - 1] = 'T';
-      }
-    }
-
-    const discards = game.getGameState().players[declarer].tricks
-      .slice(0, 4)
-      .map(c => c.id);
-    const plays = game.getPlayedCards().map(c => c.id);
-
-    const rawBooks = game.getBooksWon();
-    const humanBooks: [number, number] = [rawBooks[0], rawBooks[1]];
-    const shadowBooks: [number, number] | null =
-      shadow ? [shadow.booksWon[0], shadow.booksWon[1]] : null;
-    // The human sits on team 0; strictly more books than the
-    // all-strategy counterfactual = flag.
-    const flagged = shadow != null && humanBooks[0] > shadow.booksWon[0];
-
-    const record: HandRecord = {
-      deal,
-      dealer,
-      bids,
-      call: { suit: trumpSuit, direction: game.getBidDirection() },
-      discards,
-      plays,
-      assists: this.assists.slice(),
-      outcome: { humanBooks, shadowBooks, flagged },
-    };
 
     const stored: StoredChallengeRecord = {
       ts: Date.now(),
       strategyName: this.strategyName,
       encoded: encodeHandRecord(record),
-      flagged,
+      flagged: record.outcome.flagged,
       assistCount: this.assists.length,
-      deal,
+      deal: record.deal,
     };
     ChallengeRecorder.append(stored);
     this.assists = [];

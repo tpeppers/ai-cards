@@ -1,0 +1,33 @@
+# signal-cli in JSON-RPC daemon mode, for the score/archive announcer.
+#
+# Signal has no official bot API, so the announcer drives signal-cli. The
+# number must be registered once by hand before this is useful — see
+# docker/SIGNAL.md.
+#
+#   docker compose --profile signal up --build
+#
+# Registration state lives in /var/lib/signal-cli, which compose keeps in a
+# named volume so it survives rebuilds.
+
+FROM eclipse-temurin:21-jre-jammy
+
+ARG SIGNAL_CLI_VERSION=0.13.12
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL -o /tmp/signal-cli.tar.gz \
+      "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}.tar.gz" \
+    && tar xf /tmp/signal-cli.tar.gz -C /opt \
+    && ln -s "/opt/signal-cli-${SIGNAL_CLI_VERSION}/bin/signal-cli" /usr/local/bin/signal-cli \
+    && rm /tmp/signal-cli.tar.gz
+
+ENV SIGNAL_CLI_CONFIG=/var/lib/signal-cli
+VOLUME ["/var/lib/signal-cli"]
+
+EXPOSE 8080
+
+# JSON-RPC over HTTP at http://signal:8080/api/v1/rpc — this is what
+# server/announce/signalCli.js posts to.
+CMD ["sh", "-c", "signal-cli --config $SIGNAL_CLI_CONFIG daemon --http 0.0.0.0:8080"]
