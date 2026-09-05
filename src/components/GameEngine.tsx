@@ -45,6 +45,12 @@ interface GameEngineProps {
   showAllCards?: boolean;
   onToggleShowAllCards?: () => void;
   hideGameOver?: boolean;
+  /**
+   * Move the human's card indices to the bottom edge. Set while an overlay
+   * has no room left to clear the fan, so the strip still on screen is the
+   * one carrying the rank and suit.
+   */
+  handIndexAtBottom?: boolean;
 }
 
 // Global settings
@@ -71,6 +77,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
   showAllCards: showAllCardsProp,
   onToggleShowAllCards,
   hideGameOver = false,
+  handIndexAtBottom = false,
 }) => {
   const [gameState, setGameState] = useState<GameState>(game.getGameState());
   const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
@@ -354,6 +361,7 @@ const GameEngine: React.FunctionComponent<GameEngineProps> = ({
           showAllCards={showAllCards}
           previewCardId={player.id === 0 ? previewCardId : null}
           displayName={playerDisplayNames?.[player.id]}
+          indexAtBottom={player.id === 0 && handIndexAtBottom}
         />
       ))}
       {/* Turn indicator */}

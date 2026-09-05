@@ -19,6 +19,12 @@ interface CardProps {
   faceDown?: boolean;
   width?: number;
   height?: number;
+  /**
+   * Move the readable rank/suit index to the BOTTOM of the card. Used when an
+   * overlay has to cover the top of the player's hand — the exposed strip is
+   * then the one carrying the index, so the hand is still playable.
+   */
+  indexAtBottom?: boolean;
 }
 
 // Card component with classic Microsoft Hearts styling
@@ -32,7 +38,8 @@ const Card: React.FC<CardProps> = ({
   onClick,
   faceDown = false,
   width,
-  height
+  height,
+  indexAtBottom = false
 }) => {
   // Derive dimensions and text scale from props (defaults = classic size)
   const w = width ?? BASE_CARD_WIDTH;
@@ -43,6 +50,16 @@ const Card: React.FC<CardProps> = ({
   const jokerCenterFontSize = Math.max(14, Math.round(30 * scale));
   const cornerPadding = Math.max(1, Math.round(4 * scale));
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // Corner placement. Normally the upright index is top-left and its mirrored
+  // twin bottom-right; flipping swaps the two so the upright one lands in the
+  // strip left visible below an overlay.
+  const uprightCorner: React.CSSProperties = indexAtBottom
+    ? { bottom: cornerPadding, left: cornerPadding }
+    : { top: cornerPadding, left: cornerPadding };
+  const mirroredCorner: React.CSSProperties = indexAtBottom
+    ? { top: cornerPadding, right: cornerPadding }
+    : { bottom: cornerPadding, right: cornerPadding };
 
   // Check if card is a joker
   const isJoker = card.suit === 'joker';
@@ -138,7 +155,7 @@ const Card: React.FC<CardProps> = ({
             {isJoker ? (
               <>
                 {/* Joker card layout */}
-                <div className="absolute leading-none" style={{ top: cornerPadding, left: cornerPadding, color: getColor(card.suit) }}>
+                <div className="absolute leading-none" style={{ ...uprightCorner, color: getColor(card.suit) }}>
                   <span className="font-bold" style={{ fontSize: cornerFontSize }}>{getJokerLabel()}</span>
                 </div>
                 {/* Center: large star */}
@@ -146,15 +163,15 @@ const Card: React.FC<CardProps> = ({
                   <span style={{ fontSize: jokerCenterFontSize, lineHeight: 1 }}>★</span>
                   <span className="font-bold" style={{ fontSize: cornerFontSize }}>JOKER</span>
                 </div>
-                {/* Bottom-right corner (rotated) */}
-                <div className="absolute leading-none rotate-180" style={{ bottom: cornerPadding, right: cornerPadding, color: getColor(card.suit) }}>
+                {/* Mirrored label in the opposite corner */}
+                <div className="absolute leading-none rotate-180" style={{ ...mirroredCorner, color: getColor(card.suit) }}>
                   <span className="font-bold" style={{ fontSize: cornerFontSize }}>{getJokerLabel()}</span>
                 </div>
               </>
             ) : (
               <>
-                {/* Top-left corner: rank + suit side-by-side */}
-                <div className="absolute flex items-center leading-none" style={{ top: cornerPadding, left: cornerPadding, color: getColor(card.suit) }}>
+                {/* Upright index: rank + suit side-by-side */}
+                <div className="absolute flex items-center leading-none" style={{ ...uprightCorner, color: getColor(card.suit) }}>
                   <span className="font-bold" style={{ fontSize: cornerFontSize + 2 }}>{getRank(card.rank)}</span>
                   <span style={{ fontSize: cornerFontSize }}>{getSuitSymbol(card.suit)}</span>
                 </div>
@@ -162,8 +179,8 @@ const Card: React.FC<CardProps> = ({
                 <div className="absolute inset-0 flex items-center justify-center" style={{ color: getColor(card.suit) }}>
                   <span style={{ fontSize: centerFontSize, lineHeight: 1 }}>{getSuitSymbol(card.suit)}</span>
                 </div>
-                {/* Bottom-right corner: rank + suit side-by-side (rotated) */}
-                <div className="absolute flex items-center leading-none rotate-180" style={{ bottom: cornerPadding, right: cornerPadding, color: getColor(card.suit) }}>
+                {/* Mirrored index in the opposite corner */}
+                <div className="absolute flex items-center leading-none rotate-180" style={{ ...mirroredCorner, color: getColor(card.suit) }}>
                   <span className="font-bold" style={{ fontSize: cornerFontSize + 2 }}>{getRank(card.rank)}</span>
                   <span style={{ fontSize: cornerFontSize }}>{getSuitSymbol(card.suit)}</span>
                 </div>

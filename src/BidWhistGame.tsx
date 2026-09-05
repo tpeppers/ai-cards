@@ -90,6 +90,10 @@ const BidWhistGameComponent: React.FunctionComponent = () => {
   const [previewBid, setPreviewBid] = useState<number | null>(null);
   const [previewTrump, setPreviewTrump] = useState<{ suit: string; direction: string } | null>(null);
   const [showAllCards, setShowAllCards] = useState(false);
+  // Set by BiddingOverlay once it has exhausted its compact layouts and has to
+  // sit on the fan; the human's cards then carry their index along the bottom
+  // edge, in the strip the panel leaves exposed.
+  const [bidPanelCoversHand, setBidPanelCoversHand] = useState(false);
   const [whistingAnimation, setWhistingAnimation] = useState<string | null>(null);
   // Once-per-game latch for the whisting celebration (see handleGameStateChange).
   const whistingCelebratedRef = useRef(false);
@@ -718,6 +722,7 @@ Card Rankings:
           setShowAllCards(nextValue);
         }}
         hideGameOver={!!whistingAnimation}
+        handIndexAtBottom={bidPanelCoversHand}
         extraControls={
           <>
             {/* Deal + Strategy Config */}
@@ -815,6 +820,7 @@ Card Rankings:
           currentBidder={gameState.currentPlayer}
           onBid={handleBid}
           previewBid={previewBid}
+          onHandCoverageChange={setBidPanelCoversHand}
         />
       )}
 

@@ -12,10 +12,12 @@ interface PlayerAreaProps {
   previewCardId?: string | null;
   displayName?: string;
   subtitle?: string;
+  /** Render this player's cards with the rank/suit index along the bottom edge. */
+  indexAtBottom?: boolean;
 }
 
 // Player area component
-const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard, showAllCards, previewCardId = null, displayName, subtitle }) => {
+const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuman, playCard, showAllCards, previewCardId = null, displayName, subtitle, indexAtBottom = false }) => {
   const { width, height, scale, cardWidth, cardHeight, isCompact, handTopOffset } = useResponsiveLayout();
 
   // Scaled layout constants
@@ -142,6 +144,7 @@ const PlayerArea: React.FC<PlayerAreaProps> = ({ player, isCurrentPlayer, isHuma
           draggable={isHuman && isCurrentPlayer}
           onClick={isHuman && isCurrentPlayer ? () => playCard(card) : undefined}
           faceDown={!isHuman && !showAllCards}
+          indexAtBottom={indexAtBottom}
           width={cardWidth}
           height={cardHeight}
         />
