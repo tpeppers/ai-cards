@@ -566,6 +566,50 @@ function createTableSessions({ storageDir, mlServiceUrl, ports = {} }) {
     }
   });
 
+  // The CustomCuts cast board: a soundboard of tagged video moments. Pads
+  // are pressed here and play on the Chromecast the CustomCuts host has
+  // chosen; a phone can also play a pad itself via mediaUrl / its YouTube url.
+  async function ccBoard(pathname, body) {
+    const r = await fetch(`${ccUrl()}${pathname}`, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: { 'X-CC-Auth': ccToken(), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(6000),
+    });
+    let data = {};
+    try { data = await r.json(); } catch { /* not json */ }
+    if (r.status === 404 && !data.error) data.error = 'This CustomCuts host has no cast board (update CustomCuts)';
+    if (r.status === 401) data.error = 'CustomCuts rejected the token (CUSTOMCUTS_TOKEN)';
+    return { status: r.status, data };
+  }
+
+  const boardRoute = (fn) => async (req, res) => {
+    if (!ccUrl()) return res.status(404).json({ success: false, error: 'CUSTOMCUTS_URL is not set on the host' });
+    try {
+      const { status, data } = await fn(req);
+      res.status(status).json({ ...data, success: status < 400 && data.ok !== false });
+    } catch (e) {
+      res.status(502).json({ success: false, error: `CustomCuts host unreachable: ${e.message}` });
+    }
+  };
+
+  router.get('/customcuts/board', boardRoute(async () => {
+    const out = await ccBoard('/board/state.json');
+    if (out.status < 400 && Array.isArray(out.data.pads)) {
+      out.data.pads = out.data.pads.map(p => ({
+        ...p,
+        mediaUrl: p.media_id ? `/api/table/customcuts/media/${encodeURIComponent(p.media_id)}` : null,
+      }));
+    }
+    return out;
+  }));
+  router.post('/customcuts/board/play', boardRoute(req => ccBoard('/board/play', {
+    pad_id: req.body && req.body.padId,
+  })));
+  router.post('/customcuts/board/control', boardRoute(req => ccBoard('/board/control', {
+    action: req.body && req.body.action,
+  })));
+
   router.get('/customcuts/media/:id', (req, res) => {
     if (!ccUrl()) return res.status(404).end();
     const target = new URL(`${ccUrl()}/media/${encodeURIComponent(req.params.id)}`);

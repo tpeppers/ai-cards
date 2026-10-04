@@ -423,7 +423,7 @@ export default function TableCam() {
           <h1 className="text-xl font-bold">Table Cam</h1>
           <Link to="/table/sessions" className="ml-auto text-sm px-3 py-1 rounded bg-gray-700">Sessions</Link>
           <button className="text-sm px-3 py-1 rounded bg-red-700" onClick={() => setShowPlayer(v => !v)}>
-            {showPlayer ? 'Hide video' : '▶ Play a video'}
+            {showPlayer ? 'Hide videos' : config?.customcuts ? '🔊 Soundboard' : '▶ Play a video'}
           </button>
         </div>
 

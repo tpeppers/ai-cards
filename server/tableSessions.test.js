@@ -61,6 +61,22 @@ const cc = http.createServer((req, res) => {
       { id: 'v1', title: 'Match', url: 'https://www.youtube.com/watch?v=abcdefghijk', cuts: { skip: [{ start: 10, end: 20 }], only: [] } },
     ] }));
   }
+  if (req.url === '/board/state.json') {
+    res.setHeader('content-type', 'application/json');
+    return res.end(JSON.stringify({ ok: true, device: { uuid: 'u1', name: 'Den TV' }, now: null, pads: [
+      { id: 'p1', label: 'Hurricanrana', url: 'https://www.youtube.com/watch?v=abcdefghijk', start: 61, end: 64.5, media_id: 'pad-p1-abc' },
+    ] }));
+  }
+  if (req.url === '/board/play' || req.url === '/board/control') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      const b = JSON.parse(body || '{}');
+      res.setHeader('content-type', 'application/json');
+      if (req.url === '/board/play' && b.pad_id !== 'p1') { res.statusCode = 400; return res.end(JSON.stringify({ ok: false, error: 'no such pad' })); }
+      res.end(JSON.stringify({ ok: true, echo: b }));
+    });
+  }
   if (req.url.startsWith('/media/v1')) {
     res.statusCode = req.headers.range ? 206 : 200;
     res.setHeader('content-type', 'video/mp4');
@@ -213,6 +229,22 @@ async function test(name, fn) {
     const m = await api('GET', q.json.items[0].mediaUrl, undefined, { Range: 'bytes=0-' });
     assert.strictEqual(m.status, 206);
     assert.strictEqual(m.text, 'MEDIA');
+  });
+
+  await test('the CustomCuts cast board is proxied: pads, play, control', async () => {
+    const b = await api('GET', '/api/table/customcuts/board');
+    assert.strictEqual(b.json.success, true);
+    assert.strictEqual(b.json.device.name, 'Den TV');
+    assert.strictEqual(b.json.pads[0].mediaUrl, '/api/table/customcuts/media/pad-p1-abc');
+    const p = await api('POST', '/api/table/customcuts/board/play', { padId: 'p1' });
+    assert.deepStrictEqual(p.json.echo, { pad_id: 'p1' });
+    const bad = await api('POST', '/api/table/customcuts/board/play', { padId: 'zz' });
+    assert.strictEqual(bad.status, 400);
+    assert.strictEqual(bad.json.success, false);
+    assert.strictEqual(bad.json.error, 'no such pad');
+    const c = await api('POST', '/api/table/customcuts/board/control', { action: 'stop' });
+    assert.deepStrictEqual(c.json.echo, { action: 'stop' });
+    assert.ok(!JSON.stringify([b.json, p.json, c.json]).includes('sekrit'));
   });
 
   srv.close(); ml.close(); cc.close();

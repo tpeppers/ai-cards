@@ -99,19 +99,33 @@ Settings › Camera › Formats › **Most Compatible** (H.264).
 - Sessions live in `game-mode-storage/table-sessions/<id>/`
   (`session.json` + `video.*`); `TABLE_STORAGE` moves them.
 
-## Play a video
+## Soundboard and videos
 
-**▶ Play a video** on the Table Cam page:
+**🔊 Soundboard** (or **▶ Play a video** without CustomCuts) on the Table Cam page:
 
-- **YouTube** — paste any YouTube link (needs internet). Recent links are
-  remembered on the phone.
-- **CustomCuts** — when the host has a CustomCuts host running, set
-  `CUSTOMCUTS_URL=http://<customcuts-host>:8787` and
-  `CUSTOMCUTS_TOKEN=<its auth token>` before `npm run server`. The tab
-  lists CustomCuts' current queue and plays entries with their cuts
-  (skipped segments are jumped over; "only" tags play just the tagged
-  seconds). Local CustomCuts media is streamed through this host, so the
-  token never reaches the phone.
+- **Soundboard**: the CustomCuts **cast board**. Each pad is a tagged moment
+  from your CustomCuts library (a video plus the tag's start/end). Tap one and
+  it plays that moment on the **TV**, the Chromecast CustomCuts casts to, and
+  stops at the tag's end. Switch *Play on* to **This phone** to play it on the
+  phone instead (YouTube embed, or the CustomCuts stream through this host).
+  Pads are made and arranged on the CustomCuts manager's **Casting** tab
+  (＋ next to any timed tag, or a custom range); the Chromecast is picked there
+  too.
+- **YouTube**: paste any YouTube link (needs internet).
+- **Queue**: CustomCuts' current play queue, with its cuts applied.
+
+Connecting the two: in the CustomCuts manager, **Casting** tab →
+**Copy ai-cards settings**, which copies
+
+```
+CUSTOMCUTS_URL=http://<customcuts-host>:8787
+CUSTOMCUTS_TOKEN=<its auth token>
+```
+
+Set those in the environment of `npm run server` (the Deck) and restart it.
+CustomCuts hosting must allow LAN connections (Playlists tab) unless both run
+on the same machine. Everything goes through this host, so the CustomCuts
+token never reaches the phones.
 
 ## How detection decides a card was played
 

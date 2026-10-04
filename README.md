@@ -52,7 +52,8 @@ detector turns the cards hitting the table into a game-play string (`TPS1…`), 
 the phone can record the session (video + audio) to the host and/or the phone.
 Recordings made earlier with the Camera app can be uploaded and processed later.
 Each session has a shareable page on the host with the video synced to the
-string, plus a YouTube / CustomCuts video player. See [TABLE-CAM.md](TABLE-CAM.md).
+string, plus a soundboard of CustomCuts tagged moments (cast to the TV's Chromecast or
+played on the phone) and a YouTube player. See [TABLE-CAM.md](TABLE-CAM.md).
 
 ## Tech Stack
 

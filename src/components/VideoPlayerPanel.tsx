@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { parseYouTubeId, parseYouTubeStart, cutAction, cutStart } from '../utils/videoCuts';
 
-// A video player for the table: paste a YouTube link, or pick a video from
-// the CustomCuts queue on the host (its cuts — skip ranges / "only these
-// seconds" — are applied while it plays).
+// A video player for the table:
+//   - Soundboard: the CustomCuts cast board — pads of tagged video moments
+//     (made on the CustomCuts manager's Casting tab). A tap plays that moment
+//     on the TV (the Chromecast CustomCuts casts to) or here on the phone.
+//   - YouTube: paste a link.
+//   - Queue: CustomCuts' current queue, with its cuts applied.
 
 interface Cuts {
   skip?: { start: number; end: number }[];
@@ -36,6 +39,151 @@ declare global {
 }
 
 const RECENT_KEY = 'tableCam.recentVideos';
+const TARGET_KEY = 'tableCam.boardTarget';
+
+interface Pad {
+  id: string;
+  label: string;
+  url: string;
+  title?: string;
+  start: number;
+  end: number | null;
+  color?: string | null;
+  mute?: boolean;
+  mediaUrl?: string | null;
+}
+
+interface BoardState {
+  pads: Pad[];
+  device: { uuid: string; name: string } | null;
+  now: { label: string; state: string; position?: number | null; error?: string } | null;
+}
+
+// Literal class names so Tailwind keeps them.
+const PAD_COLORS: Record<string, string> = {
+  red: 'bg-red-600', orange: 'bg-orange-600', yellow: 'bg-yellow-600', green: 'bg-green-600',
+  teal: 'bg-teal-600', blue: 'bg-blue-600', purple: 'bg-purple-600', pink: 'bg-pink-600', gray: 'bg-gray-600',
+};
+const PAD_ORDER = Object.keys(PAD_COLORS);
+
+const clock = (t: number | null | undefined) => {
+  if (t === null || t === undefined || !Number.isFinite(t)) return '';
+  const s = Math.max(0, Math.round(t));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+function Soundboard({ onPlayHere }: { onPlayHere: (p: Playing) => void }) {
+  const [board, setBoard] = useState<BoardState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [target, setTarget] = useState<'tv' | 'phone'>(() => {
+    try { return localStorage.getItem(TARGET_KEY) === 'phone' ? 'phone' : 'tv'; } catch { return 'tv'; }
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch('/api/table/customcuts/board');
+      const d = await r.json();
+      if (!d.success) throw new Error(d.error || 'Failed');
+      setBoard(d);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const t = window.setInterval(() => { if (!document.hidden) load(); }, 2500);
+    return () => window.clearInterval(t);
+  }, [load]);
+
+  const chooseTarget = (t: 'tv' | 'phone') => {
+    setTarget(t);
+    try { localStorage.setItem(TARGET_KEY, t); } catch { /* storage unavailable */ }
+  };
+
+  const post = async (url: string, body: object) => {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!d.success) throw new Error(d.error || `Failed (${r.status})`);
+    return d;
+  };
+
+  const press = async (pad: Pad) => {
+    if (target === 'phone') {
+      const youtubeId = parseYouTubeId(pad.url);
+      const cuts = pad.end !== null ? { only: [{ start: pad.start, end: pad.end }] } : null;
+      if (!youtubeId && !pad.mediaUrl) {
+        setError('This pad cannot play on the phone.');
+        return;
+      }
+      onPlayHere(youtubeId
+        ? { title: pad.label, youtubeId, start: pad.start, cuts, mute: pad.mute }
+        : { title: pad.label, mediaUrl: pad.mediaUrl || undefined, start: pad.start, cuts, mute: pad.mute });
+      return;
+    }
+    setBusy(pad.id);
+    try {
+      await post('/api/table/customcuts/board/play', { padId: pad.id });
+      if (navigator.vibrate) navigator.vibrate(20);
+      window.setTimeout(load, 600);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const control = (action: string) => post('/api/table/customcuts/board/control', { action })
+    .then(() => window.setTimeout(load, 400))
+    .catch(e => setError(e instanceof Error ? e.message : String(e)));
+
+  const now = board?.now;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-gray-400">Play on</span>
+        <button className={`px-3 py-1 rounded ${target === 'tv' ? 'bg-blue-600' : 'bg-gray-700'}`} onClick={() => chooseTarget('tv')}>
+          📺 {board?.device?.name || 'TV'}
+        </button>
+        <button className={`px-3 py-1 rounded ${target === 'phone' ? 'bg-blue-600' : 'bg-gray-700'}`} onClick={() => chooseTarget('phone')}>
+          📱 This phone
+        </button>
+      </div>
+      {target === 'tv' && board && !board.device && (
+        <p className="text-sm text-yellow-300">No Chromecast chosen yet — pick one on the CustomCuts manager's Casting tab.</p>
+      )}
+      {target === 'tv' && now && (
+        <div className="flex items-center gap-2 text-sm bg-gray-900 rounded px-2 py-1">
+          <span className={`truncate ${now.state === 'error' ? 'text-red-400' : ''}`}>
+            {now.state === 'error' ? `Failed: ${now.label} — ${now.error || ''}` : `${now.state}: ${now.label} ${clock(now.position)}`}
+          </span>
+          <button className="ml-auto px-2 py-0.5 rounded bg-gray-700" onClick={() => control('toggle')}>⏯</button>
+          <button className="px-2 py-0.5 rounded bg-gray-700" onClick={() => control('replay')}>↺</button>
+          <button className="px-2 py-0.5 rounded bg-red-700" onClick={() => control('stop')}>■</button>
+        </div>
+      )}
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {board && board.pads.length === 0 && (
+        <p className="text-sm text-gray-400">The board is empty. Add moments on the CustomCuts manager's Casting tab (＋ next to a tag).</p>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {(board?.pads || []).map((p, i) => (
+          <button
+            key={p.id}
+            onClick={() => press(p)}
+            disabled={busy === p.id}
+            className={`${PAD_COLORS[p.color || ''] || PAD_COLORS[PAD_ORDER[i % PAD_ORDER.length]]} min-h-[68px] rounded-lg p-2 text-left flex flex-col justify-between shadow active:translate-y-0.5 disabled:opacity-60`}
+          >
+            <span className="font-semibold leading-tight line-clamp-2">{p.label}</span>
+            <span className="text-[11px] opacity-80">{p.end !== null ? `${clock(p.start)}–${clock(p.end)}` : `from ${clock(p.start)}`}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 let ytApiPromise: Promise<any> | null = null;
 function loadYouTubeApi(): Promise<any> {
@@ -146,7 +294,7 @@ function MediaPlayer({ playing }: { playing: Playing }) {
 }
 
 export default function VideoPlayerPanel({ customcuts }: { customcuts: boolean }) {
-  const [tab, setTab] = useState<'youtube' | 'customcuts'>('youtube');
+  const [tab, setTab] = useState<'board' | 'youtube' | 'customcuts'>(customcuts ? 'board' : 'youtube');
   const [link, setLink] = useState('');
   const [linkError, setLinkError] = useState<string | null>(null);
   const [recent, setRecent] = useState(readRecent);
@@ -194,6 +342,14 @@ export default function VideoPlayerPanel({ customcuts }: { customcuts: boolean }
   return (
     <div className="bg-gray-800 rounded-lg p-3 text-white">
       <div className="flex gap-2 mb-3">
+        {customcuts && (
+          <button
+            className={`px-3 py-1 rounded ${tab === 'board' ? 'bg-green-700' : 'bg-gray-700'}`}
+            onClick={() => setTab('board')}
+          >
+            Soundboard
+          </button>
+        )}
         <button
           className={`px-3 py-1 rounded ${tab === 'youtube' ? 'bg-red-600' : 'bg-gray-700'}`}
           onClick={() => setTab('youtube')}
@@ -205,7 +361,7 @@ export default function VideoPlayerPanel({ customcuts }: { customcuts: boolean }
             className={`px-3 py-1 rounded ${tab === 'customcuts' ? 'bg-blue-600' : 'bg-gray-700'}`}
             onClick={() => setTab('customcuts')}
           >
-            CustomCuts
+            Queue
           </button>
         )}
         {playing && (
@@ -224,6 +380,8 @@ export default function VideoPlayerPanel({ customcuts }: { customcuts: boolean }
           {playing.youtubeId ? <YouTubePlayer playing={playing} /> : <MediaPlayer playing={playing} />}
         </div>
       )}
+
+      {tab === 'board' && <Soundboard onPlayHere={setPlaying} />}
 
       {tab === 'youtube' && (
         <div>
