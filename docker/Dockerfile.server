@@ -54,5 +54,5 @@ ENV PORT=3001
 # required for the full flow. Document this.
 ENV ML_SERVICE_URL=http://localhost:3002
 
-EXPOSE 3001
+EXPOSE 3001 3443
 CMD ["node", "server/server.js"]

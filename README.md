@@ -45,6 +45,15 @@ the host's hotspot IP. Phones scan both, hand-photo upload works with no interne
 
 Stop the hotspot with `nmcli connection down Hotspot && nmcli connection delete Hotspot`.
 
+## Table Cam (iPhone video → game-play string)
+
+An iPhone on a stand watches the middle of a real table; the host's local card
+detector turns the cards hitting the table into a game-play string (`TPS1…`), and
+the phone can record the session (video + audio) to the host and/or the phone.
+Recordings made earlier with the Camera app can be uploaded and processed later.
+Each session has a shareable page on the host with the video synced to the
+string, plus a YouTube / CustomCuts video player. See [TABLE-CAM.md](TABLE-CAM.md).
+
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Lucide React icons

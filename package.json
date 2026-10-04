@@ -36,6 +36,8 @@
     "wifi": "bash scripts/start-hotspot.sh --serve",
     "wifi:stop": "bash scripts/start-hotspot.sh stop",
     "wifi:qr": "bash scripts/start-hotspot.sh --qr",
+    "table:cert": "bash scripts/make-table-cert.sh",
+    "test:table": "node server/tablePlay.test.js && node server/tableSessions.test.js",
     "dev": "concurrently \"npm run server\" \"npm start\"",
     "dev:full": "concurrently \"npm run server\" \"npm start\" \"npm run ml:server\" \"npm run label-studio\"",
     "build:ios": "cd ios && xcodebuild -project HeartsCardCapture.xcodeproj -scheme HeartsCardCapture -configuration Release -derivedDataPath ./build -destination generic/platform=iOS clean build",

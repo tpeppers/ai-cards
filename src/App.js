@@ -10,6 +10,12 @@ import ReplayPage from './components/ReplayPage.tsx';
 import SettingsPage from './components/SettingsPage.tsx';
 import MultiplayerPage from './components/MultiplayerPage.tsx';
 import TableAnalysis from './components/TableAnalysis.tsx';
+import TableCam from './components/TableCam.tsx';
+import { TableSessionList, TableSessionView } from './components/TableSessions.tsx';
+
+// '/table' is active on /table and /table/sessions, not on /table-analysis.
+const isActivePath = (pathname, to) =>
+  to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`);
 
 function NavDropdown({ label, items, openMenu, setOpenMenu }) {
   const ref = useRef(null);
@@ -27,7 +33,7 @@ function NavDropdown({ label, items, openMenu, setOpenMenu }) {
 
   const location = useLocation();
   const isActive = items.some(item =>
-    item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)
+    isActivePath(location.pathname, item.to)
   );
 
   return (
@@ -51,7 +57,7 @@ function NavDropdown({ label, items, openMenu, setOpenMenu }) {
               to={item.to}
               onClick={() => setOpenMenu(null)}
               className={`block px-4 py-2 transition-colors ${
-                (item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to))
+                isActivePath(location.pathname, item.to)
                   ? 'text-blue-300 bg-gray-600'
                   : 'hover:bg-gray-600 hover:text-blue-300'
               }`}
@@ -74,6 +80,7 @@ function NavBar() {
     { label: 'Hearts', to: '/hearts' },
     { label: 'Bid Whist', to: '/bidwhist' },
     { label: 'Multiplayer', to: '/multiplayer' },
+    { label: 'Table Cam', to: '/table' },
   ];
 
   const analysisItems = [
@@ -82,6 +89,7 @@ function NavBar() {
     { label: 'Compare', to: '/compare' },
     { label: 'Replay', to: '/replay' },
     { label: 'Table Analysis', to: '/table-analysis' },
+    { label: 'Table Sessions', to: '/table/sessions' },
   ];
 
   return (
@@ -130,6 +138,9 @@ function App() {
               <Route path="/replay" element={<ReplayPage />} />
               <Route path="/multiplayer" element={<MultiplayerPage />} />
               <Route path="/table-analysis" element={<TableAnalysis />} />
+              <Route path="/table" element={<TableCam />} />
+              <Route path="/table/sessions" element={<TableSessionList />} />
+              <Route path="/table/s/:id" element={<TableSessionView />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </div>

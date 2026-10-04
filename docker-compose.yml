@@ -23,6 +23,9 @@ services:
     container_name: ai-cards
     ports:
       - "3001:3001"
+      # Table Cam over HTTPS (iPhone live camera). Needs ./certs from
+      # `npm run table:cert` mounted below.
+      - "3443:3443"
     environment:
       # Where inside the container Game Mode zips are written.
       GAME_MODE_STORAGE: /data/games
@@ -34,4 +37,5 @@ services:
       # Host directory for persistent storage. Change the left side to
       # wherever you want long-term storage on your host machine.
       - ./game-mode-storage:/data
+      - ./certs:/app/certs:ro
     restart: unless-stopped

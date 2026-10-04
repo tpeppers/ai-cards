@@ -5,12 +5,17 @@ Loads YOLOv11 model and exposes /recognize endpoint.
 """
 
 import io
+import json
+import os
+import shutil
+import tempfile
 import time
 from pathlib import Path
 from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageOps
 
@@ -101,6 +106,7 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "POST /recognize": "Recognize cards in an uploaded image",
+            "POST /recognize-video": "Sample a video and stream per-frame detections (NDJSON)",
             "GET /health": "Health check endpoint"
         }
     }
@@ -214,8 +220,119 @@ async def recognize_cards(
         'cards': unique_cards,
         'totalDetections': len(detected_cards),
         'uniqueCards': len(unique_cards),
-        'processingTimeMs': processing_time
+        'processingTimeMs': processing_time,
+        # Every box, both corners of a card included, plus the image size
+        # the boxes are measured in (the table tracker places cards by them).
+        'detections': _frame_detections(results, confidence),
+        'imageWidth': img.width,
+        'imageHeight': img.height,
     }
+
+
+def _frame_detections(results, confidence):
+    """Raw per-box detections (no per-card dedup: the table tracker wants
+    both index corners of a card so it can find the card's centre)."""
+    out = []
+    for result in results:
+        boxes = result.boxes
+        for i in range(len(boxes)):
+            class_id = int(boxes.cls[i].item())
+            conf = float(boxes.conf[i].item())
+            if class_id not in CLASS_TO_ALPHA or conf < confidence:
+                continue
+            out.append({
+                'alpha': CLASS_TO_ALPHA[class_id],
+                'confidence': round(conf, 3),
+                'bbox': [round(x, 1) for x in boxes.xyxy[i].tolist()],
+            })
+    return out
+
+
+@app.post("/recognize-video")
+async def recognize_video(
+    video: UploadFile = File(...),
+    fps: Optional[float] = 3.0,
+    confidence: Optional[float] = 0.4,
+    max_side: Optional[int] = 1280,
+):
+    """
+    Sample a recorded table video at `fps` frames per second and stream one
+    JSON line per sampled frame:
+        {"t": seconds, "width": w, "height": h, "detections": [...]}
+    preceded by {"type": "meta", "duration": s, "frames": n} and followed by
+    {"type": "done"} (or {"type": "error", "error": ...}). Streaming keeps
+    long videos from tripping HTTP timeouts and lets the caller show progress.
+    """
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded.")
+    try:
+        import cv2
+    except ImportError:
+        raise HTTPException(status_code=503, detail="opencv-python is required for video (pip install opencv-python)")
+
+    fps = max(0.25, min(15.0, fps or 3.0))
+    confidence = max(0.05, min(0.99, confidence or 0.4))
+    max_side = max(320, min(3840, max_side or 1280))
+
+    suffix = os.path.splitext(video.filename or '')[1] or '.mp4'
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    try:
+        shutil.copyfileobj(video.file, tmp)
+    finally:
+        tmp.close()
+
+    cap = cv2.VideoCapture(tmp.name)
+    if not cap.isOpened():
+        os.unlink(tmp.name)
+        raise HTTPException(status_code=400, detail="Could not open video (try H.264: iPhone Settings > Camera > Formats > Most Compatible)")
+
+    src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    if src_fps <= 0 or src_fps > 240:
+        src_fps = 30.0
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    duration = total / src_fps if total > 0 else 0
+
+    def generate():
+        try:
+            yield json.dumps({'type': 'meta', 'duration': round(duration, 2),
+                              'frames': int(duration * fps) if duration else 0}) + "\n"
+            step = 1.0 / fps
+            next_t = 0.0
+            index = 0
+            while True:
+                ok = cap.grab()
+                if not ok:
+                    break
+                # Prefer the container's timestamp (variable frame rate is
+                # normal for phone recordings); fall back to frame count.
+                pos_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+                t = pos_ms / 1000.0 if pos_ms and pos_ms > 0 else index / src_fps
+                index += 1
+                if t + 1e-6 < next_t:
+                    continue
+                next_t = t + step
+                ok, frame = cap.retrieve()
+                if not ok or frame is None:
+                    continue
+                h, w = frame.shape[:2]
+                scale = min(1.0, max_side / float(max(h, w)))
+                if scale < 1.0:
+                    frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+                    h, w = frame.shape[:2]
+                results = model(frame, conf=confidence, verbose=False)
+                yield json.dumps({'t': round(t, 2), 'width': w, 'height': h,
+                                  'detections': _frame_detections(results, confidence)}) + "\n"
+            yield json.dumps({'type': 'done'}) + "\n"
+        except Exception as e:  # noqa: BLE001 - reported to the caller in-band
+            yield json.dumps({'type': 'error', 'error': str(e)}) + "\n"
+        finally:
+            cap.release()
+            try:
+                os.unlink(tmp.name)
+            except OSError:
+                pass
+
+    return StreamingResponse(generate(), media_type="application/x-ndjson")
 
 
 def main():

@@ -15,12 +15,23 @@ const labelStudio = require('./labelStudio');
 const { initMultiplayer } = require('./multiplayer');
 const gameMode = require('./gameMode');
 const { normalizeMlCards } = require('./mlCards');
+const { createTableSessions } = require('./tableSessions');
 
 // ML service configuration
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:3002';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+// Table Cam needs the phone's live camera, which iOS Safari only grants
+// to HTTPS pages. When a certificate exists (npm run table:cert), the
+// same app is also served over HTTPS on this port.
+const HTTPS_PORT = Number(process.env.HTTPS_PORT || 3443);
+const CERT_DIR = process.env.TABLE_CERT_DIR || path.join(__dirname, '../certs');
+const httpsKeyPath = process.env.TABLE_HTTPS_KEY || path.join(CERT_DIR, 'table-server.key');
+const httpsCertPath = process.env.TABLE_HTTPS_CERT || path.join(CERT_DIR, 'table-server.crt');
+const caCertPath = path.join(CERT_DIR, 'table-ca.crt');
+const httpsEnabled = process.env.TABLE_HTTPS !== '0'
+  && fs.existsSync(httpsKeyPath) && fs.existsSync(httpsCertPath);
 
 app.use(cors());
 app.use(express.json());
@@ -822,6 +833,23 @@ app.get('/api/recognize/health', async (req, res) => {
   }
 });
 
+// Table Cam: live/offline video of a real table -> game-play string.
+const tableSessions = createTableSessions({
+  storageDir: process.env.TABLE_STORAGE || path.join(gameMode.STORAGE_DIR, 'table-sessions'),
+  mlServiceUrl: ML_SERVICE_URL,
+  ports: { http: PORT, https: httpsEnabled ? HTTPS_PORT : null },
+});
+app.use('/api/table', tableSessions.router);
+
+// The CA that signed the HTTPS certificate, for installing on a phone
+// (iOS: open over plain HTTP, install the profile, then enable full trust
+// in Settings > General > About > Certificate Trust Settings).
+app.get('/table-ca.crt', (req, res) => {
+  if (!fs.existsSync(caCertPath)) return res.status(404).send('No CA certificate (run npm run table:cert)');
+  res.type('application/x-x509-ca-cert');
+  res.sendFile(caCertPath);
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -839,7 +867,7 @@ app.use((error, req, res, next) => {
 // SPA fallback: any non-/api GET that hasn't matched serves index.html
 // so React Router can handle client-side routes (/settings, /upload, etc.)
 if (hasBuild) {
-  app.get(/^(?!\/api\b|\/socket\.io\b|\/ios\b).*$/, (req, res) => {
+  app.get(/^(?!\/api\b|\/socket\.io\b|\/ios\b|\/table-ca\.crt$).*$/, (req, res) => {
     res.sendFile(path.join(buildDir, 'index.html'));
   });
 }
@@ -847,6 +875,16 @@ if (hasBuild) {
 const server = http.createServer(app);
 initMultiplayer(server);
 gameMode.startCleanupTimer();
+
+if (httpsEnabled) {
+  const httpsServer = require('https').createServer({
+    key: fs.readFileSync(httpsKeyPath),
+    cert: fs.readFileSync(httpsCertPath),
+  }, app);
+  httpsServer.listen(HTTPS_PORT, () => {
+    console.log(`Table Cam (HTTPS, live camera): https://localhost:${HTTPS_PORT}/table`);
+  });
+}
 
 server.listen(PORT, () => {
   console.log(`Hearts Card Capture API server running on port ${PORT}`);
